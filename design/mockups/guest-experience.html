@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guest experience — invitation, RSVP, pass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --forest:#14300F;
+  --forest-deep:#0C1D08;
+  --ivory:#F7F4EC;
+  --gold:#C9A961;
+  --page:#FAFAF7;
+  --surface:#FFFFFF;
+  --ink:#171A16;
+  --muted:#5F665C;
+  --hair:#E5E7E2;
+  --green:#2F6B1C;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#E9E9E3;
+  font-family:Inter,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  color:var(--ink);
+  display:flex;justify-content:center;
+  padding:0;
+}
+.frame{
+  width:100%;max-width:420px;min-height:100vh;
+  background:var(--page);position:relative;overflow-x:hidden;
+}
+@media (min-width:520px){
+  body{padding:32px 16px}
+  .frame{min-height:auto;border-radius:26px;box-shadow:0 24px 60px rgba(20,48,15,.18);overflow:hidden}
+}
+
+/* ============ HERO ============ */
+.hero{
+  background:
+    radial-gradient(130% 90% at 50% 8%, #1B3D14 0%, var(--forest) 45%, var(--forest-deep) 100%);
+  color:var(--ivory);
+  padding:64px 30px 54px;
+  text-align:center;position:relative;
+}
+.hero::after{
+  content:"";position:absolute;inset:14px;
+  border:1px solid rgba(201,169,97,.26);
+  border-radius:4px;pointer-events:none;
+}
+.forwho{
+  font-size:10.5px;font-weight:500;letter-spacing:.24em;text-transform:uppercase;
+  color:rgba(247,244,236,.55);margin-bottom:38px;
+}
+.forwho b{color:var(--gold);font-weight:500}
+
+.names{font-family:"Cormorant Garamond",Georgia,serif;font-weight:300;line-height:.94}
+.names .n{font-size:60px;letter-spacing:.01em;display:block}
+.names .amp{
+  display:block;font-size:34px;font-style:italic;color:var(--gold);
+  margin:6px 0 4px;font-weight:300;
+}
+.rule{
+  width:52px;height:1px;background:var(--gold);opacity:.65;
+  margin:32px auto 30px;
+}
+.invited{
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:19px;font-style:italic;font-weight:300;
+  color:rgba(247,244,236,.82);line-height:1.5;
+}
+.when{margin-top:34px}
+.when .d{
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:26px;font-weight:400;letter-spacing:.02em;
+}
+.when .p{
+  margin-top:9px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(247,244,236,.55);
+}
+.cue{
+  margin-top:44px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:rgba(247,244,236,.4);
+}
+
+/* stagger */
+.fade{opacity:0;transform:translateY(9px);animation:up .8s cubic-bezier(.2,.7,.3,1) forwards}
+.fade:nth-child(1){animation-delay:.05s}
+.fade:nth-child(2){animation-delay:.22s}
+.fade:nth-child(3){animation-delay:.40s}
+.fade:nth-child(4){animation-delay:.56s}
+.fade:nth-child(5){animation-delay:.70s}
+.fade:nth-child(6){animation-delay:.84s}
+@keyframes up{to{opacity:1;transform:none}}
+
+/* ============ TABS ============ */
+.tabs{
+  position:sticky;top:0;z-index:20;display:flex;
+  background:rgba(250,250,247,.94);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--hair);
+}
+.tab{
+  flex:1;background:none;border:0;cursor:pointer;font-family:inherit;
+  padding:16px 4px 14px;font-size:12px;font-weight:500;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);position:relative;
+}
+.tab[aria-selected="true"]{color:var(--forest)}
+.tab[aria-selected="true"]::after{
+  content:"";position:absolute;left:22%;right:22%;bottom:0;height:2px;background:var(--forest);
+}
+.tab:focus-visible{outline:2px solid var(--green);outline-offset:-3px}
+
+.panel{display:none;padding:34px 26px 46px}
+.panel.on{display:block}
+
+/* ============ SHARED ============ */
+.sec{
+  font-size:10.5px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:16px;
+}
+.card{
+  background:var(--surface);border:1px solid var(--hair);
+  border-radius:16px;padding:22px;
+}
+.card + .card{margin-top:14px}
+
+.line{display:flex;justify-content:space-between;gap:16px;padding:13px 0;border-bottom:1px solid var(--hair)}
+.line:last-child{border-bottom:0;padding-bottom:0}
+.line:first-child{padding-top:0}
+.line dt{font-size:13.5px;color:var(--muted);flex:0 0 auto}
+.line dd{font-size:14.5px;font-weight:500;text-align:right}
+
+.serif{font-family:"Cormorant Garamond",Georgia,serif;font-weight:400}
+
+.btn{
+  display:block;width:100%;border:0;cursor:pointer;font-family:inherit;
+  background:var(--forest);color:var(--ivory);
+  font-size:15px;font-weight:600;padding:17px;border-radius:12px;
+  margin-top:20px;letter-spacing:.01em;
+}
+.btn:hover{background:#1B3D14}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--hair);margin-top:9px}
+.btn.ghost:hover{background:#F2F2ED}
+.btn:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+.maplink{
+  display:inline-block;margin-top:14px;font-size:13.5px;font-weight:500;
+  color:var(--green);text-decoration:none;border-bottom:1px solid rgba(47,107,28,.3);padding-bottom:1px;
+}
+
+/* ============ RSVP ============ */
+.q{
+  font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:28px;font-weight:400;line-height:1.25;letter-spacing:.01em;
+}
+.qsub{font-size:14px;color:var(--muted);margin-top:10px;line-height:1.55}
+
+.counts{display:flex;gap:8px;margin-top:24px}
+.ct{
+  flex:1;aspect-ratio:1;border-radius:13px;cursor:pointer;font-family:inherit;
+  border:1.5px solid var(--hair);background:var(--surface);
+  font-size:21px;font-weight:500;color:var(--ink);
+}
+.ct:hover{border-color:#C5CCBF}
+.ct[aria-pressed="true"]{background:var(--forest);color:var(--ivory);border-color:var(--forest)}
+.ct:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+
+.done{text-align:center;padding:14px 0 4px}
+.done .mark{
+  width:46px;height:46px;border-radius:50%;background:var(--forest);color:var(--ivory);
+  display:grid;place-items:center;margin:0 auto 20px;font-size:19px;
+}
+.done h3{font-family:"Cormorant Garamond",Georgia,serif;font-size:30px;font-weight:400;letter-spacing:.01em}
+.done p{font-size:14.5px;color:var(--muted);margin-top:11px;line-height:1.6}
+
+/* ============ PASS ============ */
+.pass{
+  background:var(--surface);border-radius:20px;overflow:hidden;
+  border:1px solid var(--hair);
+  box-shadow:0 10px 34px rgba(20,48,15,.09);
+}
+.pass-top{
+  background:var(--forest);color:var(--ivory);padding:24px 22px 22px;text-align:center;
+  position:relative;
+}
+.pass-top::after{
+  content:"";position:absolute;left:18px;right:18px;top:11px;bottom:11px;
+  border:1px solid rgba(201,169,97,.28);border-radius:3px;pointer-events:none;
+}
+.pass-top .ev{
+  font-family:"Cormorant Garamond",Georgia,serif;font-size:27px;font-weight:300;letter-spacing:.02em;
+}
+.pass-top .dt{
+  margin-top:7px;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(247,244,236,.6);
+}
+
+.perf{
+  height:20px;background:var(--forest);position:relative;
+}
+.perf::before,.perf::after{
+  content:"";position:absolute;top:-10px;width:20px;height:20px;border-radius:50%;background:var(--page);
+}
+.perf::before{left:-10px}
+.perf::after{right:-10px}
+.perf .dash{
+  position:absolute;left:14px;right:14px;top:9px;height:1px;
+  background:repeating-linear-gradient(90deg,rgba(247,244,236,.34) 0 5px,transparent 5px 11px);
+}
+
+.pass-body{padding:26px 22px 24px;text-align:center}
+.qr{
+  width:186px;height:186px;margin:0 auto;display:block;
+}
+.admits{
+  display:inline-block;margin-top:20px;
+  font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+  background:#EDF3EA;color:var(--green);padding:8px 15px;border-radius:8px;
+}
+.pass-who{
+  margin-top:20px;font-family:"Cormorant Garamond",Georgia,serif;
+  font-size:27px;font-weight:400;letter-spacing:.01em;
+}
+.pass-meta{font-size:13.5px;color:var(--muted);margin-top:7px}
+.pass-foot{
+  border-top:1px solid var(--hair);margin-top:22px;padding-top:17px;
+  font-size:12.5px;color:var(--muted);line-height:1.5;
+}
+.table-chip{
+  margin-top:16px;display:inline-block;
+  font-family:"Cormorant Garamond",Georgia,serif;font-size:22px;
+  border:1px solid var(--hair);border-radius:11px;padding:9px 20px;
+}
+.table-chip b{font-family:Inter,sans-serif;font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px}
+
+.note{
+  margin-top:22px;font-size:13px;line-height:1.65;color:var(--muted);text-align:center;
+}
+
+@media (prefers-reduced-motion:reduce){
+  .fade{animation:none;opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <!-- ================= HERO ================= -->
+  <header class="hero">
+    <div class="forwho fade">For <b>Mr &amp; Mrs Adeyemi</b></div>
+    <div class="names fade">
+      <span class="n">Ahmed</span>
+      <span class="amp">&amp;</span>
+      <span class="n">Aisha</span>
+    </div>
+    <div class="rule fade"></div>
+    <p class="invited fade">request the pleasure of<br>your company</p>
+    <div class="when fade">
+      <div class="d serif">Saturday, 12 December 2026</div>
+      <div class="p">Ikoyi · Lagos</div>
+    </div>
+    <div class="cue fade">Scroll for details</div>
+  </header>
+
+  <!-- ================= TABS ================= -->
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true"  onclick="show(0,this)">Invitation</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="show(1,this)">Details</button>
+    <button class="tab" role="tab" aria-selected="false" onclick="show(2,this)">My pass</button>
+  </nav>
+
+  <!-- ---------- 0 · RSVP ---------- -->
+  <section class="panel on" id="p0">
+    <div id="ask">
+      <p class="sec">Your reply</p>
+      <p class="q">You're invited for four.<br>How many will come?</p>
+      <p class="qsub">Ahmed and Aisha would love to know before 1 December, so the caterers can plan.</p>
+
+      <div class="counts">
+        <button class="ct" aria-pressed="false" onclick="pick(this,1)">1</button>
+        <button class="ct" aria-pressed="false" onclick="pick(this,2)">2</button>
+        <button class="ct" aria-pressed="false" onclick="pick(this,3)">3</button>
+        <button class="ct" aria-pressed="true"  onclick="pick(this,4)">4</button>
+      </div>
+
+      <button class="btn" onclick="reply()">Confirm 4 guests</button>
+      <button class="btn ghost" onclick="decline()">We can't make it</button>
+    </div>
+
+    <div id="thanks" style="display:none">
+      <div class="done">
+        <div class="mark">✓</div>
+        <h3 id="thx-h">You're confirmed</h3>
+        <p id="thx-p">Four of you, on 12 December. Your pass is ready.</p>
+      </div>
+      <button class="btn" onclick="show(2,document.querySelectorAll('.tab')[2])">Open my pass</button>
+      <button class="btn ghost" onclick="reopen()">Change my reply</button>
+    </div>
+  </section>
+
+  <!-- ---------- 1 · DETAILS ---------- -->
+  <section class="panel" id="p1">
+    <p class="sec">The day</p>
+    <div class="card">
+      <dl>
+        <div class="line"><dt>Nikkah</dt><dd>11:00 AM</dd></div>
+        <div class="line"><dt>Reception</dt><dd>4:00 PM</dd></div>
+        <div class="line"><dt>Doors close</dt><dd>6:30 PM</dd></div>
+      </dl>
+    </div>
+
+    <p class="sec" style="margin-top:30px">Where</p>
+    <div class="card">
+      <div class="serif" style="font-size:22px">Oriental Hotel</div>
+      <div style="font-size:14px;color:var(--muted);margin-top:6px;line-height:1.55">
+        3 Lekki–Epe Expressway<br>Victoria Island, Lagos
+      </div>
+      <a class="maplink" href="#">Open in Maps</a>
+    </div>
+
+    <p class="sec" style="margin-top:30px">Notes from the couple</p>
+    <div class="card">
+      <div style="font-size:14.5px;line-height:1.7">
+        Aso-ebi colours are emerald and gold. Parking fills quickly after 3 PM — the Ozumba gate is usually clearer.
+      </div>
+    </div>
+
+    <p class="note">Bring the pass on your phone. Screenshots work.</p>
+  </section>
+
+  <!-- ---------- 2 · PASS ---------- -->
+  <section class="panel" id="p2">
+    <div class="pass">
+      <div class="pass-top">
+        <div class="ev">Ahmed &amp; Aisha</div>
+        <div class="dt">12 December 2026 · Ikoyi</div>
+      </div>
+      <div class="perf"><div class="dash"></div></div>
+      <div class="pass-body">
+        <svg class="qr" id="qr" viewBox="0 0 29 29" shape-rendering="crispEdges" role="img" aria-label="Entry code"></svg>
+        <div class="admits" id="admits">Admits 4</div>
+        <div class="pass-who">Mr &amp; Mrs Adeyemi</div>
+        <div class="pass-meta">Groom's Family</div>
+        <div class="table-chip"><b>Table</b>12</div>
+        <div class="pass-foot">Show this at the gate.<br>Works without signal.</div>
+      </div>
+    </div>
+    <p class="note">This pass is yours whether or not you've replied — but replying helps the couple plan.</p>
+  </section>
+
+</div>
+
+<script>
+/* ---- tabs ---- */
+function show(i,el){
+  document.querySelectorAll('.panel').forEach((p,n)=>p.classList.toggle('on',n===i));
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected','false'));
+  el.setAttribute('aria-selected','true');
+  document.querySelector('.tabs').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ---- rsvp ---- */
+let count=4;
+function pick(el,n){
+  count=n;
+  document.querySelectorAll('.ct').forEach(c=>c.setAttribute('aria-pressed','false'));
+  el.setAttribute('aria-pressed','true');
+  document.querySelector('#ask .btn').textContent =
+    n===1 ? 'Confirm 1 guest' : 'Confirm '+n+' guests';
+}
+const word=['','One','Two','Three','Four'];
+function reply(){
+  document.getElementById('ask').style.display='none';
+  document.getElementById('thanks').style.display='block';
+  document.getElementById('thx-h').textContent="You're confirmed";
+  document.getElementById('thx-p').textContent=
+    word[count]+' of you, on 12 December. Your pass is ready.';
+  document.getElementById('admits').textContent='Admits '+count;
+}
+function decline(){
+  document.getElementById('ask').style.display='none';
+  document.getElementById('thanks').style.display='block';
+  document.getElementById('thx-h').textContent='Thank you for letting us know';
+  document.getElementById('thx-p').textContent='Ahmed and Aisha will miss you. You can change this any time before 1 December.';
+}
+function reopen(){
+  document.getElementById('ask').style.display='block';
+  document.getElementById('thanks').style.display='none';
+}
+
+/* ---- placeholder code graphic ---- */
+(function(){
+  const N=29, svg=document.getElementById('qr');
+  let s=20261212;
+  const rnd=()=>{s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff};
+  const on=[];
+  for(let y=0;y<N;y++){on[y]=[];for(let x=0;x<N;x++)on[y][x]=rnd()>0.53}
+  const finder=(ox,oy)=>{
+    for(let y=0;y<7;y++)for(let x=0;x<7;x++){
+      const edge=(x===0||x===6||y===0||y===6), core=(x>1&&x<5&&y>1&&y<5);
+      on[oy+y][ox+x]=edge||core;
+    }
+    for(let y=-1;y<8;y++)for(let x=-1;x<8;x++){
+      const gy=oy+y, gx=ox+x;
+      if(gy<0||gx<0||gy>=N||gx>=N) continue;
+      if(y===-1||y===7||x===-1||x===7) on[gy][gx]=false;
+    }
+  };
+  finder(0,0); finder(N-7,0); finder(0,N-7);
+  let d='';
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++) if(on[y][x]) d+=`M${x} ${y}h1v1h-1z`;
+  svg.innerHTML=`<rect width="29" height="29" fill="#fff"/><path d="${d}" fill="#14300F"/>`;
+})();
+</script>
+</body>
+</html>

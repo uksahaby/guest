@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Everyone you invited. Nobody you didn't.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --forest:#14300F;--forest-deep:#0C1D08;--forest-mid:#1B3D14;
+  --ivory:#F7F4EC;--gold:#C9A961;
+  --page:#FAFAF7;--surface:#FFF;--surface-2:#F4F4EF;
+  --line:#E5E7E2;--line-soft:#EFEFEA;
+  --ink:#171A16;--ink-2:#5F665C;--ink-3:#8A9187;
+  --p600:#2F6B1C;--p100:#E8F1E4;--p50:#F5F9F3;
+  --ok:#4ADE80;--hold:#FBBF24;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--page);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+.narrow{max-width:760px;margin:0 auto}
+
+.serif{font-family:"Cormorant Garamond",Georgia,serif;font-weight:300;letter-spacing:.005em}
+
+/* ---------- nav ---------- */
+.nav{position:sticky;top:0;z-index:50;background:rgba(250,250,247,.93);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:14px;height:62px}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink)}
+.brand .m{width:27px;height:27px;border-radius:8px;background:var(--forest);color:var(--ivory);display:grid;place-items:center;font-size:13px;font-weight:700}
+.brand span{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.nav .sp{flex:1}
+.nav a.lnk{color:var(--ink-2);text-decoration:none;font-size:14px;font-weight:500}
+.nav a.lnk:hover{color:var(--ink)}
+.nav .hideS{display:none}
+@media(min-width:760px){.nav .hideS{display:inline}}
+
+.btn{display:inline-block;border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  font:600 14px Inter,sans-serif;padding:11px 17px;border-radius:11px;cursor:pointer;text-decoration:none}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--forest);color:var(--ivory);border-color:var(--forest)}
+.btn.pri:hover{background:var(--forest-mid)}
+.btn.lg{padding:15px 26px;font-size:15.5px;border-radius:13px}
+.btn.ivory{background:var(--ivory);color:var(--forest);border-color:var(--ivory)}
+.btn.ivory:hover{background:#fff}
+.btn.outline-i{background:transparent;color:var(--ivory);border-color:rgba(247,244,236,.34)}
+.btn.outline-i:hover{background:rgba(247,244,236,.09)}
+.btn:focus-visible{outline:2px solid var(--p600);outline-offset:2px}
+
+/* ---------- hero ---------- */
+.hero{background:radial-gradient(125% 95% at 50% 0%, var(--forest-mid) 0%, var(--forest) 44%, var(--forest-deep) 100%);
+  color:var(--ivory);padding:76px 0 84px;text-align:center;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;left:18px;right:18px;top:18px;bottom:18px;
+  border:1px solid rgba(201,169,97,.2);border-radius:6px;pointer-events:none}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:rgba(247,244,236,.5)}
+.hero h1{font-size:clamp(40px,8.4vw,72px);line-height:1.02;margin-top:26px}
+.hero h1 em{font-style:italic;color:var(--gold);display:block}
+.hero .lead{font-size:17px;line-height:1.65;color:rgba(247,244,236,.8);max-width:520px;margin:26px auto 0}
+.hero .cta{display:flex;gap:11px;justify-content:center;margin-top:34px;flex-wrap:wrap}
+.hero .fine{font-size:13px;color:rgba(247,244,236,.5);margin-top:22px}
+.rulegold{width:46px;height:1px;background:var(--gold);opacity:.6;margin:0 auto}
+
+/* ---------- sections ---------- */
+section{padding:74px 0}
+.kicker{font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--p600);text-align:center}
+h2.big{font-size:clamp(29px,5vw,42px);line-height:1.14;text-align:center;margin-top:14px}
+.sublede{font-size:16.5px;color:var(--ink-2);text-align:center;max-width:560px;margin:16px auto 0;line-height:1.65}
+
+/* problem */
+.probs{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:14px;margin-top:44px}
+.prob{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px}
+.prob .n{font-size:12px;font-weight:600;color:var(--ink-3);letter-spacing:.1em}
+.prob h3{font-size:17.5px;font-weight:600;margin-top:12px;letter-spacing:-.015em;line-height:1.35}
+.prob p{font-size:14.5px;color:var(--ink-2);margin-top:9px;line-height:1.62}
+
+/* steps */
+.steps{margin-top:48px;display:grid;gap:2px;background:var(--line);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+@media(min-width:800px){.steps{grid-template-columns:1fr 1fr}}
+.stp{background:var(--surface);padding:28px 26px}
+.stp .n{font-family:"Cormorant Garamond",serif;font-size:34px;color:var(--gold);line-height:1}
+.stp h3{font-size:18px;font-weight:600;margin-top:10px;letter-spacing:-.015em}
+.stp p{font-size:14.5px;color:var(--ink-2);margin-top:9px;line-height:1.65}
+
+/* ---------- signature: the gate ---------- */
+.gate{background:var(--forest-deep);color:var(--ivory)}
+.gate .kicker{color:var(--gold)}
+.gate h2.big{color:var(--ivory)}
+.gate .sublede{color:rgba(247,244,236,.7)}
+.gatecard{max-width:430px;margin:46px auto 0;background:#16221A;border:1px solid #253326;border-radius:20px;overflow:hidden}
+.gbar{height:5px;background:var(--ok)}
+.gbody{padding:26px 24px}
+.gstat{font-size:11.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ok);display:flex;align-items:center;gap:9px}
+.gstat .tick{width:19px;height:19px;border-radius:50%;background:var(--ok);color:#0A2413;display:grid;place-items:center;font-size:11px;font-weight:700}
+.gwho{font-size:31px;font-weight:600;letter-spacing:-.03em;margin-top:15px;line-height:1.1;font-family:Inter,sans-serif}
+.gmeta{font-size:14px;color:rgba(247,244,236,.55);margin-top:9px}
+.gpips{display:flex;align-items:center;gap:7px;margin-top:20px;padding-top:19px;border-top:1px solid rgba(255,255,255,.1)}
+.gp{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.25)}
+.gp.in{background:var(--ok);border-color:var(--ok)}
+.gpips b{font-size:14.5px;font-weight:600;margin-left:8px}
+.gpips b span{color:rgba(247,244,236,.55);font-weight:400}
+.gpoints{display:grid;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));gap:26px;margin-top:52px}
+.gpt h3{font-size:17px;font-weight:600;letter-spacing:-.015em}
+.gpt p{font-size:14.5px;color:rgba(247,244,236,.62);margin-top:9px;line-height:1.65}
+
+/* feature rows */
+.rows{margin-top:48px;display:grid;gap:14px}
+.frow{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:30px 28px}
+@media(min-width:800px){.frow{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center}}
+.frow h3{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.25}
+.frow p{font-size:15.5px;color:var(--ink-2);margin-top:13px;line-height:1.7}
+.chatbox{background:#E7F7EC;border:1px solid #BFE8CD;border-radius:16px;padding:17px 18px;font-size:14px;line-height:1.62;color:#0E3A1E;white-space:pre-line;margin-top:20px}
+@media(min-width:800px){.chatbox{margin-top:0}}
+.offbox{background:var(--forest-deep);border-radius:16px;padding:22px;color:var(--ivory);margin-top:20px}
+@media(min-width:800px){.offbox{margin-top:0}}
+.offrow{display:flex;align-items:center;gap:11px;padding:9px 0;font-size:14px}
+.offrow .t{width:18px;height:18px;border-radius:50%;background:var(--ok);color:#0A2413;display:grid;place-items:center;font-size:10px;font-weight:700;flex:0 0 auto}
+.offrow .t.w{background:transparent;border:1.5px solid var(--hold);color:var(--hold)}
+.offrow .r{margin-left:auto;font-size:12.5px;color:rgba(247,244,236,.5)}
+
+/* pricing */
+.ptable{margin-top:44px;background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.prow{display:flex;align-items:center;gap:16px;padding:19px 24px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+.prow:last-child{border-bottom:0}
+.prow.hl{background:var(--p50)}
+.prow .cap{flex:1;min-width:150px}
+.prow .cap b{font-size:16.5px;font-weight:600;display:block}
+.prow .cap span{font-size:13.5px;color:var(--ink-3)}
+.prow .amt{font-size:19px;font-weight:600;letter-spacing:-.02em;text-align:right;min-width:88px}
+.prow .head{font-size:13px;color:var(--ink-3);min-width:74px;text-align:right}
+.pnote{font-size:14.5px;color:var(--ink-2);text-align:center;margin-top:22px;line-height:1.7}
+.incl{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:26px}
+.incl span{font-size:13px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:7px 12px}
+
+/* institutions */
+.inst{background:var(--surface-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.instgrid{display:grid;gap:24px;margin-top:40px}
+@media(min-width:820px){.instgrid{grid-template-columns:1.15fr 1fr;gap:44px;align-items:center}}
+.instlist{display:grid;gap:2px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.instrow{background:var(--surface);padding:16px 20px;display:flex;gap:13px;align-items:flex-start}
+.instrow .ic{color:var(--p600);font-size:13px;margin-top:3px}
+.instrow b{font-size:14.5px;font-weight:600;display:block}
+.instrow p{font-size:13.5px;color:var(--ink-2);margin-top:3px;line-height:1.6}
+
+/* faq */
+.faq{margin-top:40px;border-top:1px solid var(--line)}
+details{border-bottom:1px solid var(--line)}
+summary{padding:20px 2px;font-size:16.5px;font-weight:500;cursor:pointer;list-style:none;display:flex;gap:16px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";margin-left:auto;color:var(--ink-3);font-size:19px;font-weight:400}
+details[open] summary::after{content:"–"}
+details p{font-size:15px;color:var(--ink-2);padding:0 2px 22px;line-height:1.72;max-width:640px}
+
+/* final */
+.final{background:radial-gradient(120% 100% at 50% 0%, var(--forest-mid) 0%, var(--forest) 50%, var(--forest-deep) 100%);
+  color:var(--ivory);text-align:center;position:relative}
+.final::after{content:"";position:absolute;left:18px;right:18px;top:18px;bottom:18px;border:1px solid rgba(201,169,97,.2);border-radius:6px;pointer-events:none}
+.final h2{font-size:clamp(31px,5.6vw,50px);line-height:1.1}
+.final p{font-size:16.5px;color:rgba(247,244,236,.72);margin-top:18px}
+
+/* footer */
+footer{background:var(--page);padding:44px 0 56px;border-top:1px solid var(--line)}
+.fgrid{display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start}
+.fgrid .sp{flex:1}
+.fcol h4{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
+.fcol a{display:block;font-size:14px;color:var(--ink-2);text-decoration:none;padding:4px 0}
+.fcol a:hover{color:var(--ink)}
+.fbot{margin-top:34px;padding-top:22px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap}
+.fbot .sp{flex:1}
+
+.newstrip{background:var(--p50);border:1px solid var(--p100);border-radius:14px;padding:15px 18px;margin-top:44px;text-align:center;font-size:14.5px;color:var(--ink-2);line-height:1.65}
+.newstrip b{color:var(--forest)}
+</style>
+</head>
+<body>
+
+<nav class="nav"><div class="wrap">
+  <a class="brand" href="#"><div class="m">◈</div><span>Working name</span></a>
+  <div class="sp"></div>
+  <a class="lnk hideS" href="#how">How it works</a>
+  <a class="lnk hideS" href="#price">Pricing</a>
+  <a class="lnk hideS" href="#inst">For organisations</a>
+  <a class="lnk" href="#">Log in</a>
+  <a class="btn pri" href="#">Create your event</a>
+</div></nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">For Nigerian weddings</div>
+  <h1 class="serif">Everyone you invited.<em>Nobody you didn't.</em></h1>
+  <p class="lead">Send your invitations on WhatsApp, let each family reply, and check every guest in at the gate with a scan.</p>
+  <div class="cta">
+    <a class="btn ivory lg" href="#">Create your event free</a>
+    <a class="btn outline-i lg" href="#how">See how it works</a>
+  </div>
+  <p class="fine">Your first 150 guests are free · No card needed</p>
+</div></header>
+
+<!-- ================= PROBLEM ================= -->
+<section><div class="wrap">
+  <div class="kicker">The gate on the day</div>
+  <h2 class="big serif">You planned for 400.<br>600 turned up.</h2>
+  <p class="sublede">Nigerian weddings are generous by nature. The trouble is that generosity meets a caterer who counted plates, and a hall with a fire limit.</p>
+
+  <div class="probs">
+    <div class="prob"><div class="n">01</div>
+      <h3>The list lives in four places</h3>
+      <p>A WhatsApp group with your sisters, a notebook, an old spreadsheet, and your mother's memory. Nobody knows the real number.</p></div>
+    <div class="prob"><div class="n">02</div>
+      <h3>Printed cards get passed around</h3>
+      <p>One card, one family — in theory. In practice it's photographed and forwarded, and you find out at the door.</p></div>
+    <div class="prob"><div class="n">03</div>
+      <h3>Your uncle is on the gate with a biro</h3>
+      <p>Searching 400 names on paper while a queue builds behind, arguing with people he half recognises.</p></div>
+  </div>
+</div></section>
+
+<!-- ================= HOW ================= -->
+<section id="how" style="padding-top:0"><div class="wrap">
+  <div class="kicker">How it works</div>
+  <h2 class="big serif">Four things, in order</h2>
+
+  <div class="steps">
+    <div class="stp"><div class="n">1</div>
+      <h3>Build your list by family</h3>
+      <p>Not 512 names — 186 invitations. "Mr &amp; Mrs Adeyemi, admits 4." Import the spreadsheet you already have, or type them in. It's free to build a list of any size.</p></div>
+    <div class="stp"><div class="n">2</div>
+      <h3>Send on WhatsApp</h3>
+      <p>Each family gets their own link, sent from your own WhatsApp. They open it, see a proper invitation, and tell you how many are coming.</p></div>
+    <div class="stp"><div class="n">3</div>
+      <h3>Everyone gets a pass</h3>
+      <p>A code on their phone, tied to that family and that wedding alone. Screenshots are fine. Nobody downloads an app.</p></div>
+    <div class="stp"><div class="n">4</div>
+      <h3>Scan them in</h3>
+      <p>Your ushers scan with their own phones. You watch the numbers climb from wherever you're standing.</p></div>
+  </div>
+</div></section>
+
+<!-- ================= SIGNATURE: THE GATE ================= -->
+<section class="gate"><div class="wrap">
+  <div class="kicker">The part nobody else gets right</div>
+  <h2 class="big serif">A family of four<br>doesn't arrive at once</h2>
+  <p class="sublede">Most systems give every person a separate code, then treat a second scan as fraud. Ours knows the Adeyemis were invited for four, three have walked in, and one is still parking.</p>
+
+  <div class="gatecard">
+    <div class="gbar"></div>
+    <div class="gbody">
+      <div class="gstat"><span class="tick">✓</span>3 of 4 admitted</div>
+      <div class="gwho">Mr &amp; Mrs Adeyemi</div>
+      <div class="gmeta">Groom's Family · Table 12</div>
+      <div class="gpips">
+        <span class="gp in"></span><span class="gp in"></span><span class="gp in"></span><span class="gp"></span>
+        <b>1 still to come <span>· pass stays active</span></b>
+      </div>
+    </div>
+  </div>
+
+  <div class="gpoints">
+    <div class="gpt"><h3>No plus-one admin</h3>
+      <p>You never tick a box marked "plus one". You write how many the invitation admits, and that's the whole idea.</p></div>
+    <div class="gpt"><h3>Extra cousin at the gate?</h3>
+      <p>Your usher lets them in and you see it happen on your phone. Nobody is turned away in front of the family.</p></div>
+    <div class="gpt"><h3>Every scan recorded</h3>
+      <p>Who came, when, through which gate, and who was turned away. You get the whole story the next morning.</p></div>
+  </div>
+</div></section>
+
+<!-- ================= FEATURES ================= -->
+<section><div class="wrap">
+  <div class="rows">
+
+    <div class="frow">
+      <div>
+        <h3>Sent where your guests already are</h3>
+        <p>No email addresses to chase. Each family's invitation opens in your own WhatsApp with the message written and their personal link attached — you just press send.</p>
+      </div>
+      <div class="chatbox">Mr &amp; Mrs Adeyemi — you're invited to the wedding of Ahmed &amp; Aisha on Saturday 12 December at Oriental Hotel, Victoria Island.
+
+Your invitation admits 4.
+
+Open it here to reply and get your entry pass:
+gtfd.ng/a9k2mv</div>
+    </div>
+
+    <div class="frow">
+      <div>
+        <h3>The hall has no network. It doesn't matter.</h3>
+        <p>Your ushers download the guest list before doors open. Scanning carries on with no signal at all, and everything syncs the moment a phone finds the network again.</p>
+      </div>
+      <div class="offbox">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:rgba(247,244,236,.45);margin-bottom:8px">Main Gate · Musa</div>
+        <div class="offrow"><span class="t">✓</span>Guest list downloaded<span class="r">512</span></div>
+        <div class="offrow"><span class="t">✓</span>Entry keys stored<span class="r">Ready</span></div>
+        <div class="offrow"><span class="t w">!</span>No signal — still scanning<span class="r">7 queued</span></div>
+      </div>
+    </div>
+
+    <div class="frow">
+      <div>
+        <h3>Your guests never install anything</h3>
+        <p>They tap a link. It opens in whatever browser their phone already has — old iPhone, cheap Android, doesn't matter. They reply, they save the pass, they show it at the gate.</p>
+      </div>
+      <div>
+        <p style="font-size:15.5px;color:var(--ink-2);line-height:1.7">And they never pay a naira. Your guests should not be asked for money to attend your wedding, so there is no charge to them at any point.</p>
+      </div>
+    </div>
+
+  </div>
+</div></section>
+
+<!-- ================= PRICING ================= -->
+<section id="price" style="background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+<div class="wrap">
+  <div class="kicker">Pricing</div>
+  <h2 class="big serif">One payment, for your wedding</h2>
+  <p class="sublede">Not a subscription. Nothing renews, nothing is charged again, and you can build your whole guest list before you decide.</p>
+
+  <div class="ptable narrow">
+    <div class="prow"><div class="cap"><b>Free</b><span>Try the whole thing</span></div><div class="head">150 guests</div><div class="amt">₦0</div></div>
+    <div class="prow"><div class="cap"><b>Small</b><span>An intimate wedding</span></div><div class="head">300 guests</div><div class="amt">₦7,500</div></div>
+    <div class="prow hl"><div class="cap"><b>Standard</b><span>Most Nigerian weddings</span></div><div class="head">600 guests</div><div class="amt">₦15,000</div></div>
+    <div class="prow"><div class="cap"><b>Large</b><span>A full hall</span></div><div class="head">1,200 guests</div><div class="amt">₦25,000</div></div>
+    <div class="prow"><div class="cap"><b>Grand</b><span>The whole town is coming</span></div><div class="head">2,500 guests</div><div class="amt">₦40,000</div></div>
+  </div>
+
+  <p class="pnote narrow">Roughly the cost of two or three plates of food, for the one part of the day where a mistake is visible to everyone.</p>
+
+  <div class="incl">
+    <span>Every feature on every plan</span><span>Unlimited ushers</span><span>Unlimited gates</span>
+    <span>Offline check-in</span><span>Tables &amp; seating</span><span>Full report afterwards</span>
+  </div>
+
+  <p class="pnote narrow" style="font-size:14px;color:var(--ink-3)">Planning weddings for a living? There's a monthly plan for that — but if you run fewer than about sixteen events a year, paying per event is cheaper and we'd rather you did that.</p>
+</div></section>
+
+<!-- ================= FAQ ================= -->
+<section><div class="wrap narrow">
+  <div class="kicker">Questions</div>
+  <h2 class="big serif">The ones people ask</h2>
+
+  <div class="faq">
+    <details open><summary>What if a guest turns up without their phone?</summary>
+      <p>Your usher searches their name and checks them in by hand. It takes a few seconds and it's recorded the same way as a scan. Dead batteries are the most ordinary thing that happens at a wedding — it's a normal part of the app, not an emergency.</p></details>
+    <details><summary>Someone forwarded their pass to a friend. What happens?</summary>
+      <p>The first family through gets in. When the pass is presented again with none of the invitation left, the usher sees that it's already been fully used, along with the time and which gate. Whoever is holding it can be turned away or waved through — that's your call, not the software's.</p></details>
+    <details><summary>Do I have to name every single guest?</summary>
+      <p>No. "The Okafor Family, admits 6" is a complete entry. Name the individuals only if you want table cards or a record of exactly who came.</p></details>
+    <details><summary>Can I try it before paying?</summary>
+      <p>Yes, and properly. Build your entire guest list free — there's no cap on that. Invite 150 guests, watch them reply, and check people in. You only choose a plan when you send more invitations than the free 150.</p></details>
+    <details><summary>What happens after the wedding?</summary>
+      <p>You get a report: who came, who didn't, when people arrived, which gate they used, and anyone turned away. Download it as a spreadsheet. Your data stays yours and you can delete it whenever you like.</p></details>
+  </div>
+
+  <div class="newstrip">
+    <b>We're new.</b> This is our first season, and we'd rather say so than invent testimonials. If you're planning a wedding and want a hand setting it up, message us — you'll get a real person, and probably the person who built it.
+  </div>
+</div></section>
+
+<!-- ================= INSTITUTIONS ================= -->
+<section class="inst" id="inst"><div class="wrap">
+  <div class="kicker">Beyond weddings</div>
+  <h2 class="big serif">The same system, at a bigger gate</h2>
+  <p class="sublede">Weddings are the hardest version of this problem: no tickets, no barriers, everyone knows somebody. What handles that handles a graduation or a conference comfortably.</p>
+
+  <div class="instgrid">
+    <div class="instlist">
+      <div class="instrow"><span class="ic">◆</span><div><b>Universities and schools</b>
+        <p>Matriculation, convocation, prize days. Thousands of guests through eight gates on one morning.</p></div></div>
+      <div class="instrow"><span class="ic">◆</span><div><b>Churches and mosques</b>
+        <p>Programmes that repeat across days and sessions, with attendance tracked separately for each.</p></div></div>
+      <div class="instrow"><span class="ic">◆</span><div><b>Companies and conferences</b>
+        <p>Named delegates, printed badges, and a record of exactly who was in the building.</p></div></div>
+      <div class="instrow"><span class="ic">◆</span><div><b>Government and restricted events</b>
+        <p>Different passes for different areas, and a complete audit trail of every entry and every refusal.</p></div></div>
+    </div>
+    <div>
+      <p style="font-size:15.5px;color:var(--ink-2);line-height:1.75">Multiple gates running at once, staff who only see their own entrance, and a permanent log of who came in, when, through where, and who was turned away.</p>
+      <p style="font-size:15.5px;color:var(--ink-2);line-height:1.75;margin-top:16px">Annual pricing, and a conversation first rather than a signup form.</p>
+      <a class="btn pri lg" href="#" style="margin-top:22px">Talk to us about your organisation</a>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= FINAL ================= -->
+<section class="final"><div class="wrap">
+  <div class="rulegold" style="margin-bottom:30px"></div>
+  <h2 class="serif">Start with your guest list</h2>
+  <p>Build the whole thing free. Decide on a plan when you're ready to invite people.</p>
+  <div style="margin-top:32px"><a class="btn ivory lg" href="#">Create your event</a></div>
+  <p style="font-size:13px;color:rgba(247,244,236,.45);margin-top:20px">First 150 guests free · No card needed · Takes about two minutes</p>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="fgrid">
+    <div style="max-width:250px">
+      <a class="brand" href="#"><div class="m">◈</div><span>Working name</span></a>
+      <p style="font-size:14px;color:var(--ink-2);margin-top:13px;line-height:1.65">Guest lists, invitations and entry, for Nigerian weddings and everything larger.</p>
+    </div>
+    <div class="sp"></div>
+    <div class="fcol"><h4>Product</h4>
+      <a href="#how">How it works</a><a href="#price">Pricing</a><a href="#inst">For organisations</a><a href="#">Log in</a></div>
+    <div class="fcol"><h4>Company</h4>
+      <a href="#">About</a><a href="#">Contact</a><a href="#">WhatsApp us</a></div>
+    <div class="fcol"><h4>Legal</h4>
+      <a href="#">Terms</a><a href="#">Privacy</a><a href="#">How we handle guest data</a></div>
+  </div>
+  <div class="fbot"><span>© 2026</span><div class="sp"></div><span>Lagos, Nigeria</span></div>
+</div></footer>
+
+</body>
+</html>

@@ -1,0 +1,1050 @@
+openapi: 3.1.0
+
+# =====================================================================
+#  API CONTRACT v1
+#
+#  This file is the only source of truth for the API surface.
+#  Generate from it, never hand-write a client:
+#    TypeScript (Next.js) → openapi-typescript + openapi-fetch
+#    Dart (Flutter)       → openapi-generator -g dart-dio
+#
+#  Three things shape the design:
+#    · The scanner is offline-first, so it bootstraps in bulk and
+#      submits check-ins in batches that may arrive hours late.
+#    · Every check-in carries a client-generated UUID. Replays are
+#      expected and must be free.
+#    · Guest endpoints are unauthenticated and served under /public.
+#      They must never expose anything but that one household's data.
+# =====================================================================
+
+info:
+  title: Event guest & access API
+  version: 1.0.0
+  description: Households, passes and gates.
+
+servers:
+  - url: https://api.example.ng/v1
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+  - name: events
+  - name: invitations
+  - name: scanner
+  - name: public
+  - name: reports
+  - name: billing
+
+# =====================================================================
+paths:
+# =====================================================================
+
+  # ---------------------------------------------------------------- auth
+  /auth/otp/request:
+    post:
+      tags: [auth]
+      security: []
+      summary: Send a login code by SMS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: "+2348034112098" }
+      responses:
+        "202":
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  retry_after_seconds: { type: integer, example: 30 }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /auth/otp/verify:
+    post:
+      tags: [auth]
+      security: []
+      summary: Exchange a code for a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string }
+                code:  { type: string, example: "492713" }
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        "401": { $ref: "#/components/responses/Unauthorised" }
+
+  /me:
+    get:
+      tags: [auth]
+      summary: Current user and memberships
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+
+  # -------------------------------------------------------------- events
+  /events:
+    get:
+      tags: [events]
+      summary: Events in the current workspace
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/EventStatus" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Event" }
+    post:
+      tags: [events]
+      summary: Create an event
+      description: >
+        Always creates at least one leg in the same transaction. A single-venue
+        event has exactly one and the client never has to handle a legless event.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+
+  /events/{eventId}:
+    parameters: [{ $ref: "#/components/parameters/eventId" }]
+    get:
+      tags: [events]
+      summary: One event with its legs
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+    patch:
+      tags: [events]
+      summary: Update event details or entry policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+
+  /events/{eventId}/legs:
+    parameters: [{ $ref: "#/components/parameters/eventId" }]
+    post:
+      tags: [events]
+      summary: Add a leg
+      description: A second venue or date — the Abuja traditional, the Lagos white wedding.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LegCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Leg" }
+
+  /legs/{legId}/entrances:
+    parameters: [{ $ref: "#/components/parameters/legId" }]
+    get:
+      tags: [events]
+      summary: Gates at this leg
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Entrance" } }
+    post:
+      tags: [events]
+      summary: Add a gate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties: { name: { type: string, example: "Main Gate" } }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Entrance" }
+
+  /legs/{legId}/staff:
+    parameters: [{ $ref: "#/components/parameters/legId" }]
+    get:
+      tags: [events]
+      summary: Who is working this leg
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/StaffAssignment" } }
+    post:
+      tags: [events]
+      summary: Invite someone to work this leg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, role]
+              properties:
+                phone:       { type: string }
+                full_name:   { type: string }
+                role:        { $ref: "#/components/schemas/Role" }
+                entrance_id: { type: string, format: uuid, nullable: true }
+                can_walk_in: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Invited
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StaffAssignment" }
+
+  # --------------------------------------------------------- invitations
+  /events/{eventId}/invitations:
+    parameters: [{ $ref: "#/components/parameters/eventId" }]
+    get:
+      tags: [invitations]
+      summary: The guest list — households, not people
+      parameters:
+        - { name: leg_id,   in: query, schema: { type: string, format: uuid } }
+        - { name: rsvp,     in: query, schema: { $ref: "#/components/schemas/Rsvp" } }
+        - { name: arrived,  in: query, schema: { type: string, enum: [none, some, all] } }
+        - { name: no_table, in: query, schema: { type: boolean } }
+        - { name: q,        in: query, schema: { type: string }, description: Name or phone }
+        - { $ref: "#/components/parameters/cursor" }
+        - { $ref: "#/components/parameters/limit" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Invitation" } }
+                  next_cursor: { type: string, nullable: true }
+    post:
+      tags: [invitations]
+      summary: Add a household
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvitationCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invitation" }
+
+  /events/{eventId}/invitations/import:
+    parameters: [{ $ref: "#/components/parameters/eventId" }]
+    post:
+      tags: [invitations]
+      summary: Import a spreadsheet of households
+      description: >
+        One row per household. Free on every plan and never blocked by the
+        people limit — the limit applies at send time, not at import.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, mapping]
+              properties:
+                file:    { type: string, format: binary }
+                mapping: { type: string, description: JSON column map }
+                leg_ids: { type: string, description: Comma-separated legs to invite to }
+      responses:
+        "202":
+          description: Accepted for processing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJob" }
+
+  /invitations/{invitationId}:
+    parameters: [{ $ref: "#/components/parameters/invitationId" }]
+    get:
+      tags: [invitations]
+      summary: One household in full
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationDetail" }
+    patch:
+      tags: [invitations]
+      summary: Update a household
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvitationUpdate" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationDetail" }
+    delete:
+      tags: [invitations]
+      summary: Remove a household and revoke its pass
+      responses:
+        "204": { description: Removed }
+
+  /invitations/{invitationId}/legs/{legId}:
+    parameters:
+      - { $ref: "#/components/parameters/invitationId" }
+      - { $ref: "#/components/parameters/legId" }
+    put:
+      tags: [invitations]
+      summary: Set what this household is entitled to at this leg
+      description: Six at the traditional, two at the white wedding. Delete to uninvite.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allowance]
+              properties:
+                allowance: { type: integer, minimum: 1, example: 4 }
+                table_id:  { type: string, format: uuid, nullable: true }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvitationLeg" }
+    delete:
+      tags: [invitations]
+      summary: Uninvite from this leg
+      responses:
+        "204": { description: Removed }
+
+  /events/{eventId}/delivery-links:
+    parameters: [{ $ref: "#/components/parameters/eventId" }]
+    post:
+      tags: [invitations]
+      summary: Generate WhatsApp deep links
+      description: >
+        Returns a wa.me URL per household with the message pre-filled. Sending
+        happens in the organiser's own WhatsApp, so delivery cannot be confirmed —
+        state moves not_sent → link_generated → opened, never "delivered".
+        This call consumes people limit; it is the billing gate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invitation_ids]
+              properties:
+                invitation_ids: { type: array, items: { type: string, format: uuid } }
+                template: { type: string, nullable: true }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DeliveryLink" }
+        "402": { $ref: "#/components/responses/LimitReached" }
+
+  # ------------------------------------------------------------- scanner
+  /scanner/assignments:
+    get:
+      tags: [scanner]
+      summary: Legs this usher can work
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ScannerAssignment" } }
+
+  /scanner/legs/{legId}/bootstrap:
+    parameters: [{ $ref: "#/components/parameters/legId" }]
+    get:
+      tags: [scanner]
+      summary: Everything needed to work offline
+      description: >
+        Called when an usher opens a leg, and again on reconnect with `since`.
+        Includes the event signing key — this is the only endpoint that ever
+        returns it, and only to a user with a staff_assignment on this leg.
+        The device holds keys for every leg it is assigned to, so a pass from
+        another event can be named rather than dismissed as invalid.
+      parameters:
+        - { name: since, in: query, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bootstrap" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /scanner/check-ins:
+    post:
+      tags: [scanner]
+      summary: Submit scans, one or many
+      description: >
+        The device queues scans offline and replays them here. Every item carries
+        a client_uuid; a repeat returns the stored outcome rather than admitting
+        anyone twice. Partial success is normal — read each item's status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 500
+                  items: { $ref: "#/components/schemas/CheckInSubmit" }
+      responses:
+        "200":
+          description: Each item processed independently
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: "#/components/schemas/CheckInOutcome" }
+
+  /scanner/legs/{legId}/test:
+    parameters: [{ $ref: "#/components/parameters/legId" }]
+    post:
+      tags: [scanner]
+      summary: Record that this usher has tested the scanner
+      description: Satisfies readiness check 8. Any real scan satisfies it too.
+      responses:
+        "204": { description: Recorded }
+
+  # -------------------------------------------------------------- public
+  /public/invitations/{token}:
+    parameters: [{ $ref: "#/components/parameters/token" }]
+    get:
+      tags: [public]
+      security: []
+      summary: A household's own invitation and pass
+      description: >
+        Unauthenticated, guessing-resistant token. Returns only this household.
+        The pass is available immediately — it does not wait on an RSVP.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicInvitation" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /public/invitations/{token}/rsvp:
+    parameters: [{ $ref: "#/components/parameters/token" }]
+    post:
+      tags: [public]
+      security: []
+      summary: Reply, per leg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leg_id, attending]
+              properties:
+                leg_id:    { type: string, format: uuid }
+                attending: { type: boolean }
+                count:     { type: integer, minimum: 0, description: How many of the allowance }
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicInvitation" }
+
+  # ------------------------------------------------------------- reports
+  /legs/{legId}/attendance:
+    parameters: [{ $ref: "#/components/parameters/legId" }]
+    get:
+      tags: [reports]
+      summary: Live numbers for the organiser
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Attendance" }
+
+  /legs/{legId}/stream:
+    parameters: [{ $ref: "#/components/parameters/legId" }]
+    get:
+      tags: [reports]
+      summary: Server-sent events — arrivals as they happen
+      responses:
+        "200":
+          description: text/event-stream of CheckInFeedItem
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+  /events/{eventId}/report:
+    parameters: [{ $ref: "#/components/parameters/eventId" }]
+    get:
+      tags: [reports]
+      summary: Final report, per leg and overall
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+            text/csv:
+              schema: { type: string }
+
+  # ------------------------------------------------------------- billing
+  /events/{eventId}/billing:
+    parameters: [{ $ref: "#/components/parameters/eventId" }]
+    get:
+      tags: [billing]
+      summary: Plan, people counted, headroom
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Billing" }
+
+  /events/{eventId}/checkout:
+    parameters: [{ $ref: "#/components/parameters/eventId" }]
+    post:
+      tags: [billing]
+      summary: Start a payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan]
+              properties:
+                plan:     { $ref: "#/components/schemas/Plan" }
+                provider: { type: string, enum: [paystack, flutterwave] }
+      responses:
+        "200":
+          description: Redirect the customer here
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorization_url: { type: string, format: uri }
+                  reference:         { type: string }
+
+# =====================================================================
+components:
+# =====================================================================
+
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+
+  parameters:
+    eventId:      { name: eventId,      in: path, required: true, schema: { type: string, format: uuid } }
+    legId:        { name: legId,        in: path, required: true, schema: { type: string, format: uuid } }
+    invitationId: { name: invitationId, in: path, required: true, schema: { type: string, format: uuid } }
+    token:        { name: token,        in: path, required: true, schema: { type: string } }
+    cursor:       { name: cursor,       in: query, schema: { type: string } }
+    limit:        { name: limit,        in: query, schema: { type: integer, default: 50, maximum: 200 } }
+
+  responses:
+    Unauthorised:
+      description: Not signed in
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: Signed in, not allowed
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: No such thing
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    RateLimited:
+      description: Too many attempts
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    LimitReached:
+      description: Plan limit reached — choose a plan to continue
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  schemas:
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:    { type: string, example: people_limit_reached }
+        message: { type: string, example: "Sending these invitations needs 512 of your 150 passes." }
+        details: { type: object, additionalProperties: true }
+
+    Role:       { type: string, enum: [owner, event_manager, usher] }
+    EventStatus:{ type: string, enum: [draft, active, completed, cancelled] }
+    Rsvp:       { type: string, enum: [pending, attending, partial, declined] }
+    Plan:       { type: string, enum: [free, small, standard, large, grand, professional, organisation] }
+
+    CheckInResult:
+      type: string
+      description: The twelve outcomes of the check-in state machine, plus corrections.
+      enum:
+        - admitted
+        - partial
+        - manual
+        - overflow_admitted
+        - re_entry
+        - reversal
+        - checked_out
+        - allowance_exhausted
+        - invalid
+        - wrong_event
+        - wrong_leg
+        - revoked
+        - rsvp_blocked
+        - rsvp_declined
+        - overflow_blocked
+        - not_found
+
+    Session:
+      type: object
+      properties:
+        access_token:  { type: string }
+        refresh_token: { type: string }
+        expires_in:    { type: integer }
+        user:          { $ref: "#/components/schemas/User" }
+
+    User:
+      type: object
+      properties:
+        id:        { type: string, format: uuid }
+        full_name: { type: string }
+        phone:     { type: string }
+        email:     { type: string, nullable: true }
+
+    Me:
+      type: object
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+        workspaces:
+          type: array
+          items:
+            type: object
+            properties:
+              id:          { type: string, format: uuid }
+              name:        { type: string }
+              role:        { $ref: "#/components/schemas/Role" }
+              is_implicit: { type: boolean, description: Hide the switcher while true }
+
+    Event:
+      type: object
+      properties:
+        id:              { type: string, format: uuid }
+        name:            { type: string }
+        event_type:      { type: string }
+        status:          { $ref: "#/components/schemas/EventStatus" }
+        cover_image_url: { type: string, nullable: true }
+        allow_overflow:  { type: boolean }
+        require_rsvp:    { type: boolean }
+        allow_walkins:   { type: boolean }
+        rsvp_deadline:   { type: string, format: date, nullable: true }
+        plan:            { $ref: "#/components/schemas/Plan" }
+        people_limit:    { type: integer }
+        legs:
+          type: array
+          items: { $ref: "#/components/schemas/Leg" }
+
+    EventCreate:
+      type: object
+      required: [name, leg]
+      properties:
+        name:       { type: string }
+        event_type: { type: string, default: wedding }
+        leg:        { $ref: "#/components/schemas/LegCreate" }
+
+    EventUpdate:
+      type: object
+      properties:
+        name:           { type: string }
+        status:         { $ref: "#/components/schemas/EventStatus" }
+        allow_overflow: { type: boolean }
+        require_rsvp:   { type: boolean }
+        allow_walkins:  { type: boolean }
+        rsvp_deadline:  { type: string, format: date, nullable: true }
+
+    Leg:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        name:           { type: string, example: "Traditional Ceremony" }
+        sequence:       { type: integer }
+        starts_at:      { type: string, format: date-time }
+        doors_close_at: { type: string, format: date-time, nullable: true }
+        venue_name:     { type: string, nullable: true }
+        address_line:   { type: string, nullable: true }
+        city:           { type: string, nullable: true }
+        tables_enabled: { type: boolean }
+
+    LegCreate:
+      type: object
+      required: [name, starts_at]
+      properties:
+        name:           { type: string }
+        starts_at:      { type: string, format: date-time }
+        doors_close_at: { type: string, format: date-time }
+        venue_name:     { type: string }
+        address_line:   { type: string }
+        city:           { type: string }
+        tables_enabled: { type: boolean, default: false }
+
+    Entrance:
+      type: object
+      properties:
+        id:        { type: string, format: uuid }
+        leg_id:    { type: string, format: uuid }
+        name:      { type: string }
+        is_active: { type: boolean }
+
+    StaffAssignment:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        user:           { $ref: "#/components/schemas/User" }
+        leg_id:         { type: string, format: uuid }
+        entrance_id:    { type: string, format: uuid, nullable: true }
+        role:           { $ref: "#/components/schemas/Role" }
+        can_walk_in:    { type: boolean }
+        last_tested_at: { type: string, format: date-time, nullable: true }
+        accepted:       { type: boolean }
+
+    Invitation:
+      type: object
+      description: A household. The unit of invitation, RSVP, seating and entry.
+      properties:
+        id:            { type: string, format: uuid }
+        display_name:  { type: string, example: "Mr & Mrs Adeyemi" }
+        primary_phone: { type: string, nullable: true }
+        primary_email: { type: string, nullable: true }
+        category:      { type: string, nullable: true }
+        named_count:   { type: integer, description: 0 is normal and valid }
+        legs:
+          type: array
+          items: { $ref: "#/components/schemas/InvitationLeg" }
+        delivery_state: { type: string, enum: [not_sent, link_generated, sent, opened] }
+
+    InvitationLeg:
+      type: object
+      properties:
+        leg_id:     { type: string, format: uuid }
+        allowance:  { type: integer, example: 4 }
+        rsvp:       { $ref: "#/components/schemas/Rsvp" }
+        rsvp_count: { type: integer, nullable: true }
+        table_name: { type: string, nullable: true }
+        admitted:   { type: integer }
+        remaining:  { type: integer }
+
+    InvitationDetail:
+      allOf:
+        - $ref: "#/components/schemas/Invitation"
+        - type: object
+          properties:
+            guests:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:         { type: string, format: uuid }
+                  first_name: { type: string }
+                  last_name:  { type: string, nullable: true }
+                  is_primary: { type: boolean }
+            pass_status: { type: string, enum: [active, revoked] }
+            history:
+              type: array
+              items: { $ref: "#/components/schemas/CheckInFeedItem" }
+
+    InvitationCreate:
+      type: object
+      required: [display_name, legs]
+      properties:
+        display_name:  { type: string }
+        primary_phone: { type: string }
+        primary_email: { type: string }
+        category_id:   { type: string, format: uuid, nullable: true }
+        legs:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [leg_id, allowance]
+            properties:
+              leg_id:    { type: string, format: uuid }
+              allowance: { type: integer, minimum: 1 }
+              table_id:  { type: string, format: uuid, nullable: true }
+        guests:
+          type: array
+          description: Optional. Naming people is never required.
+          items:
+            type: object
+            properties:
+              first_name: { type: string }
+              last_name:  { type: string }
+
+    InvitationUpdate:
+      type: object
+      properties:
+        display_name:  { type: string }
+        primary_phone: { type: string }
+        primary_email: { type: string }
+        category_id:   { type: string, format: uuid, nullable: true }
+
+    ImportJob:
+      type: object
+      properties:
+        id:        { type: string, format: uuid }
+        status:    { type: string, enum: [queued, running, done, failed] }
+        rows:      { type: integer }
+        imported:  { type: integer }
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              row:     { type: integer }
+              message: { type: string, example: "No party size — assumed 1" }
+
+    DeliveryLink:
+      type: object
+      properties:
+        invitation_id: { type: string, format: uuid }
+        display_name:  { type: string }
+        whatsapp_url:  { type: string, format: uri, example: "https://wa.me/2348034112098?text=..." }
+        invite_url:    { type: string, format: uri }
+        message:       { type: string }
+
+    ScannerAssignment:
+      type: object
+      properties:
+        leg_id:        { type: string, format: uuid }
+        leg_name:      { type: string }
+        event_name:    { type: string }
+        starts_at:     { type: string, format: date-time }
+        venue_name:    { type: string, nullable: true }
+        entrance_id:   { type: string, format: uuid, nullable: true }
+        guest_count:   { type: integer }
+        is_open:       { type: boolean }
+
+    Bootstrap:
+      type: object
+      description: The offline payload. Everything the gate needs with no network.
+      properties:
+        synced_at: { type: string, format: date-time }
+        event:
+          type: object
+          properties:
+            id:              { type: string, format: uuid }
+            name:            { type: string }
+            allow_overflow:  { type: boolean }
+            require_rsvp:    { type: boolean }
+            allow_walkins:   { type: boolean }
+        keys:
+          type: array
+          description: >
+            Signing keys for every event this usher is assigned to, not just
+            this one. Lets the scanner name a pass from another wedding instead
+            of calling it invalid.
+          items:
+            type: object
+            properties:
+              event_id:      { type: string, format: uuid }
+              event_name:    { type: string }
+              token_version: { type: integer }
+              key:           { type: string, description: base64 HMAC secret }
+        entrances:
+          type: array
+          items: { $ref: "#/components/schemas/Entrance" }
+        invitations:
+          type: array
+          items:
+            type: object
+            properties:
+              pass_id:      { type: string, format: uuid }
+              display_name: { type: string }
+              category:     { type: string, nullable: true }
+              table_name:   { type: string, nullable: true }
+              allowance:    { type: integer }
+              admitted:     { type: integer }
+              rsvp:         { $ref: "#/components/schemas/Rsvp" }
+              search_terms: { type: string, description: Name plus phone, for local search }
+        revoked_pass_ids:
+          type: array
+          items: { type: string, format: uuid }
+
+    CheckInSubmit:
+      type: object
+      required: [client_uuid, leg_id, result, scanned_at]
+      properties:
+        client_uuid:  { type: string, format: uuid, description: Generated on device. Replays are free. }
+        leg_id:       { type: string, format: uuid }
+        entrance_id:  { type: string, format: uuid, nullable: true }
+        pass_id:      { type: string, format: uuid, nullable: true }
+        result:       { $ref: "#/components/schemas/CheckInResult" }
+        admitted_count: { type: integer, default: 0 }
+        reverses_client_uuid: { type: string, format: uuid, nullable: true }
+        scanned_at:   { type: string, format: date-time, description: Device clock }
+        device_id:    { type: string }
+        note:         { type: string, nullable: true }
+
+    CheckInOutcome:
+      type: object
+      properties:
+        client_uuid: { type: string, format: uuid }
+        id:          { type: string, format: uuid, nullable: true }
+        accepted:    { type: boolean }
+        duplicate:   { type: boolean, description: Already had this client_uuid. Not an error. }
+        contested:   { type: boolean, description: Another device admitted the same pass offline. }
+        error:       { $ref: "#/components/schemas/Error" }
+
+    CheckInFeedItem:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        display_name:   { type: string }
+        result:         { $ref: "#/components/schemas/CheckInResult" }
+        admitted_count: { type: integer }
+        entrance_name:  { type: string, nullable: true }
+        staff_name:     { type: string }
+        recorded_at:    { type: string, format: date-time }
+
+    PublicInvitation:
+      type: object
+      description: What a guest sees. Nothing about any other household.
+      properties:
+        event_name: { type: string }
+        note:       { type: string, nullable: true }
+        display_name: { type: string }
+        pass_code:  { type: string, description: The QR payload. Available before any RSVP. }
+        legs:
+          type: array
+          items:
+            type: object
+            properties:
+              leg_id:        { type: string, format: uuid }
+              name:          { type: string }
+              starts_at:     { type: string, format: date-time }
+              venue_name:    { type: string, nullable: true }
+              address_line:  { type: string, nullable: true }
+              map_url:       { type: string, format: uri, nullable: true }
+              allowance:     { type: integer }
+              rsvp:          { $ref: "#/components/schemas/Rsvp" }
+              rsvp_count:    { type: integer, nullable: true }
+              table_name:    { type: string, nullable: true }
+        rsvp_deadline: { type: string, format: date, nullable: true }
+
+    Attendance:
+      type: object
+      properties:
+        leg_id:           { type: string, format: uuid }
+        invitations:      { type: integer }
+        invited_people:   { type: integer }
+        confirmed_people: { type: integer }
+        arrived_people:   { type: integer }
+        overflow_parties: { type: integer }
+        refused:          { type: integer }
+        by_entrance:
+          type: array
+          items:
+            type: object
+            properties:
+              entrance_id:   { type: string, format: uuid }
+              name:          { type: string }
+              admitted:      { type: integer }
+              refused:       { type: integer }
+              last_seen_at:  { type: string, format: date-time, nullable: true }
+              offline_since: { type: string, format: date-time, nullable: true }
+
+    Report:
+      type: object
+      properties:
+        event_id: { type: string, format: uuid }
+        legs:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/Attendance"
+              - type: object
+                properties:
+                  no_shows: { type: integer }
+                  arrivals_by_half_hour:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        from:  { type: string, format: date-time }
+                        count: { type: integer }
+                  refusals:
+                    type: array
+                    items: { $ref: "#/components/schemas/CheckInFeedItem" }
+
+    Billing:
+      type: object
+      properties:
+        plan:              { $ref: "#/components/schemas/Plan" }
+        people_limit:      { type: integer }
+        billable_people:   { type: integer, description: Sum over households of their largest allowance across legs }
+        passes_issued:     { type: integer }
+        over_limit:        { type: boolean, description: True does not block the gate }
+        amount_paid_minor: { type: integer }
+        currency:          { type: string, example: NGN }

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Organiser — plans, billing, reports, team, settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAFAF7;--surface:#FFF;--surface-2:#F5F5F1;
+  --line:#E5E7E2;--line-soft:#EFEFEA;
+  --ink:#171A16;--ink-2:#5F665C;--ink-3:#8A9187;
+  --p900:#163300;--p600:#2F6B1C;--p100:#E8F1E4;--p50:#F5F9F3;
+  --ok:#2E7D32;--ok-bg:#E8F5E9;
+  --warn:#B7791F;--warn-bg:#FFF7E6;--warn-line:#F0DDB4;
+  --err:#C62828;--err-bg:#FDECEC;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+
+.picker{position:sticky;top:0;z-index:60;background:var(--p900);color:#fff;display:flex;gap:4px;padding:9px 14px;overflow-x:auto;align-items:center}
+.picker b{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.55;margin-right:10px;white-space:nowrap}
+.pbtn{border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.72);font:500 12.5px Inter,sans-serif;padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.pbtn:hover{background:rgba(255,255,255,.1);color:#fff}
+.pbtn.on{background:#fff;color:var(--p900);border-color:#fff;font-weight:600}
+
+.app{display:flex;min-height:calc(100vh - 46px)}
+.side{width:230px;flex:0 0 230px;background:var(--surface);border-right:1px solid var(--line);padding:18px 0}
+.ev-head{padding:0 18px 16px;border-bottom:1px solid var(--line)}
+.ev-head .t{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.ev-head .s{font-size:12px;color:var(--ink-3);margin-top:4px}
+.nav{padding:14px 10px;display:flex;flex-direction:column;gap:1px}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;color:var(--ink-2);text-decoration:none;font-size:13px;font-weight:500}
+.nav a:hover{background:var(--surface-2)}
+.nav a.on{background:var(--p100);color:var(--p900);font-weight:600}
+.nav .ic{width:14px;text-align:center;font-size:12px;opacity:.75}
+
+.main{flex:1;min-width:0}
+.top{height:54px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 24px;gap:12px}
+.crumb{font-size:13px;color:var(--ink-3)}.crumb b{color:var(--ink);font-weight:500}
+.top .sp{flex:1}
+.avatar{width:29px;height:29px;border-radius:50%;background:var(--p900);color:#fff;display:grid;place-items:center;font-size:11.5px;font-weight:600}
+.body{padding:26px 24px 70px;max-width:1080px}
+
+h1{font-size:23px;font-weight:600;letter-spacing:-.02em}
+.lede{font-size:13.5px;color:var(--ink-2);margin-top:5px;line-height:1.55}
+.head{margin-bottom:22px;display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.head .sp{flex:1}
+.sec{font:600 11px Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:30px 0 12px}
+
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:500 13.5px Inter,sans-serif;padding:10px 15px;border-radius:10px;cursor:pointer}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--p900);color:#fff;border-color:var(--p900);font-weight:600}
+.btn.pri:hover{background:#1F4506}
+.btn.sm{padding:7px 11px;font-size:12.5px}
+.btn.danger{color:var(--err);border-color:#F3D2D2}
+.btn.danger:hover{background:var(--err-bg)}
+.btn:focus-visible{outline:2px solid var(--p600);outline-offset:2px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px}
+.card+.card{margin-top:14px}
+.card h2{font-size:15px;font-weight:600;margin-bottom:4px}
+.card .sub{font-size:13px;color:var(--ink-3);margin-bottom:0;line-height:1.55}
+
+.ban{border-radius:14px;padding:15px 17px;display:flex;gap:13px;align-items:flex-start;margin-bottom:18px}
+.ban.warn{background:var(--warn-bg);border:1px solid var(--warn-line)}
+.ban.info{background:var(--p50);border:1px solid var(--p100)}
+.ban .ic{font-size:14px;line-height:1.3}
+.ban.warn .ic{color:var(--warn)} .ban.info .ic{color:var(--p600)}
+.ban .t{font-size:13.5px;font-weight:600} .ban .d{font-size:12.5px;margin-top:4px;line-height:1.55}
+.ban.warn .t{color:#7A5510}.ban.warn .d{color:#8A6317}
+.ban.info .t{color:var(--p900)}.ban.info .d{color:var(--ink-2)}
+.ban .sp{flex:1}
+
+/* ---------- plans ---------- */
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:12px}
+.plan{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:19px;position:relative;display:flex;flex-direction:column}
+.plan.pick{border-color:var(--p900);box-shadow:0 8px 26px rgba(22,51,0,.1)}
+.plan.dim{opacity:.62}
+.flagpin{position:absolute;top:-10px;left:19px;background:var(--p900);color:#fff;font:600 10.5px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;padding:4px 9px;border-radius:6px}
+.plan .cap{font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.plan .ppl{font-size:26px;font-weight:600;letter-spacing:-.03em;margin-top:7px;line-height:1}
+.plan .ppl span{font-size:13px;font-weight:500;color:var(--ink-3);letter-spacing:0}
+.plan .amt{font-size:19px;font-weight:600;margin-top:14px;letter-spacing:-.02em}
+.plan .per{font-size:12px;color:var(--ink-3);margin-top:4px}
+.plan .go{margin-top:16px}
+.plan .go .btn{width:100%}
+.plan.now{background:var(--surface-2);border-style:dashed}
+
+.allin{background:var(--p50);border:1px solid var(--p100);border-radius:16px;padding:20px;margin-top:14px}
+.allin h3{font-size:14px;font-weight:600;color:var(--p900)}
+.allin ul{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:7px 18px;margin-top:13px}
+.allin li{font-size:13px;color:var(--ink-2);display:flex;gap:8px}
+.allin li::before{content:"✓";color:var(--p600);font-weight:700}
+
+/* ---------- tables ---------- */
+.tbl{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;font:600 11.5px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+tbody td{padding:13px 16px;border-bottom:1px solid var(--line-soft);font-size:13.5px}
+tbody tr:last-child td{border-bottom:0}
+.nm{font-weight:500}
+.sm2{font-size:12px;color:var(--ink-3);margin-top:2px}
+.tag{display:inline-block;font:600 11.5px Inter,sans-serif;padding:4px 8px;border-radius:6px;white-space:nowrap}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.pend{background:var(--warn-bg);color:var(--warn)}
+.tag.no{background:var(--err-bg);color:var(--err)}
+.tag.flat{background:var(--surface-2);color:var(--ink-3)}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- reports ---------- */
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.fig .k{font-size:11.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.fig .v{font-size:28px;font-weight:600;letter-spacing:-.03em;margin-top:7px;line-height:1}
+.fig .n{font-size:12px;color:var(--ink-3);margin-top:6px}
+
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px}
+.bars{display:flex;align-items:flex-end;gap:5px;height:160px;margin-top:18px}
+.bcol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:7px;height:100%}
+.bcol i{width:100%;background:var(--p600);border-radius:4px 4px 0 0;display:block;min-height:2px}
+.bcol.peak i{background:var(--p900)}
+.bcol span{font-size:10.5px;color:var(--ink-3);white-space:nowrap}
+.peaknote{font-size:12.5px;color:var(--ink-2);margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft)}
+
+/* ---------- team ---------- */
+.tperson{display:flex;align-items:center;gap:14px;padding:15px 18px;border-bottom:1px solid var(--line-soft);background:var(--surface)}
+.tperson:last-child{border-bottom:0}
+.tav{width:34px;height:34px;border-radius:50%;background:var(--p100);color:var(--p900);display:grid;place-items:center;font-size:12.5px;font-weight:600;flex:0 0 auto}
+.tperson .who{flex:1;min-width:0}
+.tlist{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+
+/* ---------- settings ---------- */
+.tog{display:flex;align-items:flex-start;gap:14px;padding:16px 0;border-bottom:1px solid var(--line-soft)}
+.tog:last-child{border-bottom:0;padding-bottom:0}
+.tog .txt{flex:1}
+.tog .t{font-size:14px;font-weight:500}
+.tog .d{font-size:12.5px;color:var(--ink-3);margin-top:4px;line-height:1.55}
+.sw{width:42px;height:24px;border-radius:14px;background:var(--line);border:0;cursor:pointer;position:relative;flex:0 0 auto;transition:background .15s;margin-top:2px}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw.on{background:var(--p600)}
+.sw.on::after{transform:translateX(18px)}
+.sw:focus-visible{outline:2px solid var(--p600);outline-offset:2px}
+label{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin-bottom:6px}
+.inp,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px 13px;font:14px Inter,sans-serif;background:var(--surface);color:var(--ink)}
+.inp:focus,select:focus{outline:none;border-color:var(--p600)}
+.f{margin-bottom:16px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.danger-card{border-color:#F3D2D2!important;background:#FEF8F8}
+.danger-card h2{color:var(--err)}
+.drow{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid #F3D2D2}
+.drow:last-child{border-bottom:0}
+.drow .txt{flex:1}
+.drow .t{font-size:13.5px;font-weight:500}
+.drow .d{font-size:12.5px;color:var(--ink-2);margin-top:3px;line-height:1.5}
+
+.scr{display:none}
+@media (max-width:860px){.side{display:none}.body{padding:18px 14px 50px}.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav class="picker">
+  <b>Screen</b>
+  <button class="pbtn on" onclick="S(0,this)">Plans</button>
+  <button class="pbtn" onclick="S(1,this)">Billing</button>
+  <button class="pbtn" onclick="S(2,this)">Reports</button>
+  <button class="pbtn" onclick="S(3,this)">Team</button>
+  <button class="pbtn" onclick="S(4,this)">Event settings</button>
+</nav>
+
+<div class="app">
+  <aside class="side">
+    <div class="ev-head"><div class="t">Ahmed &amp; Aisha</div><div class="s">12 Dec 2026 · Ikoyi, Lagos</div></div>
+    <nav class="nav">
+      <a href="#"><span class="ic">◈</span>Overview</a>
+      <a href="#"><span class="ic">◎</span>Guests</a>
+      <a href="#"><span class="ic">✉</span>Invitations</a>
+      <a href="#"><span class="ic">▤</span>Tables</a>
+      <a href="#"><span class="ic">▦</span>Passes</a>
+      <a href="#"><span class="ic">◉</span>Check-in</a>
+      <a href="#" id="n-rep"><span class="ic">▥</span>Reports</a>
+      <a href="#" id="n-team"><span class="ic">◐</span>Team</a>
+      <a href="#" id="n-bill"><span class="ic">▦</span>Billing</a>
+      <a href="#" id="n-set"><span class="ic">⚙</span>Settings</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="top"><div class="crumb">Ahmed &amp; Aisha / <b id="crumb">Plans</b></div><div class="sp"></div><div class="avatar">AS</div></header>
+
+    <!-- =============== 0 · PLANS =============== -->
+    <div class="body scr" id="s0" style="display:block">
+      <div class="head"><div>
+        <h1>Choose a plan for this event</h1>
+        <p class="lede">One payment, for this event only. Not a subscription — nothing renews and nothing is charged again.</p>
+      </div></div>
+
+      <div class="ban info"><span class="ic">◈</span><div>
+        <div class="t">You need 512 people</div>
+        <div class="d">186 invitations, admitting 512 between them. The 600 plan covers you with room for walk-ins.</div></div></div>
+
+      <div class="plans">
+        <div class="plan now">
+          <div class="cap">Free</div>
+          <div class="ppl">150 <span>people</span></div>
+          <div class="amt">₦0</div>
+          <div class="per">Your current plan</div>
+          <div class="go"><button class="btn" disabled style="opacity:.5">Not enough</button></div>
+        </div>
+        <div class="plan dim">
+          <div class="cap">Small</div>
+          <div class="ppl">300 <span>people</span></div>
+          <div class="amt">₦7,500</div>
+          <div class="per">₦25 a head</div>
+          <div class="go"><button class="btn">Too small</button></div>
+        </div>
+        <div class="plan pick">
+          <span class="flagpin">Fits your event</span>
+          <div class="cap">Standard</div>
+          <div class="ppl">600 <span>people</span></div>
+          <div class="amt">₦15,000</div>
+          <div class="per">₦25 a head</div>
+          <div class="go"><button class="btn pri">Pay ₦15,000</button></div>
+        </div>
+        <div class="plan">
+          <div class="cap">Large</div>
+          <div class="ppl">1,200 <span>people</span></div>
+          <div class="amt">₦25,000</div>
+          <div class="per">₦21 a head</div>
+          <div class="go"><button class="btn">Choose</button></div>
+        </div>
+        <div class="plan">
+          <div class="cap">Grand</div>
+          <div class="ppl">2,500 <span>people</span></div>
+          <div class="amt">₦40,000</div>
+          <div class="per">₦16 a head</div>
+          <div class="go"><button class="btn">Choose</button></div>
+        </div>
+      </div>
+
+      <div class="allin">
+        <h3>Every feature, on every plan</h3>
+        <p style="font-size:13px;color:var(--ink-2);margin-top:6px;line-height:1.55">Bigger events cost less a head. Nothing is held back for a higher price.</p>
+        <ul>
+          <li>Unlimited ushers and gates</li>
+          <li>Offline check-in</li>
+          <li>WhatsApp invitations</li>
+          <li>Walk-ins at the gate</li>
+          <li>Tables and seating</li>
+          <li>Live attendance</li>
+          <li>Full reports and CSV export</li>
+          <li>Guests never pay anything</li>
+        </ul>
+      </div>
+
+      <div class="sec">Organising events regularly?</div>
+      <div class="card">
+        <h2>Professional — ₦25,000 a month, or ₦240,000 a year</h2>
+        <p class="sub">Unlimited events, multiple client workspaces, your whole team. For planners and companies running events all year.</p>
+        <div class="ban warn" style="margin:16px 0 0"><span class="ic">▲</span><div>
+          <div class="t">Below about 16 events a year, paying per event is cheaper</div>
+          <div class="d">Two or three weddings a year? Stay on one-off pricing. We'd rather tell you than have you overpay and leave.</div></div></div>
+      </div>
+
+      <div class="sec">Paying</div>
+      <div class="card">
+        <p class="sub">Card, bank transfer or USSD through Paystack. Payment confirms in seconds and your guest limit lifts immediately — you don't lose your place.</p>
+      </div>
+    </div>
+
+    <!-- =============== 1 · BILLING =============== -->
+    <div class="body scr" id="s1">
+      <div class="head"><div><h1>Billing</h1><p class="lede">Payments are per event. There's nothing to cancel.</p></div></div>
+
+      <div class="card">
+        <h2>Ahmed &amp; Aisha — Standard</h2>
+        <p class="sub">Up to 600 people · paid 8 November · ₦15,000</p>
+        <div style="display:flex;gap:22px;margin-top:18px;flex-wrap:wrap">
+          <div><div style="font-size:22px;font-weight:600;letter-spacing:-.02em">512</div><div style="font-size:12px;color:var(--ink-3);margin-top:3px">passes issued</div></div>
+          <div><div style="font-size:22px;font-weight:600;letter-spacing:-.02em">88</div><div style="font-size:12px;color:var(--ink-3);margin-top:3px">still available</div></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px"><button class="btn">Increase limit</button><button class="btn">Download receipt</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Aisha's Bridal Shower — Free</h2>
+        <p class="sub">Up to 150 people · 42 passes issued</p>
+        <div style="margin-top:16px"><button class="btn sm">Choose a plan</button></div>
+      </div>
+
+      <div class="sec">Payment history</div>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Date</th><th>Event</th><th>Plan</th><th>Method</th><th class="num">Amount</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>8 Nov 2026</td><td class="nm">Ahmed &amp; Aisha</td><td>Standard · 600</td><td>Card ···· 4417</td><td class="num">₦15,000</td><td><span class="tag ok">Paid</span></td></tr>
+            <tr><td>2 Nov 2026</td><td class="nm">Ahmed &amp; Aisha</td><td>Standard · 600</td><td>Card ···· 4417</td><td class="num">₦15,000</td><td><span class="tag no">Failed</span></td></tr>
+            <tr><td>14 Aug 2026</td><td class="nm">Nikkah Family Dinner</td><td>Small · 300</td><td>Transfer</td><td class="num">₦7,500</td><td><span class="tag ok">Paid</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede" style="margin-top:12px">Receipts are emailed and stay here permanently. Failed attempts are never charged.</p>
+    </div>
+
+    <!-- =============== 2 · REPORTS =============== -->
+    <div class="body scr" id="s2">
+      <div class="head">
+        <div><h1>Report</h1><p class="lede">Ahmed &amp; Aisha · Saturday 12 December · closed 11:40 PM</p></div>
+        <div class="sp"></div><button class="btn">Export CSV</button><button class="btn pri">Download PDF</button>
+      </div>
+
+      <div class="figs">
+        <div class="fig"><div class="k">Invited</div><div class="v">512</div><div class="n">186 invitations</div></div>
+        <div class="fig"><div class="k">Confirmed</div><div class="v">431</div><div class="n">84% replied</div></div>
+        <div class="fig"><div class="k">Arrived</div><div class="v">397</div><div class="n">78% of invited</div></div>
+        <div class="fig"><div class="k">No-shows</div><div class="v">34</div><div class="n">confirmed, didn't come</div></div>
+        <div class="fig"><div class="k">Over allowance</div><div class="v">21</div><div class="n">across 14 parties</div></div>
+      </div>
+
+      <div class="chart">
+        <h2 style="font-size:15px;font-weight:600">When people arrived</h2>
+        <p class="sub" style="color:var(--ink-3);font-size:13px;margin-top:4px">Guests admitted, in 30-minute blocks</p>
+        <div class="bars">
+          <div class="bcol"><i style="height:6%"></i><span>4:00</span></div>
+          <div class="bcol"><i style="height:14%"></i><span>4:30</span></div>
+          <div class="bcol"><i style="height:31%"></i><span>5:00</span></div>
+          <div class="bcol peak"><i style="height:78%"></i><span>5:30</span></div>
+          <div class="bcol peak"><i style="height:100%"></i><span>6:00</span></div>
+          <div class="bcol"><i style="height:56%"></i><span>6:30</span></div>
+          <div class="bcol"><i style="height:27%"></i><span>7:00</span></div>
+          <div class="bcol"><i style="height:12%"></i><span>7:30</span></div>
+          <div class="bcol"><i style="height:5%"></i><span>8:00</span></div>
+        </div>
+        <p class="peaknote"><b>171 people arrived between 5:30 and 6:30.</b> That's 43% of the night through three gates in one hour. Next time, either open earlier or put a fourth usher on the main gate.</p>
+      </div>
+
+      <div class="sec">By gate</div>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Gate</th><th>Ushers</th><th class="num">Admitted</th><th class="num">Refused</th><th>Busiest</th></tr></thead>
+          <tbody>
+            <tr><td class="nm">Main Gate</td><td>Musa, Ifeoma</td><td class="num">248</td><td class="num">4</td><td>5:45–6:15 PM</td></tr>
+            <tr><td class="nm">Side Gate</td><td>Emeka</td><td class="num">112</td><td class="num">2</td><td>6:00–6:30 PM</td></tr>
+            <tr><td class="nm">VIP Entrance</td><td>Blessing</td><td class="num">37</td><td class="num">0</td><td>5:15–5:45 PM</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sec">Refused at the gate</div>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Time</th><th>What happened</th><th>Gate</th><th>Usher</th></tr></thead>
+          <tbody>
+            <tr><td class="num">6:07 PM</td><td><span class="tag no">Wrong event</span> Pass belonged to Yusuf &amp; Maryam</td><td>Side Gate</td><td>Emeka</td></tr>
+            <tr><td class="num">6:22 PM</td><td><span class="tag no">Invalid</span> Code did not verify</td><td>Main Gate</td><td>Musa</td></tr>
+            <tr><td class="num">6:41 PM</td><td><span class="tag pend">Party full</span> Adeyemi — 4 of 4 already admitted</td><td>Main Gate</td><td>Ifeoma</td></tr>
+            <tr><td class="num">7:03 PM</td><td><span class="tag no">Revoked</span> Tunde Bakare — removed 9 Dec</td><td>Main Gate</td><td>Musa</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede" style="margin-top:12px">Every scan is recorded, including the ones that were turned away. Six people were refused entry on the night.</p>
+    </div>
+
+    <!-- =============== 3 · TEAM =============== -->
+    <div class="body scr" id="s3">
+      <div class="head"><div><h1>Team</h1><p class="lede">Who can help you run this event, and what they can reach.</p></div>
+        <div class="sp"></div><button class="btn pri">Invite someone</button></div>
+
+      <div class="ban warn"><span class="ic">▲</span><div>
+        <div class="t">Two ushers haven't opened the scanner yet</div>
+        <div class="d">Ask them to sign in and scan any pass before the day. Staff who've never used it will hold up the queue.</div></div>
+        <div class="sp"></div><button class="btn sm">Send a nudge</button></div>
+
+      <div class="tlist">
+        <div class="tperson"><div class="tav">AS</div>
+          <div class="who"><div class="nm">Ahmed Sahabi <span class="tag flat">You</span></div><div class="sm2">Owner · full access including billing</div></div>
+          <span class="tag ok">Ready</span></div>
+        <div class="tperson"><div class="tav">FA</div>
+          <div class="who"><div class="nm">Fatima Aliyu</div><div class="sm2">Event manager · guests, tables, reports. No billing</div></div>
+          <span class="tag ok">Ready</span><button class="btn sm">Change</button></div>
+        <div class="tperson"><div class="tav">MU</div>
+          <div class="who"><div class="nm">Musa Ibrahim</div><div class="sm2">Usher · Main Gate · tested 21 Nov</div></div>
+          <span class="tag ok">Ready</span><button class="btn sm">Change</button></div>
+        <div class="tperson"><div class="tav">IF</div>
+          <div class="who"><div class="nm">Ifeoma Nwachukwu</div><div class="sm2">Usher · Main Gate</div></div>
+          <span class="tag pend">Never scanned</span><button class="btn sm">Remind</button></div>
+        <div class="tperson"><div class="tav">EM</div>
+          <div class="who"><div class="nm">Emeka Obi</div><div class="sm2">Usher · Side Gate</div></div>
+          <span class="tag pend">Never scanned</span><button class="btn sm">Remind</button></div>
+        <div class="tperson"><div class="tav">BL</div>
+          <div class="who"><div class="nm">Blessing Adeleke</div><div class="sm2">Usher · VIP Entrance · tested 19 Nov</div></div>
+          <span class="tag ok">Ready</span><button class="btn sm">Change</button></div>
+        <div class="tperson"><div class="tav" style="background:var(--surface-2);color:var(--ink-3)">?</div>
+          <div class="who"><div class="nm" style="color:var(--ink-3)">chidi.okeke@gmail.com</div><div class="sm2">Usher · invited 22 Nov, not accepted</div></div>
+          <span class="tag flat">Pending</span><button class="btn sm">Resend</button></div>
+      </div>
+
+      <div class="sec">What each role can do</div>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>&nbsp;</th><th>Owner</th><th>Event manager</th><th>Usher</th></tr></thead>
+          <tbody>
+            <tr><td class="nm">Scan and check in</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><td class="nm">Search guests by name</td><td>✓</td><td>✓</td><td>✓</td></tr>
+            <tr><td class="nm">Add walk-ins</td><td>✓</td><td>✓</td><td>Optional</td></tr>
+            <tr><td class="nm">Add and edit guests</td><td>✓</td><td>✓</td><td>—</td></tr>
+            <tr><td class="nm">Send invitations</td><td>✓</td><td>✓</td><td>—</td></tr>
+            <tr><td class="nm">Assign tables</td><td>✓</td><td>✓</td><td>—</td></tr>
+            <tr><td class="nm">See reports</td><td>✓</td><td>✓</td><td>Own gate only</td></tr>
+            <tr><td class="nm">Export the guest list</td><td>✓</td><td>✓</td><td>—</td></tr>
+            <tr><td class="nm">Billing and plans</td><td>✓</td><td>—</td><td>—</td></tr>
+            <tr><td class="nm">Manage the team</td><td>✓</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede" style="margin-top:12px">Ushers only ever see the event and gate they're assigned to. They can't export anyone's contact details.</p>
+    </div>
+
+    <!-- =============== 4 · SETTINGS =============== -->
+    <div class="body scr" id="s4">
+      <div class="head"><div><h1>Event settings</h1><p class="lede">Ahmed &amp; Aisha</p></div></div>
+
+      <div class="card">
+        <h2>The basics</h2>
+        <p class="sub">Changing the date or venue updates every guest's invitation page straight away.</p>
+        <div style="margin-top:18px">
+          <div class="f"><label>Event name</label><input class="inp" value="Ahmed &amp; Aisha"></div>
+          <div class="row2">
+            <div class="f"><label>Date</label><input class="inp" type="date" value="2026-12-12"></div>
+            <div class="f"><label>Venue</label><input class="inp" value="Oriental Hotel"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>At the gate</h2>
+        <p class="sub">How your ushers should handle the awkward cases.</p>
+        <div style="margin-top:6px">
+          <div class="tog"><div class="txt"><div class="t">Allow more people than invited</div>
+            <div class="d">Currently on. 14 parties have come with extra people — 21 in all.</div></div>
+            <button class="sw on" onclick="this.classList.toggle('on')"></button></div>
+          <div class="tog"><div class="txt"><div class="t">Require an RSVP before entry</div>
+            <div class="d">Off. 81 people never replied and would be stopped at the gate if you turn this on.</div></div>
+            <button class="sw" onclick="this.classList.toggle('on')"></button></div>
+          <div class="tog"><div class="txt"><div class="t">Let ushers add walk-ins</div>
+            <div class="d">On. Anyone added at the gate is flagged in your report.</div></div>
+            <button class="sw on" onclick="this.classList.toggle('on')"></button></div>
+          <div class="tog"><div class="txt"><div class="t">Let ushers undo their own check-ins</div>
+            <div class="d">On, for 30 seconds after a scan. Mis-taps happen; corrections are logged, never deleted.</div></div>
+            <button class="sw on" onclick="this.classList.toggle('on')"></button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Replies</h2>
+        <div style="margin-top:6px">
+          <div class="tog"><div class="txt"><div class="t">Ask how many are coming</div>
+            <div class="d">A household invited for four can reply that only three will come. Recommended — it's how you get a real headcount for the caterer.</div></div>
+            <button class="sw on" onclick="this.classList.toggle('on')"></button></div>
+          <div class="tog"><div class="txt"><div class="t">Let guests change their reply</div>
+            <div class="d">Up until the deadline below.</div></div>
+            <button class="sw on" onclick="this.classList.toggle('on')"></button></div>
+        </div>
+        <div class="f" style="margin-top:18px;margin-bottom:0;max-width:260px"><label>Reply by</label><input class="inp" type="date" value="2026-12-01"></div>
+      </div>
+
+      <div class="card danger-card">
+        <h2>Careful</h2>
+        <p class="sub" style="color:var(--ink-2)">These affect guests immediately.</p>
+        <div style="margin-top:10px">
+          <div class="drow"><div class="txt"><div class="t">Reissue every pass</div>
+            <div class="d">Kills all 512 existing passes and creates new ones. Only if you think codes have been shared widely. Everyone must be sent their link again.</div></div>
+            <button class="btn sm danger">Reissue</button></div>
+          <div class="drow"><div class="txt"><div class="t">Cancel this event</div>
+            <div class="d">Guests see a cancellation notice on their invitation. Passes stop working. Your data stays.</div></div>
+            <button class="btn sm danger">Cancel event</button></div>
+          <div class="drow"><div class="txt"><div class="t">Delete this event</div>
+            <div class="d">Removes 186 invitations, 512 passes and the full check-in history. This cannot be undone.</div></div>
+            <button class="btn sm danger">Delete</button></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const CR=["Plans","Billing","Report","Team","Settings"];
+const NAV={0:null,1:'n-bill',2:'n-rep',3:'n-team',4:'n-set'};
+function S(i,el){
+  document.querySelectorAll('.scr').forEach((s,n)=>s.style.display=n===i?'block':'none');
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  document.querySelectorAll('.nav a').forEach(a=>a.classList.remove('on'));
+  if(NAV[i]) document.getElementById(NAV[i]).classList.add('on');
+  document.getElementById('crumb').textContent=CR[i];
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>

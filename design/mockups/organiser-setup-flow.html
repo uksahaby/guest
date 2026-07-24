@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Organiser — setup &amp; sending</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAFAF7;--surface:#FFF;--surface-2:#F5F5F1;
+  --line:#E5E7E2;--line-soft:#EFEFEA;
+  --ink:#171A16;--ink-2:#5F665C;--ink-3:#8A9187;
+  --p900:#163300;--p600:#2F6B1C;--p100:#E8F1E4;--p50:#F5F9F3;
+  --ok:#2E7D32;--ok-bg:#E8F5E9;
+  --warn:#B7791F;--warn-bg:#FFF7E6;--warn-line:#F0DDB4;
+  --err:#C62828;--err-bg:#FDECEC;
+  --wa:#25D366;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+
+/* screen picker */
+.picker{
+  position:sticky;top:0;z-index:60;background:var(--p900);color:#fff;
+  display:flex;gap:4px;padding:9px 14px;overflow-x:auto;align-items:center;
+}
+.picker b{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.55;margin-right:10px;white-space:nowrap}
+.pbtn{
+  border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.72);
+  font:500 12.5px Inter,sans-serif;padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;
+}
+.pbtn:hover{background:rgba(255,255,255,.1);color:#fff}
+.pbtn.on{background:#fff;color:var(--p900);border-color:#fff;font-weight:600}
+
+.app{display:flex;min-height:calc(100vh - 46px)}
+
+/* sidebar */
+.side{width:230px;flex:0 0 230px;background:var(--surface);border-right:1px solid var(--line);padding:18px 0}
+.ev-head{padding:0 18px 16px;border-bottom:1px solid var(--line)}
+.ev-head .t{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.ev-head .s{font-size:12px;color:var(--ink-3);margin-top:4px}
+.nav{padding:14px 10px;display:flex;flex-direction:column;gap:1px}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;color:var(--ink-2);text-decoration:none;font-size:13px;font-weight:500}
+.nav a:hover{background:var(--surface-2)}
+.nav a.on{background:var(--p100);color:var(--p900);font-weight:600}
+.nav .ic{width:14px;text-align:center;font-size:12px;opacity:.75}
+
+.main{flex:1;min-width:0}
+.top{height:54px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 24px;gap:12px}
+.crumb{font-size:13px;color:var(--ink-3)}
+.crumb b{color:var(--ink);font-weight:500}
+.top .sp{flex:1}
+.avatar{width:29px;height:29px;border-radius:50%;background:var(--p900);color:#fff;display:grid;place-items:center;font-size:11.5px;font-weight:600}
+
+.body{padding:26px 24px 60px;max-width:1000px}
+.wide{max-width:1180px}
+
+h1{font-size:23px;font-weight:600;letter-spacing:-.02em}
+.lede{font-size:13.5px;color:var(--ink-2);margin-top:5px}
+.head{margin-bottom:22px;display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.head .sp{flex:1}
+
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:500 13.5px Inter,sans-serif;padding:10px 15px;border-radius:10px;cursor:pointer}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--p900);color:#fff;border-color:var(--p900);font-weight:600}
+.btn.pri:hover{background:#1F4506}
+.btn.sm{padding:7px 11px;font-size:12.5px}
+.btn.wa{background:var(--wa);border-color:var(--wa);color:#062B12;font-weight:600}
+.btn.wa:hover{background:#1FBB5A}
+.btn:focus-visible{outline:2px solid var(--p600);outline-offset:2px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px}
+.card+.card{margin-top:14px}
+.card h2{font-size:15px;font-weight:600;margin-bottom:4px}
+.card .sub{font-size:13px;color:var(--ink-3);margin-bottom:18px}
+
+label{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin-bottom:6px}
+.inp,select,textarea{
+  width:100%;border:1px solid var(--line);border-radius:10px;padding:12px 13px;
+  font:14px Inter,sans-serif;background:var(--surface);color:var(--ink);
+}
+.inp:focus,select:focus,textarea:focus{outline:none;border-color:var(--p600)}
+.f{margin-bottom:16px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.hint{font-size:12px;color:var(--ink-3);margin-top:6px;line-height:1.5}
+
+/* stepper */
+.steps{display:flex;gap:6px;margin-bottom:24px;flex-wrap:wrap}
+.step{
+  border:1px solid var(--line);background:var(--surface);border-radius:10px;
+  padding:9px 14px;font:500 12.5px Inter,sans-serif;color:var(--ink-3);cursor:pointer;
+  display:flex;align-items:center;gap:8px;
+}
+.step:hover{background:var(--surface-2)}
+.step.on{background:var(--p900);color:#fff;border-color:var(--p900);font-weight:600}
+.step.done{color:var(--p600);border-color:var(--p100);background:var(--p50)}
+.step .n{font-size:11px;opacity:.7}
+.pane{display:none}
+.pane.on{display:block}
+
+/* choice cards */
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.choice{
+  border:1.5px solid var(--line);background:var(--surface);border-radius:12px;
+  padding:14px;cursor:pointer;text-align:left;font-family:inherit;
+}
+.choice:hover{border-color:#CFD6C9}
+.choice.on{border-color:var(--p900);background:var(--p50)}
+.choice .t{font-size:13.5px;font-weight:600}
+.choice .d{font-size:12px;color:var(--ink-3);margin-top:4px;line-height:1.45}
+
+/* toggle rows */
+.tog{display:flex;align-items:flex-start;gap:14px;padding:16px 0;border-bottom:1px solid var(--line-soft)}
+.tog:last-child{border-bottom:0;padding-bottom:0}
+.tog .txt{flex:1}
+.tog .t{font-size:14px;font-weight:500}
+.tog .d{font-size:12.5px;color:var(--ink-3);margin-top:4px;line-height:1.55}
+.sw{
+  width:42px;height:24px;border-radius:14px;background:var(--line);border:0;cursor:pointer;
+  position:relative;flex:0 0 auto;transition:background .15s;margin-top:2px;
+}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw.on{background:var(--p600)}
+.sw.on::after{transform:translateX(18px)}
+.sw:focus-visible{outline:2px solid var(--p600);outline-offset:2px}
+
+/* dropzone */
+.drop{
+  border:1.5px dashed #CFD6C9;border-radius:16px;padding:38px 22px;text-align:center;background:var(--p50);
+}
+.drop .ic{font-size:26px;color:var(--p600)}
+.drop .t{font-size:15px;font-weight:600;margin-top:12px}
+.drop .d{font-size:13px;color:var(--ink-2);margin-top:6px}
+
+/* mapping */
+.map{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px}
+.maprow{display:grid;grid-template-columns:1fr 30px 1fr;gap:12px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--line-soft)}
+.maprow:last-child{border-bottom:0}
+.maprow .src{font-size:13.5px;font-weight:500}
+.maprow .src span{display:block;font-size:12px;color:var(--ink-3);font-weight:400;margin-top:2px}
+.maprow .ar{text-align:center;color:var(--ink-3)}
+.maprow select{padding:9px 11px;font-size:13px}
+
+/* table */
+.tbl{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;font:600 11.5px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+tbody td{padding:13px 16px;border-bottom:1px solid var(--line-soft)}
+tbody tr:last-child td{border-bottom:0}
+.nm{font-size:13.5px;font-weight:500}
+.sm2{font-size:12px;color:var(--ink-3);margin-top:2px}
+.tag{display:inline-block;font:600 11.5px Inter,sans-serif;padding:4px 8px;border-radius:6px}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.pend{background:var(--warn-bg);color:var(--warn)}
+.tag.no{background:var(--err-bg);color:var(--err)}
+.tag.flat{background:var(--surface-2);color:var(--ink-3)}
+
+/* banner */
+.ban{border-radius:14px;padding:15px 17px;display:flex;gap:13px;align-items:flex-start;margin-bottom:16px}
+.ban.warn{background:var(--warn-bg);border:1px solid var(--warn-line)}
+.ban.info{background:var(--p50);border:1px solid var(--p100)}
+.ban .ic{font-size:14px;line-height:1.3}
+.ban.warn .ic{color:var(--warn)}
+.ban.info .ic{color:var(--p600)}
+.ban .t{font-size:13.5px;font-weight:600}
+.ban .d{font-size:12.5px;margin-top:4px;line-height:1.55}
+.ban.warn .t{color:#7A5510}.ban.warn .d{color:#8A6317}
+.ban.info .t{color:var(--p900)}.ban.info .d{color:var(--ink-2)}
+.ban .sp{flex:1}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(23,26,22,.4);display:none;align-items:center;justify-content:center;z-index:80;padding:20px}
+.scrim.on{display:flex}
+.modal{background:var(--surface);border-radius:20px;width:100%;max-width:470px;padding:24px;max-height:90vh;overflow:auto}
+.modal h3{font-size:17px;font-weight:600;margin-bottom:3px}
+.modal .sub{font-size:13px;color:var(--ink-3);margin-bottom:20px}
+.mfoot{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+
+/* drawer */
+.dwrap{position:fixed;inset:0;z-index:70;display:none}
+.dwrap.on{display:block}
+.dscrim{position:absolute;inset:0;background:rgba(23,26,22,.35)}
+.drawer{
+  position:absolute;right:0;top:0;bottom:0;width:min(430px,100%);background:var(--surface);
+  border-left:1px solid var(--line);overflow:auto;padding:24px;
+}
+.dhead{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px}
+.dhead h3{font-size:19px;font-weight:600;letter-spacing:-.015em}
+.dhead .s{font-size:13px;color:var(--ink-3);margin-top:4px}
+.dhead .x{margin-left:auto;background:none;border:0;font-size:17px;color:var(--ink-3);cursor:pointer}
+.dsec{font:600 11px Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:22px 0 11px}
+.kv{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px}
+.kv:last-child{border-bottom:0}
+.kv dt{color:var(--ink-2)}
+.kv dd{font-weight:500;text-align:right}
+.person{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:13.5px}
+.person .dot{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.person .dot.in{background:var(--ok)}
+.person .st{margin-left:auto;font-size:12px;color:var(--ink-3)}
+.tl{display:flex;gap:11px;padding:10px 0;font-size:13px}
+.tl .d{width:7px;height:7px;border-radius:50%;background:var(--p600);margin-top:5px;flex:0 0 auto}
+.tl .w{color:var(--ink-3);font-size:12px;margin-top:2px}
+
+/* send list */
+.sendrow{display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid var(--line-soft);background:var(--surface)}
+.sendrow:last-child{border-bottom:0}
+.sendrow .who{flex:1;min-width:0}
+.sendrow .st{font-size:12px;color:var(--ink-3);white-space:nowrap}
+.sendlist{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.chk{width:16px;height:16px;accent-color:var(--p900)}
+
+.msgbox{
+  background:#E7F7EC;border:1px solid #BFE8CD;border-radius:14px;padding:15px 16px;
+  font-size:13.5px;line-height:1.6;color:#0E3A1E;white-space:pre-line;
+}
+
+@media (max-width:860px){
+  .side{display:none}
+  .body{padding:18px 14px 50px}
+  .row2,.row3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav class="picker">
+  <b>Screen</b>
+  <button class="pbtn on" onclick="S(0,this)">Create event</button>
+  <button class="pbtn" onclick="S(1,this)">Import guests</button>
+  <button class="pbtn" onclick="S(2,this)">Send invitations</button>
+  <button class="pbtn" onclick="S(3,this)">Add invitation</button>
+  <button class="pbtn" onclick="S(4,this)">Invitation detail</button>
+</nav>
+
+<div class="app">
+  <aside class="side">
+    <div class="ev-head"><div class="t">Ahmed &amp; Aisha</div><div class="s">12 Dec 2026 · Ikoyi, Lagos</div></div>
+    <nav class="nav">
+      <a href="#"><span class="ic">◈</span>Overview</a>
+      <a href="#" class="on" id="nav-g"><span class="ic">◎</span>Guests</a>
+      <a href="#"><span class="ic">✉</span>Invitations</a>
+      <a href="#"><span class="ic">▤</span>Tables</a>
+      <a href="#"><span class="ic">▦</span>Passes</a>
+      <a href="#"><span class="ic">◉</span>Check-in</a>
+      <a href="#"><span class="ic">▥</span>Reports</a>
+      <a href="#"><span class="ic">⚙</span>Settings</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="crumb">Events / <b id="crumb">Create event</b></div>
+      <div class="sp"></div><div class="avatar">AS</div>
+    </header>
+
+    <!-- ================= 0 · CREATE EVENT ================= -->
+    <div class="body scr on" id="s0">
+      <div class="head"><div><h1>Create event</h1><p class="lede">You can change any of this later.</p></div></div>
+
+      <div class="steps">
+        <button class="step on" onclick="P(0,this)"><span class="n">1</span>Details</button>
+        <button class="step" onclick="P(1,this)"><span class="n">2</span>Venue</button>
+        <button class="step" onclick="P(2,this)"><span class="n">3</span>Guests &amp; entry</button>
+        <button class="step" onclick="P(3,this)"><span class="n">4</span>Tables</button>
+        <button class="step" onclick="P(4,this)"><span class="n">5</span>Review</button>
+      </div>
+
+      <div class="pane on">
+        <div class="card">
+          <h2>What are you organising?</h2>
+          <p class="sub">This only changes a few defaults — nothing is locked.</p>
+          <div class="choices">
+            <button class="choice on"><div class="t">Wedding</div><div class="d">Households, tables, aso-ebi</div></button>
+            <button class="choice"><div class="t">Birthday or party</div><div class="d">Smaller, informal</div></button>
+            <button class="choice"><div class="t">Religious programme</div><div class="d">Repeating sessions</div></button>
+            <button class="choice"><div class="t">Corporate</div><div class="d">Badges, named guests</div></button>
+            <button class="choice"><div class="t">Conference</div><div class="d">Multi-day, sessions</div></button>
+            <button class="choice"><div class="t">Something else</div><div class="d">Start from blank</div></button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="f"><label>Event name</label><input class="inp" value="Ahmed &amp; Aisha"></div>
+          <div class="row3">
+            <div class="f"><label>Date</label><input class="inp" type="date" value="2026-12-12"></div>
+            <div class="f"><label>Guests arrive</label><input class="inp" type="time" value="16:00"></div>
+            <div class="f"><label>Doors close</label><input class="inp" type="time" value="18:30"></div>
+          </div>
+          <div class="f" style="margin-bottom:0"><label>A note for guests <span style="color:var(--ink-3);font-weight:400">(optional)</span></label>
+            <textarea class="inp" rows="3">Aso-ebi colours are emerald and gold.</textarea></div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <div class="card">
+          <h2>Where is it?</h2>
+          <p class="sub">Guests see this on their invitation with a link to Maps.</p>
+          <div class="f"><label>Venue</label><input class="inp" value="Oriental Hotel"></div>
+          <div class="f"><label>Street address</label><input class="inp" value="3 Lekki–Epe Expressway"></div>
+          <div class="row2">
+            <div class="f"><label>City</label><input class="inp" value="Victoria Island, Lagos"></div>
+            <div class="f"><label>Country</label><select><option>Nigeria</option><option>United Kingdom</option><option>Ghana</option></select></div>
+          </div>
+          <div class="f" style="margin-bottom:0"><label>Gates</label><input class="inp" value="Main Gate, Side Gate, VIP Entrance">
+            <p class="hint">Separate with commas. Every check-in records which gate it came through, so add them even if you only expect one.</p></div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <div class="card">
+          <h2>How you'll invite people</h2>
+          <p class="sub">Invitations go to a household, not a person. A family of four is one invitation that admits four.</p>
+          <div class="tog">
+            <div class="txt"><div class="t">Allow more people than invited</div>
+              <div class="d">A party of four turns up with five. Your usher can let them in and you'll see it on the dashboard as it happens. Turning this off means they're stopped at the gate until a manager intervenes.</div></div>
+            <button class="sw on" onclick="this.classList.toggle('on')"></button>
+          </div>
+          <div class="tog">
+            <div class="txt"><div class="t">Require an RSVP before entry</div>
+              <div class="d">Off by default. Most guests who never reply still turn up, and refusing them at the gate causes a scene.</div></div>
+            <button class="sw" onclick="this.classList.toggle('on')"></button>
+          </div>
+          <div class="tog">
+            <div class="txt"><div class="t">Let ushers add walk-ins</div>
+              <div class="d">Creates an invitation and pass on the spot. Anyone added this way is flagged in your reports.</div></div>
+            <button class="sw on" onclick="this.classList.toggle('on')"></button>
+          </div>
+        </div>
+        <div class="ban info"><span class="ic">◈</span><div><div class="t">Your free plan covers 150 people</div>
+          <div class="d">Build the whole list now — nothing is capped until you send invitations.</div></div></div>
+      </div>
+
+      <div class="pane">
+        <div class="card">
+          <h2>Seating</h2>
+          <p class="sub">Optional. You can turn this on later once replies come in.</p>
+          <div class="tog"><div class="txt"><div class="t">Assign guests to tables</div>
+            <div class="d">Table numbers appear on each guest's pass and on the usher's screen when they scan.</div></div>
+            <button class="sw on" onclick="this.classList.toggle('on')"></button></div>
+          <div class="row2" style="margin-top:18px">
+            <div class="f"><label>How many tables</label><input class="inp" value="42"></div>
+            <div class="f"><label>Seats per table</label><input class="inp" value="10"></div>
+          </div>
+          <p class="hint" style="margin-top:0">Creates Table 1 to Table 42. Rename any of them afterwards — VIP Table, Bride's Family, and so on.</p>
+        </div>
+      </div>
+
+      <div class="pane">
+        <div class="card">
+          <h2>Ready to create</h2>
+          <p class="sub">Check it over.</p>
+          <dl>
+            <div class="kv"><dt>Event</dt><dd>Ahmed &amp; Aisha · Wedding</dd></div>
+            <div class="kv"><dt>When</dt><dd>Sat 12 Dec 2026 · 4:00–6:30 PM</dd></div>
+            <div class="kv"><dt>Where</dt><dd>Oriental Hotel, Victoria Island</dd></div>
+            <div class="kv"><dt>Gates</dt><dd>Main · Side · VIP</dd></div>
+            <div class="kv"><dt>Over-allowance</dt><dd>Allowed, you're notified</dd></div>
+            <div class="kv"><dt>RSVP required</dt><dd>No</dd></div>
+            <div class="kv"><dt>Tables</dt><dd>42 tables · 10 seats</dd></div>
+          </dl>
+          <div style="display:flex;gap:10px;margin-top:22px"><button class="btn">Back</button><button class="btn pri">Create event</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 1 · IMPORT ================= -->
+    <div class="body scr" id="s1">
+      <div class="head"><div><h1>Import guests</h1><p class="lede">A spreadsheet of households. One row per invitation, not per person.</p></div></div>
+
+      <div class="drop">
+        <div class="ic">▤</div>
+        <div class="t">guest-list.csv</div>
+        <div class="d">186 rows found · <a href="#" style="color:var(--p600)">Choose a different file</a></div>
+      </div>
+
+      <h2 style="font-size:14px;font-weight:600;margin:26px 0 4px">Match your columns</h2>
+      <p class="lede" style="margin-bottom:0">We've guessed from your headings. Change anything that's wrong.</p>
+      <div class="map">
+        <div class="maprow"><div class="src">Name<span>Mr &amp; Mrs Adeyemi</span></div><div class="ar">→</div>
+          <select><option selected>Invitation name</option><option>Ignore</option></select></div>
+        <div class="maprow"><div class="src">No. of guests<span>4</span></div><div class="ar">→</div>
+          <select><option selected>Party size</option><option>Ignore</option></select></div>
+        <div class="maprow"><div class="src">Phone<span>0803 411 2098</span></div><div class="ar">→</div>
+          <select><option selected>Phone number</option><option>Ignore</option></select></div>
+        <div class="maprow"><div class="src">Side<span>Groom's Family</span></div><div class="ar">→</div>
+          <select><option selected>Category</option><option>Ignore</option></select></div>
+        <div class="maprow"><div class="src">Email<span>(mostly empty)</span></div><div class="ar">→</div>
+          <select><option selected>Ignore</option><option>Email address</option></select></div>
+      </div>
+
+      <div class="ban warn" style="margin-top:22px"><span class="ic">▲</span>
+        <div><div class="t">11 rows need a second look</div>
+          <div class="d">7 have no party size — we'll set them to 1. 3 phone numbers look incomplete. 1 name appears twice.</div></div>
+        <div class="sp"></div><button class="btn sm">Review these</button></div>
+
+      <h2 style="font-size:14px;font-weight:600;margin:6px 0 12px">First few rows</h2>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Invitation</th><th>Party</th><th>Phone</th><th>Category</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="nm">Mr &amp; Mrs Adeyemi</td><td>4</td><td>0803 411 2098</td><td>Groom's Family</td><td></td></tr>
+            <tr><td class="nm">The Okafor Family</td><td>6</td><td>0806 220 7714</td><td>Bride's Family</td><td></td></tr>
+            <tr><td class="nm">Chidinma Okafor</td><td>1</td><td>0701 884 3320</td><td>Bride's Colleagues</td><td></td></tr>
+            <tr><td class="nm">Alhaji Ibrahim Sani</td><td>2</td><td>0805 913 6002</td><td>VIP</td><td></td></tr>
+            <tr><td class="nm">Emeka Balogun</td><td><span style="color:var(--warn)">1</span></td><td>0703 552 1187</td><td>Groom's Colleagues</td><td><span class="tag pend">Assumed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="ban info" style="margin-top:20px"><span class="ic">◈</span>
+        <div><div class="t">512 people across 186 invitations</div>
+          <div class="d">Importing is free on every plan. You'll choose a plan when you send the invitations.</div></div></div>
+
+      <div style="display:flex;gap:10px"><button class="btn">Cancel</button><button class="btn pri">Import 186 invitations</button></div>
+    </div>
+
+    <!-- ================= 2 · SEND ================= -->
+    <div class="body wide scr" id="s2">
+      <div class="head">
+        <div><h1>Send invitations</h1><p class="lede">Each household gets its own link. Opening it shows their pass.</p></div>
+        <div class="sp"></div>
+        <button class="btn">Copy all links</button>
+        <button class="btn">Send by email instead</button>
+      </div>
+
+      <div class="ban info"><span class="ic">◈</span>
+        <div><div class="t">WhatsApp opens with the message ready — you press send</div>
+          <div class="d">Because it goes through your own WhatsApp, we can't confirm delivery. We'll show you when a link is opened instead, which is the more useful signal anyway.</div></div></div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2>What they'll receive</h2>
+        <p class="sub">Edit once, used for everyone. Names and links fill themselves in.</p>
+        <div class="msgbox">Mr &amp; Mrs Adeyemi — you're invited to the wedding of Ahmed &amp; Aisha on Saturday 12 December at Oriental Hotel, Victoria Island.
+
+Your invitation admits 4.
+
+Open it here to reply and get your entry pass:
+gtfd.ng/a9k2mv</div>
+        <button class="btn sm" style="margin-top:14px">Edit message</button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px;margin:0;font-size:13.5px"><input type="checkbox" class="chk" checked> 186 selected</label>
+        <div class="sp" style="flex:1"></div>
+        <button class="btn sm">Not yet sent (186)</button>
+        <button class="btn sm">Sent (0)</button>
+      </div>
+
+      <div class="sendlist">
+        <div class="sendrow"><input type="checkbox" class="chk" checked>
+          <div class="who"><div class="nm">Mr &amp; Mrs Adeyemi</div><div class="sm2">Admits 4 · 0803 411 2098</div></div>
+          <span class="st">Not sent</span><button class="btn wa sm">WhatsApp</button><button class="btn sm">Copy link</button></div>
+        <div class="sendrow"><input type="checkbox" class="chk" checked>
+          <div class="who"><div class="nm">The Okafor Family</div><div class="sm2">Admits 6 · 0806 220 7714</div></div>
+          <span class="st">Not sent</span><button class="btn wa sm">WhatsApp</button><button class="btn sm">Copy link</button></div>
+        <div class="sendrow"><input type="checkbox" class="chk">
+          <div class="who"><div class="nm">Chidinma Okafor</div><div class="sm2">Admits 1 · 0701 884 3320</div></div>
+          <span class="st" style="color:var(--ok)">Opened 2 days ago</span><button class="btn sm">WhatsApp again</button><button class="btn sm">Copy link</button></div>
+        <div class="sendrow"><input type="checkbox" class="chk">
+          <div class="who"><div class="nm">Alhaji Ibrahim Sani</div><div class="sm2">Admits 2 · 0805 913 6002</div></div>
+          <span class="st">Link generated</span><button class="btn wa sm">WhatsApp</button><button class="btn sm">Copy link</button></div>
+        <div class="sendrow"><input type="checkbox" class="chk" checked>
+          <div class="who"><div class="nm">Emeka Balogun</div><div class="sm2">Admits 2 · no phone number</div></div>
+          <span class="st" style="color:var(--warn)">Needs a number</span><button class="btn sm">Add number</button><button class="btn sm">Copy link</button></div>
+      </div>
+
+      <div class="ban warn" style="margin-top:20px"><span class="ic">▲</span>
+        <div><div class="t">Sending all 186 will use 512 of your 150 free passes</div>
+          <div class="d">Choose a plan to continue. Everything you've built stays as it is.</div></div>
+        <div class="sp"></div><button class="btn pri">See plans</button></div>
+    </div>
+
+    <!-- ================= 3 · ADD INVITATION ================= -->
+    <div class="body scr" id="s3">
+      <div class="head"><div><h1>Add invitation</h1><p class="lede">The modal as it appears over the guest list.</p></div>
+        <div class="sp"></div><button class="btn pri" onclick="M(1)">Open it</button></div>
+      <div class="card" style="opacity:.5"><h2>Guest list</h2><p class="sub">186 invitations · 512 people</p></div>
+    </div>
+
+    <!-- ================= 4 · DETAIL ================= -->
+    <div class="body scr" id="s4">
+      <div class="head"><div><h1>Invitation detail</h1><p class="lede">Opens as a drawer from the guest list — you never lose your place.</p></div>
+        <div class="sp"></div><button class="btn pri" onclick="D(1)">Open it</button></div>
+      <div class="card" style="opacity:.5"><h2>Guest list</h2><p class="sub">186 invitations · 512 people</p></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- modal -->
+<div class="scrim" id="scrim" onclick="if(event.target===this)M(0)">
+  <div class="modal">
+    <h3>Add invitation</h3>
+    <p class="sub">One row per household. Name the individuals later if you want to.</p>
+    <div class="f"><label>Who is it addressed to</label><input class="inp" placeholder="Mr &amp; Mrs Adeyemi">
+      <p class="hint">Exactly as you'd write it on a card. This is what they see.</p></div>
+    <div class="row2">
+      <div class="f"><label>How many people it admits</label><input class="inp" value="4"></div>
+      <div class="f"><label>Category</label><select><option>Groom's Family</option><option>Bride's Family</option><option>VIP</option><option>Colleagues</option></select></div>
+    </div>
+    <div class="f"><label>Phone number</label><input class="inp" placeholder="0803 411 2098">
+      <p class="hint">Used for the WhatsApp invitation. Email is optional.</p></div>
+    <div class="f" style="margin-bottom:0"><label>Table <span style="color:var(--ink-3);font-weight:400">(optional)</span></label>
+      <select><option>Not assigned yet</option><option>Table 12</option><option>VIP Table</option></select></div>
+    <div class="mfoot"><button class="btn" onclick="M(0)">Cancel</button><button class="btn" onclick="M(0)">Save &amp; add another</button><button class="btn pri" onclick="M(0)">Save</button></div>
+  </div>
+</div>
+
+<!-- drawer -->
+<div class="dwrap" id="dwrap"><div class="dscrim" onclick="D(0)"></div>
+  <aside class="drawer">
+    <div class="dhead"><div><h3>Mr &amp; Mrs Adeyemi</h3><div class="s">Groom's Family · admits 4</div></div>
+      <button class="x" onclick="D(0)">✕</button></div>
+
+    <div style="display:flex;gap:8px"><button class="btn sm wa">WhatsApp</button><button class="btn sm">Copy link</button><button class="btn sm">Edit</button></div>
+
+    <div class="dsec">Status</div>
+    <dl>
+      <div class="kv"><dt>Reply</dt><dd><span class="tag ok">Confirmed 4</span></dd></div>
+      <div class="kv"><dt>Table</dt><dd>Table 12</dd></div>
+      <div class="kv"><dt>Pass</dt><dd>Active</dd></div>
+      <div class="kv"><dt>Arrived</dt><dd>3 of 4 · 1 remaining</dd></div>
+      <div class="kv"><dt>Phone</dt><dd>0803 411 2098</dd></div>
+    </dl>
+
+    <div class="dsec">The people</div>
+    <div class="person"><span class="dot in"></span><span>Kunle Adeyemi</span><span class="st">Arrived 6:04 PM</span></div>
+    <div class="person"><span class="dot in"></span><span>Folake Adeyemi</span><span class="st">Arrived 6:04 PM</span></div>
+    <div class="person"><span class="dot in"></span><span>Simi Adeyemi</span><span class="st">Arrived 6:04 PM</span></div>
+    <div class="person"><span class="dot"></span><span>Tobi Adeyemi</span><span class="st">Not arrived</span></div>
+    <button class="btn sm" style="margin-top:10px">Edit names</button>
+
+    <div class="dsec">History</div>
+    <div class="tl"><span class="d"></span><div>3 of 4 admitted at Main Gate by Musa<div class="w">Today, 6:04 PM</div></div></div>
+    <div class="tl"><span class="d"></span><div>Confirmed 4 attending<div class="w">14 November</div></div></div>
+    <div class="tl"><span class="d"></span><div>Invitation opened<div class="w">9 November</div></div></div>
+    <div class="tl"><span class="d"></span><div>Sent on WhatsApp by Ahmed<div class="w">8 November</div></div></div>
+
+    <div class="dsec">Careful</div>
+    <button class="btn sm" style="color:var(--err);border-color:#F3D2D2">Revoke pass</button>
+  </aside>
+</div>
+
+<script>
+const CR=["Create event","Import guests","Send invitations","Guests","Guests"];
+function S(i,el){
+  document.querySelectorAll('.scr').forEach((s,n)=>s.style.display=n===i?'block':'none');
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('crumb').textContent=CR[i];
+  window.scrollTo(0,0);
+}
+function P(i,el){
+  document.querySelectorAll('#s0 .pane').forEach((p,n)=>p.classList.toggle('on',n===i));
+  document.querySelectorAll('.step').forEach((s,n)=>{
+    s.classList.toggle('on',n===i); s.classList.toggle('done',n<i);
+  });
+}
+function M(o){document.getElementById('scrim').classList.toggle('on',!!o)}
+function D(o){document.getElementById('dwrap').classList.toggle('on',!!o)}
+document.querySelectorAll('.scr').forEach((s,n)=>s.style.display=n===0?'block':'none');
+document.querySelectorAll('.choice').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('.choice').forEach(x=>x.classList.remove('on'));c.classList.add('on');
+});
+</script>
+</body>
+</html>

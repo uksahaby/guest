@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auth, onboarding, scanner entry, admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAFAF7;--surface:#FFF;--surface-2:#F5F5F1;
+  --line:#E5E7E2;--line-soft:#EFEFEA;
+  --ink:#171A16;--ink-2:#5F665C;--ink-3:#8A9187;
+  --p900:#163300;--p600:#2F6B1C;--p100:#E8F1E4;--p50:#F5F9F3;
+  --ok:#2E7D32;--ok-bg:#E8F5E9;
+  --warn:#B7791F;--warn-bg:#FFF7E6;--warn-line:#F0DDB4;
+  --err:#C62828;--err-bg:#FDECEC;
+  --ground:#12140F;--dsurf:#1C1F19;--dline:#333829;
+  --dtext:#F5F7F2;--dmute:#8A9187;--admit:#4ADE80;--hold:#FBBF24;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#EDEDE7;color:var(--ink);font:14px Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+
+.picker{position:sticky;top:0;z-index:60;background:var(--p900);color:#fff;display:flex;gap:4px;padding:9px 14px;overflow-x:auto;align-items:center}
+.picker b{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.55;margin-right:8px;white-space:nowrap}
+.pbtn{border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.72);font:500 12.5px Inter,sans-serif;padding:7px 11px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.pbtn:hover{background:rgba(255,255,255,.1);color:#fff}
+.pbtn.on{background:#fff;color:var(--p900);border-color:#fff;font-weight:600}
+.picker .div{width:1px;height:20px;background:rgba(255,255,255,.2);margin:0 6px;flex:0 0 auto}
+
+.scr{display:none}
+.scr.on{display:block}
+
+/* ============ auth shell ============ */
+.auth{min-height:calc(100vh - 46px);background:var(--bg);display:flex;align-items:center;justify-content:center;padding:40px 18px}
+.box{width:100%;max-width:392px}
+.logo{display:flex;align-items:center;gap:9px;justify-content:center;margin-bottom:30px}
+.logo .m{width:28px;height:28px;border-radius:8px;background:var(--p900);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:700}
+.logo span{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.acard{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px}
+.acard h1{font-size:21px;font-weight:600;letter-spacing:-.02em}
+.acard .lede{font-size:13.5px;color:var(--ink-2);margin-top:7px;line-height:1.55}
+label{display:block;font-size:12.5px;font-weight:500;color:var(--ink-2);margin-bottom:6px}
+.inp,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:13px;font:14px Inter,sans-serif;background:var(--surface);color:var(--ink)}
+.inp:focus,select:focus{outline:none;border-color:var(--p600)}
+.f{margin-bottom:15px}
+.hint{font-size:12px;color:var(--ink-3);margin-top:6px;line-height:1.5}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:500 13.5px Inter,sans-serif;padding:11px 15px;border-radius:10px;cursor:pointer}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--p900);color:#fff;border-color:var(--p900);font-weight:600}
+.btn.pri:hover{background:#1F4506}
+.btn.sm{padding:7px 11px;font-size:12.5px}
+.btn.wide{width:100%;padding:14px}
+.btn:focus-visible{outline:2px solid var(--p600);outline-offset:2px}
+.sep{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--ink-3);font-size:12px}
+.sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--line)}
+.alt{text-align:center;font-size:13.5px;color:var(--ink-2);margin-top:20px}
+.alt a{color:var(--p600);font-weight:600;text-decoration:none}
+.legal{text-align:center;font-size:12px;color:var(--ink-3);margin-top:18px;line-height:1.6}
+.legal a{color:var(--ink-2)}
+.otp{display:flex;gap:8px}
+.otp input{flex:1;text-align:center;font:600 20px Inter,sans-serif;padding:14px 0;border:1px solid var(--line);border-radius:10px}
+.otp input:focus{outline:none;border-color:var(--p600)}
+
+/* ============ onboarding ============ */
+.ob{min-height:calc(100vh - 46px);background:var(--bg);padding:44px 18px}
+.obwrap{max-width:620px;margin:0 auto}
+.obdots{display:flex;gap:6px;justify-content:center;margin-bottom:32px}
+.obdots i{width:28px;height:3px;border-radius:2px;background:var(--line)}
+.obdots i.on{background:var(--p900)}
+.ob h1{font-size:26px;font-weight:600;letter-spacing:-.025em;text-align:center}
+.ob .lede{font-size:14px;color:var(--ink-2);margin-top:9px;text-align:center;line-height:1.6}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px;margin-top:30px}
+.choice{border:1.5px solid var(--line);background:var(--surface);border-radius:14px;padding:17px;cursor:pointer;text-align:left;font-family:inherit}
+.choice:hover{border-color:#CFD6C9}
+.choice.on{border-color:var(--p900);background:var(--p50)}
+.choice .t{font-size:14px;font-weight:600}
+.choice .d{font-size:12.5px;color:var(--ink-3);margin-top:4px;line-height:1.45}
+.obcard{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px;margin-top:26px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.obfoot{display:flex;gap:10px;justify-content:center;margin-top:24px}
+
+/* empty */
+.empty{max-width:440px;margin:70px auto;text-align:center}
+.emptyart{
+  width:88px;height:88px;margin:0 auto 24px;border-radius:22px;
+  background:var(--p50);border:1px solid var(--p100);display:grid;place-items:center;
+  font-size:32px;color:var(--p600);
+}
+.empty h2{font-size:22px;font-weight:600;letter-spacing:-.02em}
+.empty p{font-size:14px;color:var(--ink-2);margin-top:11px;line-height:1.65}
+.emptyshell{min-height:calc(100vh - 46px);background:var(--bg);display:flex}
+.esbar{width:230px;flex:0 0 230px;background:var(--surface);border-right:1px solid var(--line);padding:18px 0}
+.esbar .brand{display:flex;align-items:center;gap:9px;padding:0 18px 20px}
+.esbar .m{width:25px;height:25px;border-radius:7px;background:var(--p900);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+.esnav{padding:0 10px;display:flex;flex-direction:column;gap:1px}
+.esnav a{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;color:var(--ink-3);text-decoration:none;font-size:13px;font-weight:500}
+.esnav a.on{background:var(--p100);color:var(--p900);font-weight:600}
+
+/* ============ phone (scanner) ============ */
+.stage{min-height:calc(100vh - 46px);background:#0B0C09;display:flex;justify-content:center;align-items:flex-start;padding:34px 16px 60px;gap:30px;flex-wrap:wrap}
+.phone{width:340px;height:700px;background:var(--ground);border:1px solid var(--dline);border-radius:36px;padding:10px;box-shadow:0 26px 60px rgba(0,0,0,.6);flex:0 0 auto}
+.pscreen{width:100%;height:100%;border-radius:27px;overflow:hidden;background:var(--ground);color:var(--dtext);display:flex;flex-direction:column;padding:26px 22px}
+.pscreen h2{font-size:22px;font-weight:600;letter-spacing:-.02em}
+.pscreen .sub{font-size:13.5px;color:var(--dmute);margin-top:9px;line-height:1.55}
+.dlabel{display:block;font-size:12px;font-weight:500;color:var(--dmute);margin-bottom:7px}
+.dinp{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:15px;color:var(--dtext);font:16px Inter,sans-serif}
+.dinp::placeholder{color:var(--dmute)}
+.dinp:focus{outline:none;border-color:var(--admit)}
+.dbtn{width:100%;border:0;background:var(--dtext);color:var(--ground);font:600 15px Inter,sans-serif;padding:16px;border-radius:13px;cursor:pointer;margin-top:18px}
+.dbtn.ghost{background:transparent;color:var(--dtext);border:1px solid rgba(255,255,255,.16)}
+.dbtn.green{background:var(--admit);color:#0A2413}
+.dmark{width:34px;height:34px;border-radius:10px;background:var(--dsurf);border:1px solid var(--dline);display:grid;place-items:center;font-size:15px;color:var(--admit);margin-bottom:22px}
+.pick{display:flex;align-items:center;gap:13px;padding:16px;border:1px solid var(--dline);border-radius:14px;background:var(--dsurf);margin-bottom:9px;cursor:pointer}
+.pick:hover{border-color:rgba(255,255,255,.24)}
+.pick.on{border-color:var(--admit);background:#14251A}
+.pick .t{font-size:15px;font-weight:600}
+.pick .d{font-size:12.5px;color:var(--dmute);margin-top:3px}
+.pick .r{margin-left:auto;font-size:12px;color:var(--dmute);text-align:right}
+.pick .r b{display:block;font-size:16px;color:var(--dtext);font-weight:600}
+.prep{background:var(--dsurf);border:1px solid var(--dline);border-radius:14px;padding:16px;margin-top:auto}
+.prep .row{display:flex;align-items:center;gap:11px;padding:8px 0;font-size:13.5px}
+.prep .tick{width:17px;height:17px;border-radius:50%;background:var(--admit);color:#0A2413;display:grid;place-items:center;font-size:10px;font-weight:700;flex:0 0 auto}
+.prep .tick.wait{background:transparent;border:1.5px solid var(--hold);color:var(--hold)}
+.prep .w{margin-left:auto;font-size:12px;color:var(--dmute)}
+.plabel{text-align:center;color:var(--dmute);font-size:12.5px;margin-top:14px;max-width:340px}
+
+/* ============ admin (deliberately plain) ============ */
+.adm{min-height:calc(100vh - 46px);background:#F2F2EF;display:flex}
+.admside{width:186px;flex:0 0 186px;background:#22261E;color:#C9CFC2;padding:16px 0}
+.admside .h{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#7B8375;padding:0 16px 12px}
+.admside a{display:block;padding:8px 16px;color:#C9CFC2;text-decoration:none;font-size:13px}
+.admside a:hover{background:#2C3126}
+.admside a.on{background:#3A4132;color:#fff;font-weight:600}
+.admmain{flex:1;min-width:0;padding:22px 24px 60px}
+.admmain h1{font-size:19px;font-weight:600}
+.admmain .lede{font-size:13px;color:var(--ink-2);margin-top:4px}
+.admgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px;margin:20px 0}
+.admstat{background:#fff;border:1px solid var(--line);border-radius:8px;padding:13px 15px}
+.admstat .k{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
+.admstat .v{font-size:23px;font-weight:600;margin-top:5px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.admstat .n{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.admtbl{background:#fff;border:1px solid var(--line);border-radius:8px;overflow:auto}
+.admtbl table{width:100%;border-collapse:collapse;font-size:13px}
+.admtbl th{text-align:left;padding:9px 13px;background:#F7F7F4;border-bottom:1px solid var(--line);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);white-space:nowrap}
+.admtbl td{padding:10px 13px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+.admtbl tr:last-child td{border-bottom:0}
+.admtbl .num{font-variant-numeric:tabular-nums}
+.admsearch{width:280px;border:1px solid var(--line);border-radius:7px;padding:9px 12px;font:13px Inter,sans-serif;margin-bottom:14px}
+.tag{display:inline-block;font:600 11px Inter,sans-serif;padding:3px 7px;border-radius:5px}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.no{background:var(--err-bg);color:var(--err)}
+.tag.flat{background:var(--surface-2);color:var(--ink-3)}
+.tag.pend{background:var(--warn-bg);color:var(--warn)}
+.admnote{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-size:12.5px;color:var(--ink-2);line-height:1.6;margin-top:14px}
+
+@media (max-width:880px){.esbar,.admside{display:none}.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav class="picker">
+  <b>Auth</b>
+  <button class="pbtn on" onclick="S(0,this)">Sign up</button>
+  <button class="pbtn" onclick="S(1,this)">Verify</button>
+  <button class="pbtn" onclick="S(2,this)">Log in</button>
+  <button class="pbtn" onclick="S(3,this)">Onboarding</button>
+  <button class="pbtn" onclick="S(4,this)">Empty</button>
+  <span class="div"></span><b>Usher</b>
+  <button class="pbtn" onclick="S(5,this)">Sign in</button>
+  <button class="pbtn" onclick="S(6,this)">Pick event</button>
+  <button class="pbtn" onclick="S(7,this)">Gate &amp; prep</button>
+  <span class="div"></span><b>Admin</b>
+  <button class="pbtn" onclick="S(8,this)">Overview</button>
+  <button class="pbtn" onclick="S(9,this)">Accounts</button>
+  <button class="pbtn" onclick="S(10,this)">Payments</button>
+</nav>
+
+<!-- ============ 0 SIGN UP ============ -->
+<div class="scr on"><div class="auth"><div class="box">
+  <div class="logo"><div class="m">◈</div><span>Working name</span></div>
+  <div class="acard">
+    <h1>Create your account</h1>
+    <p class="lede">Free for your first 150 guests. No card needed.</p>
+    <div style="margin-top:24px">
+      <div class="f"><label>Your name</label><input class="inp" placeholder="Ahmed Sahabi"></div>
+      <div class="f"><label>Phone number</label><input class="inp" placeholder="0803 411 2098">
+        <p class="hint">We'll text you a code. This is also how your guests reach you.</p></div>
+      <div class="f"><label>Email <span style="color:var(--ink-3);font-weight:400">— optional</span></label><input class="inp" placeholder="For receipts and password recovery"></div>
+      <button class="btn pri wide">Continue</button>
+    </div>
+    <div class="sep">or</div>
+    <button class="btn wide">Continue with Google</button>
+  </div>
+  <p class="alt">Already have an account? <a href="#">Log in</a></p>
+  <p class="legal">By continuing you agree to the <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</p>
+</div></div></div>
+
+<!-- ============ 1 VERIFY ============ -->
+<div class="scr"><div class="auth"><div class="box">
+  <div class="logo"><div class="m">◈</div><span>Working name</span></div>
+  <div class="acard">
+    <h1>Enter your code</h1>
+    <p class="lede">Sent by SMS to 0803 411 2098. <a href="#" style="color:var(--p600);font-weight:600;text-decoration:none">Wrong number?</a></p>
+    <div style="margin:24px 0 6px" class="otp">
+      <input maxlength="1" value="4"><input maxlength="1" value="9"><input maxlength="1" value="2"><input maxlength="1" value="7"><input maxlength="1"><input maxlength="1">
+    </div>
+    <p class="hint" style="margin-bottom:20px">Didn't arrive? <a href="#" style="color:var(--p600);font-weight:600;text-decoration:none">Send again in 0:24</a></p>
+    <button class="btn pri wide">Verify</button>
+  </div>
+  <p class="legal">Codes expire after 10 minutes.</p>
+</div></div></div>
+
+<!-- ============ 2 LOG IN ============ -->
+<div class="scr"><div class="auth"><div class="box">
+  <div class="logo"><div class="m">◈</div><span>Working name</span></div>
+  <div class="acard">
+    <h1>Welcome back</h1>
+    <p class="lede">Sign in to manage your events.</p>
+    <div style="margin-top:24px">
+      <div class="f"><label>Phone number or email</label><input class="inp" placeholder="0803 411 2098"></div>
+      <div class="f"><label>Password</label><input class="inp" type="password" placeholder="••••••••"></div>
+      <button class="btn pri wide">Log in</button>
+      <p style="text-align:center;margin-top:14px"><a href="#" style="font-size:13px;color:var(--p600);font-weight:600;text-decoration:none">Forgot your password?</a></p>
+    </div>
+    <div class="sep">or</div>
+    <button class="btn wide">Send me a code instead</button>
+  </div>
+  <p class="alt">New here? <a href="#">Create an account</a></p>
+</div></div></div>
+
+<!-- ============ 3 ONBOARDING ============ -->
+<div class="scr"><div class="ob"><div class="obwrap">
+  <div class="obdots"><i class="on"></i><i class="on"></i><i></i></div>
+  <h1>What are you organising?</h1>
+  <p class="lede">We'll set a few sensible defaults. You can change all of it later.</p>
+  <div class="choices">
+    <button class="choice on" onclick="C(this)"><div class="t">A wedding</div><div class="d">Households, tables, big guest lists</div></button>
+    <button class="choice" onclick="C(this)"><div class="t">A birthday or party</div><div class="d">Smaller and informal</div></button>
+    <button class="choice" onclick="C(this)"><div class="t">A church or mosque programme</div><div class="d">Repeats across sessions</div></button>
+    <button class="choice" onclick="C(this)"><div class="t">A corporate event</div><div class="d">Named guests, badges</div></button>
+    <button class="choice" onclick="C(this)"><div class="t">A conference</div><div class="d">Multiple days</div></button>
+    <button class="choice" onclick="C(this)"><div class="t">Events for clients</div><div class="d">I'm a planner</div></button>
+  </div>
+
+  <div class="obcard">
+    <div class="f"><label>What's it called?</label><input class="inp" placeholder="Ahmed &amp; Aisha"></div>
+    <div class="row2">
+      <div class="f" style="margin-bottom:0"><label>When is it?</label><input class="inp" type="date"></div>
+      <div class="f" style="margin-bottom:0"><label>Roughly how many guests?</label>
+        <select><option>Under 150</option><option selected>150 – 500</option><option>500 – 1,000</option><option>Over 1,000</option><option>Not sure yet</option></select></div>
+    </div>
+    <p class="hint">Just so we can suggest the right plan later. Nothing is locked in.</p>
+  </div>
+
+  <div class="obfoot"><button class="btn">Back</button><button class="btn pri">Create my event</button></div>
+  <p class="legal" style="margin-top:22px"><a href="#">Skip — I'll set it up myself</a></p>
+</div></div></div>
+
+<!-- ============ 4 EMPTY ============ -->
+<div class="scr"><div class="emptyshell">
+  <aside class="esbar">
+    <div class="brand"><div class="m">◈</div><span style="font-size:14px;font-weight:600">Working name</span></div>
+    <nav class="esnav">
+      <a href="#" class="on">◈ Dashboard</a><a href="#">▤ Events</a><a href="#">◎ Guests</a>
+      <a href="#">▥ Reports</a><a href="#">◐ Team</a><a href="#">⚙ Settings</a>
+    </nav>
+  </aside>
+  <div style="flex:1;padding:24px">
+    <div class="empty">
+      <div class="emptyart">◈</div>
+      <h2>Let's set up your first event</h2>
+      <p>Build your guest list, send invitations on WhatsApp, and check everyone in at the gate. Your first 150 guests are free.</p>
+      <div style="margin-top:26px;display:flex;gap:10px;justify-content:center">
+        <button class="btn pri">Create an event</button>
+        <button class="btn">See how it works</button>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ============ 5 USHER SIGN IN ============ -->
+<div class="scr"><div class="stage">
+  <div class="phone"><div class="pscreen">
+    <div class="dmark">◈</div>
+    <h2>Sign in to check guests in</h2>
+    <p class="sub">Use the number the organiser invited you on.</p>
+    <div style="margin-top:28px">
+      <label class="dlabel">Phone number</label>
+      <input class="dinp" placeholder="0803 411 2098">
+      <button class="dbtn">Send me a code</button>
+    </div>
+    <p style="margin-top:auto;font-size:12.5px;color:var(--dmute);line-height:1.6">
+      No password needed. If you were invited by WhatsApp, tapping that link signs you in directly.</p>
+  </div></div>
+  <p class="plabel">Ushers are often casual staff hired for the night. No password to forget, no account to create — the number the organiser typed in is the account.</p>
+</div></div>
+
+<!-- ============ 6 PICK EVENT ============ -->
+<div class="scr"><div class="stage">
+  <div class="phone"><div class="pscreen">
+    <div style="display:flex;align-items:center;gap:11px;margin-bottom:24px">
+      <div class="dmark" style="margin:0">◈</div>
+      <div><div style="font-size:14px;font-weight:600">Musa Ibrahim</div><div style="font-size:12px;color:var(--dmute)">Usher</div></div>
+    </div>
+    <h2 style="font-size:19px">Which event?</h2>
+    <p class="sub" style="margin-bottom:20px">You're on the team for three.</p>
+
+    <div class="pick on">
+      <div><div class="t">Ahmed &amp; Aisha</div><div class="d">Today · Oriental Hotel</div></div>
+      <div class="r"><b>512</b>guests</div>
+    </div>
+    <div class="pick">
+      <div><div class="t">Nikkah Family Dinner</div><div class="d">Tomorrow · Ikoyi</div></div>
+      <div class="r"><b>60</b>guests</div>
+    </div>
+    <div class="pick" style="opacity:.55">
+      <div><div class="t">Yusuf &amp; Maryam</div><div class="d">Finished 5 Dec</div></div>
+      <div class="r" style="font-size:12px">Closed</div>
+    </div>
+
+    <button class="dbtn green" style="margin-top:auto">Continue</button>
+  </div></div>
+  <p class="plabel">Passes from the finished wedding still exist on guests' phones. This is why a device holds the keys for every event its usher is assigned to — so a stale pass says "this is for Yusuf &amp; Maryam" instead of "invalid".</p>
+</div></div>
+
+<!-- ============ 7 GATE + PREP ============ -->
+<div class="scr"><div class="stage">
+  <div class="phone"><div class="pscreen">
+    <div style="font-size:13px;color:var(--dmute);margin-bottom:6px">Ahmed &amp; Aisha</div>
+    <h2 style="font-size:19px">Which gate are you on?</h2>
+    <p class="sub" style="margin-bottom:20px">Every check-in records where it happened.</p>
+
+    <div class="pick on"><div><div class="t">Main Gate</div><div class="d">Musa, Ifeoma</div></div></div>
+    <div class="pick"><div><div class="t">Side Gate</div><div class="d">Emeka</div></div></div>
+    <div class="pick"><div><div class="t">VIP Entrance</div><div class="d">Blessing</div></div></div>
+
+    <div class="prep">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--dmute);margin-bottom:6px">Getting ready</div>
+      <div class="row"><span class="tick">✓</span>Guest list downloaded<span class="w">512</span></div>
+      <div class="row"><span class="tick">✓</span>Entry keys stored<span class="w">3 events</span></div>
+      <div class="row"><span class="tick wait">!</span>You haven't tested a scan<span class="w">Do it now</span></div>
+    </div>
+
+    <button class="dbtn green">Start scanning</button>
+    <button class="dbtn ghost" style="margin-top:9px">Test with a sample pass</button>
+  </div></div>
+  <p class="plabel">This screen is where offline actually happens — the list and the signing keys come down before anyone arrives. It's also the only place readiness check 8 can be satisfied, so the prompt lives here rather than in a settings page nobody opens.</p>
+</div></div>
+
+<!-- ============ 8 ADMIN OVERVIEW ============ -->
+<div class="scr"><div class="adm">
+  <aside class="admside">
+    <div class="h">Internal</div>
+    <a href="#" class="on">Overview</a><a href="#">Accounts</a><a href="#">Payments</a>
+  </aside>
+  <div class="admmain">
+    <h1>Overview</h1>
+    <p class="lede">Thursday 24 July 2026, 14:02 WAT</p>
+    <div class="admgrid">
+      <div class="admstat"><div class="k">Accounts</div><div class="v">1,284</div><div class="n">+63 this week</div></div>
+      <div class="admstat"><div class="k">Events</div><div class="v">1,907</div><div class="n">311 upcoming</div></div>
+      <div class="admstat"><div class="k">Passes issued</div><div class="v">486,220</div><div class="n">+29,104 this week</div></div>
+      <div class="admstat"><div class="k">Check-ins</div><div class="v">331,884</div><div class="n">68% of passes</div></div>
+      <div class="admstat"><div class="k">Paid events</div><div class="v">742</div><div class="n">39% of all events</div></div>
+      <div class="admstat"><div class="k">Revenue, month</div><div class="v">₦4.1m</div><div class="n">₦38.6m this year</div></div>
+    </div>
+
+    <h2 style="font-size:14px;font-weight:600;margin:20px 0 10px">Events running right now</h2>
+    <div class="admtbl"><table>
+      <thead><tr><th>Event</th><th>Account</th><th class="num">Guests</th><th class="num">In</th><th>Gates</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Ahmed &amp; Aisha</td><td>Sahabi Events</td><td class="num">512</td><td class="num">318</td><td>3</td><td><span class="tag ok">Healthy</span></td></tr>
+        <tr><td>RCCG Youth Convention</td><td>RCCG Ikeja</td><td class="num">2,400</td><td class="num">1,882</td><td>6</td><td><span class="tag ok">Healthy</span></td></tr>
+        <tr><td>Chidi &amp; Ngozi</td><td>Chidi Okeke</td><td class="num">380</td><td class="num">44</td><td>1</td><td><span class="tag pend">1 gate offline 22m</span></td></tr>
+        <tr><td>UNILAG Matriculation</td><td>UNILAG Registry</td><td class="num">4,100</td><td class="num">3,970</td><td>8</td><td><span class="tag ok">Healthy</span></td></tr>
+      </tbody>
+    </table></div>
+    <div class="admnote"><b>Why this table exists.</b> An event with gates offline for a long stretch, or check-ins that have stalled while guests are clearly still arriving, is the one support call worth making before the customer calls us. Everything else on this dashboard can wait until Monday.</div>
+  </div>
+</div></div>
+
+<!-- ============ 9 ADMIN ACCOUNTS ============ -->
+<div class="scr"><div class="adm">
+  <aside class="admside">
+    <div class="h">Internal</div>
+    <a href="#">Overview</a><a href="#" class="on">Accounts</a><a href="#">Payments</a>
+  </aside>
+  <div class="admmain">
+    <h1>Accounts</h1>
+    <p class="lede">Look up a customer to answer a support question.</p>
+    <input class="admsearch" placeholder="Name, phone, email or event" style="margin-top:16px">
+    <div class="admtbl"><table>
+      <thead><tr><th>Account</th><th>Owner</th><th>Phone</th><th class="num">Events</th><th class="num">Passes</th><th>Plan</th><th>Joined</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>Sahabi Events</td><td>Ahmed Sahabi</td><td>0803 411 2098</td><td class="num">3</td><td class="num">614</td><td>Per event</td><td>2 Nov 2026</td><td><a href="#" style="color:var(--p600)">Open</a></td></tr>
+        <tr><td>RCCG Ikeja</td><td>Pastor E. Adeoye</td><td>0806 220 7714</td><td class="num">28</td><td class="num">31,440</td><td><span class="tag ok">Organisation</span></td><td>14 Jan 2026</td><td><a href="#" style="color:var(--p600)">Open</a></td></tr>
+        <tr><td>Bella Weddings</td><td>Bella Nwosu</td><td>0701 884 3320</td><td class="num">19</td><td class="num">8,902</td><td><span class="tag ok">Professional</span></td><td>3 Mar 2026</td><td><a href="#" style="color:var(--p600)">Open</a></td></tr>
+        <tr><td>Chidi Okeke</td><td>Chidi Okeke</td><td>0812 067 5541</td><td class="num">1</td><td class="num">380</td><td>Per event</td><td>19 Jul 2026</td><td><a href="#" style="color:var(--p600)">Open</a></td></tr>
+        <tr><td>Zainab Bello</td><td>Zainab Bello</td><td>0705 331 9082</td><td class="num">1</td><td class="num">96</td><td><span class="tag flat">Free</span></td><td>21 Jul 2026</td><td><a href="#" style="color:var(--p600)">Open</a></td></tr>
+      </tbody>
+    </table></div>
+    <div class="admnote"><b>What support can do here:</b> see an account's events and pass counts, extend a limit when a payment has failed but the wedding is tomorrow, and resend a receipt. <b>What it cannot do:</b> open a guest list. Nobody at this company needs to read a customer's guest list to answer a support question, so the screen doesn't offer it.</div>
+  </div>
+</div></div>
+
+<!-- ============ 10 ADMIN PAYMENTS ============ -->
+<div class="scr"><div class="adm">
+  <aside class="admside">
+    <div class="h">Internal</div>
+    <a href="#">Overview</a><a href="#">Accounts</a><a href="#" class="on">Payments</a>
+  </aside>
+  <div class="admmain">
+    <h1>Payments</h1>
+    <p class="lede">Everything through Paystack. Reconcile against their dashboard weekly.</p>
+    <div class="admgrid">
+      <div class="admstat"><div class="k">Today</div><div class="v">₦187,500</div><div class="n">14 payments</div></div>
+      <div class="admstat"><div class="k">This month</div><div class="v">₦4.1m</div><div class="n">288 payments</div></div>
+      <div class="admstat"><div class="k">Failed, 7 days</div><div class="v">31</div><div class="n">9.4% of attempts</div></div>
+      <div class="admstat"><div class="k">Refunded, month</div><div class="v">₦45,000</div><div class="n">3 events cancelled</div></div>
+    </div>
+    <div class="admtbl"><table>
+      <thead><tr><th>Time</th><th>Account</th><th>Event</th><th>Plan</th><th class="num">Amount</th><th>Method</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>13:41</td><td>Zainab Bello</td><td>Bello Family Naming</td><td>Small · 300</td><td class="num">₦7,500</td><td>Transfer</td><td><span class="tag ok">Paid</span></td></tr>
+        <tr><td>12:58</td><td>Chidi Okeke</td><td>Chidi &amp; Ngozi</td><td>Small · 300</td><td class="num">₦7,500</td><td>Card</td><td><span class="tag no">Failed</span></td></tr>
+        <tr><td>12:59</td><td>Chidi Okeke</td><td>Chidi &amp; Ngozi</td><td>Small · 300</td><td class="num">₦7,500</td><td>USSD</td><td><span class="tag ok">Paid</span></td></tr>
+        <tr><td>11:20</td><td>Bella Weddings</td><td>—</td><td>Professional · monthly</td><td class="num">₦25,000</td><td>Card</td><td><span class="tag ok">Paid</span></td></tr>
+        <tr><td>09:34</td><td>Sahabi Events</td><td>Ahmed &amp; Aisha</td><td>Standard · 600</td><td class="num">₦15,000</td><td>Card</td><td><span class="tag ok">Paid</span></td></tr>
+      </tbody>
+    </table></div>
+    <div class="admnote"><b>The 12:58 / 12:59 pair is the pattern to watch.</b> A card fails and the same customer immediately succeeds on USSD. If that repeats often enough, the answer isn't a support process — it's putting bank transfer ahead of card on the payment screen.</div>
+  </div>
+</div></div>
+
+<script>
+function S(i,el){
+  document.querySelectorAll('.scr').forEach((s,n)=>s.classList.toggle('on',n===i));
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on'); window.scrollTo(0,0);
+}
+function C(el){document.querySelectorAll('.choice').forEach(c=>c.classList.remove('on'));el.classList.add('on')}
+document.querySelectorAll('.pick').forEach(p=>p.onclick=()=>{
+  const sibs=p.parentElement.querySelectorAll('.pick');sibs.forEach(s=>s.classList.remove('on'));p.classList.add('on');
+});
+</script>
+</body>
+</html>
