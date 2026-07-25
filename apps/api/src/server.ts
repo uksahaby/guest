@@ -3,6 +3,7 @@ import jwt from "@fastify/jwt";
 import { env } from "./env.ts";
 import { sql, assertDbUp } from "./db.ts";
 import { verifyToken, type EventKey } from "checkin-core/token";
+import { authRoutes } from "./auth.ts";
 import { checkinRoutes } from "./checkins.ts";
 import { scannerRoutes } from "./scanner.ts";
 import { publicRoutes } from "./public.ts";
@@ -31,6 +32,7 @@ export function buildServer() {
     return { ok: true };
   });
 
+  app.register(authRoutes);
   app.register(checkinRoutes);
   app.register(scannerRoutes);
   app.register(publicRoutes);
