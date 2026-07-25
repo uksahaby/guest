@@ -17,7 +17,7 @@ export default async function GuestsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; q?: string }>;
+  searchParams: Promise<{ error?: string; q?: string; imported?: string; skipped?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -40,6 +40,15 @@ export default async function GuestsPage({
       </p>
       <h1 className="page">Guests</h1>
 
+      {sp.imported && (
+        <div className="plan-line">
+          <b>Imported {sp.imported} {sp.imported === "1" ? "household" : "households"}.</b>
+          {sp.skipped && sp.skipped !== "0"
+            ? ` ${sp.skipped} were already on the list and were left alone.`
+            : ""}
+        </div>
+      )}
+
       {sp.error && (
         <p className="form-error">
           {sp.error === "name"
@@ -49,7 +58,12 @@ export default async function GuestsPage({
       )}
 
       <div className="card">
-        <h2>Add a household</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <h2 style={{ marginBottom: 0 }}>Add a household</h2>
+          <Link className="ghost" href={`/events/${id}/guests/import`}>
+            Import a spreadsheet
+          </Link>
+        </div>
         <form action={addHousehold}>
           <input type="hidden" name="event_id" value={id} />
           <input type="hidden" name="leg_id" value={leg.id} />

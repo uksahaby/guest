@@ -10,6 +10,8 @@ import { scannerRoutes } from "./scanner.ts";
 import { publicRoutes } from "./public.ts";
 import { billingRoutes } from "./billing.ts";
 import { reportRoutes } from "./reports.ts";
+import { importRoutes } from "./import.ts";
+import multipart from "@fastify/multipart";
 import { makeProvider, type PaymentProvider } from "./paystack.ts";
 
 declare module "fastify" {
@@ -38,6 +40,7 @@ export function buildServer(opts: { provider?: PaymentProvider } = {}) {
     },
   );
 
+  app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
   app.register(jwt, { secret: env.jwtSecret });
 
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
@@ -60,6 +63,7 @@ export function buildServer(opts: { provider?: PaymentProvider } = {}) {
   app.register(publicRoutes);
   app.register(billingRoutes, { provider: opts.provider ?? makeProvider() });
   app.register(reportRoutes);
+  app.register(importRoutes);
 
   // Smoke route proving the whole vertical slice works: issue-side data in
   // Postgres, verify-side logic from checkin-core. Dev only.

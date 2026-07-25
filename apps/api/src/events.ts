@@ -226,9 +226,11 @@ export async function eventRoutes(app: FastifyInstance) {
       const legs = b.legs;
       const guests = b.guests ?? [];
 
-      return asUser(sqlRw, uid(req), async (db) => {
+      // Reply only after the transaction commits, or a client can read
+      // back its own write and not find it.
+      const created = await asUser(sqlRw, uid(req), async (db) => {
         const { eventId } = req.params;
-        if (!(await manages(db, eventId))) return forbidden(reply);
+        if (!(await manages(db, eventId))) return null;
 
         const [inv] = await db`
           insert into invitations (event_id, display_name, primary_phone,
@@ -252,8 +254,11 @@ export async function eventRoutes(app: FastifyInstance) {
           insert into passes (invitation_id, event_id)
           values (${inv!.id}, ${eventId})`;
 
-        return reply.code(201).send({ id: inv!.id });
+        return { id: inv!.id as string };
       });
+
+      if (!created) return forbidden(reply);
+      return reply.code(201).send(created);
     },
   );
 

@@ -62,6 +62,12 @@ type Pool = typeof sqlRw;
  * policies. `set_config(..., true)` is LOCAL — it dies with the
  * transaction, so a pooled connection never leaks one request's identity
  * into the next.
+ *
+ * DO NOT call reply.send() inside `fn` on a path that writes. The reply
+ * would go out before the transaction commits, so a client can act on
+ * "created" and then read back nothing — and if the commit then failed it
+ * would already have been told success. Return a value (or a
+ * {code, body} description) and send it after this resolves.
  */
 export async function asUser<T>(
   pool: Pool,
