@@ -5,6 +5,7 @@ import { sql, assertDbUp } from "./db.ts";
 import { verifyToken, type EventKey } from "checkin-core/token";
 import { authRoutes } from "./auth.ts";
 import { checkinRoutes } from "./checkins.ts";
+import { eventRoutes } from "./events.ts";
 import { scannerRoutes } from "./scanner.ts";
 import { publicRoutes } from "./public.ts";
 
@@ -34,6 +35,7 @@ export function buildServer() {
 
   app.register(authRoutes);
   app.register(checkinRoutes);
+  app.register(eventRoutes);
   app.register(scannerRoutes);
   app.register(publicRoutes);
 

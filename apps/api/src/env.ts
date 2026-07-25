@@ -28,4 +28,6 @@ export const env = {
   jwtSecret: required("JWT_SECRET"),
   port: Number(process.env.PORT ?? 3001),
   isDev: process.env.NODE_ENV !== "production",
+  /** Where guest pages live — used to build invitation links. */
+  webUrl: process.env.WEB_URL ?? "http://localhost:3000",
 };

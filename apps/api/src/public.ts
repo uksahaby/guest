@@ -105,6 +105,12 @@ export async function publicRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const r = await resolve(req.params.token);
       if (!r) return notFound(reply);
+      // The household opened its link — the closest thing a wa.me deep
+      // link has to a delivery receipt (state machine: never "delivered").
+      await sql`
+        update invitation_deliveries
+        set state = 'opened', opened_at = coalesce(opened_at, now())
+        where invitation_id = ${r.invitationId} and state = 'link_generated'`;
       return publicInvitation(req.params.token, r);
     },
   );
