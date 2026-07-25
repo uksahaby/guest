@@ -91,6 +91,9 @@ export default async function EventHome({
           <Link className="primary" href={`/events/${id}/guests`}>
             {att.invitations === 0 ? "Build the list" : "Open the guest list"}
           </Link>
+          <Link className="ghost" href={`/events/${id}/live`}>
+            Live check-in
+          </Link>
           <Link className="ghost" href={`/events/${id}/tables`}>
             Tables
           </Link>
