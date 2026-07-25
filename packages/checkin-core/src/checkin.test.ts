@@ -77,7 +77,11 @@ describe("token", () => {
     const inv = household();
     const t = tokenFor(inv);
     const parts = t.split(".");
-    const forged = [parts[0].slice(0, -1) + "A", parts[1], parts[2], parts[3]].join(".");
+    // Replace the last char with one that differs from it — a quarter of
+    // random uuids already end in "A", and "forging" a token into itself
+    // is no forgery at all.
+    const swap = parts[0].endsWith("A") ? "B" : "A";
+    const forged = [parts[0].slice(0, -1) + swap, parts[1], parts[2], parts[3]].join(".");
     assert.equal(verifyToken(forged, [weddingKey]).ok, false);
   });
 
