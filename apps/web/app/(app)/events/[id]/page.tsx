@@ -87,9 +87,16 @@ export default async function EventHome({
             ? "Start with your guest list — one row per household, exactly as it would be written on a card."
             : `${att.invitations} households · ${att.invited_people} people.`}
         </p>
-        <Link className="primary" href={`/events/${id}/guests`}>
-          {att.invitations === 0 ? "Build the list" : "Open the guest list"}
-        </Link>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link className="primary" href={`/events/${id}/guests`}>
+            {att.invitations === 0 ? "Build the list" : "Open the guest list"}
+          </Link>
+          {att.arrived_people > 0 && (
+            <Link className="ghost" href={`/events/${id}/report`}>
+              See the report
+            </Link>
+          )}
+        </div>
       </div>
     </>
   );

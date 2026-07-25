@@ -9,6 +9,7 @@ import { eventRoutes } from "./events.ts";
 import { scannerRoutes } from "./scanner.ts";
 import { publicRoutes } from "./public.ts";
 import { billingRoutes } from "./billing.ts";
+import { reportRoutes } from "./reports.ts";
 import { makeProvider, type PaymentProvider } from "./paystack.ts";
 
 declare module "fastify" {
@@ -58,6 +59,7 @@ export function buildServer(opts: { provider?: PaymentProvider } = {}) {
   app.register(scannerRoutes);
   app.register(publicRoutes);
   app.register(billingRoutes, { provider: opts.provider ?? makeProvider() });
+  app.register(reportRoutes);
 
   // Smoke route proving the whole vertical slice works: issue-side data in
   // Postgres, verify-side logic from checkin-core. Dev only.
