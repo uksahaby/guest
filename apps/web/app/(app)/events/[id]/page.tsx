@@ -74,7 +74,10 @@ export default async function EventHome({
       <div className="plan-line">
         <b>{event.plan[0]?.toUpperCase() + event.plan.slice(1)} plan</b> — up to{" "}
         {event.people_limit} people. Building your list is free; the limit
-        applies when invitations are sent.
+        applies when invitations are sent.{" "}
+        <Link href={`/events/${id}/billing`} style={{ color: "var(--p600)" }}>
+          Plans &amp; billing
+        </Link>
       </div>
 
       <div className="card">

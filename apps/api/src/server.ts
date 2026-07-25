@@ -8,6 +8,8 @@ import { checkinRoutes } from "./checkins.ts";
 import { eventRoutes } from "./events.ts";
 import { scannerRoutes } from "./scanner.ts";
 import { publicRoutes } from "./public.ts";
+import { billingRoutes } from "./billing.ts";
+import { makeProvider, type PaymentProvider } from "./paystack.ts";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -15,8 +17,25 @@ declare module "fastify" {
   }
 }
 
-export function buildServer() {
+export function buildServer(opts: { provider?: PaymentProvider } = {}) {
   const app = Fastify({ logger: env.isDev && process.env.NODE_TEST_CONTEXT === undefined });
+
+  // Webhook signatures are HMACs over the EXACT bytes the provider sent.
+  // Re-serialising the parsed object changes key order and whitespace and
+  // the digest silently stops matching, so keep the raw string around.
+  app.addContentTypeParser(
+    "application/json",
+    { parseAs: "string" },
+    (req, body, done) => {
+      (req as { rawBody?: string }).rawBody = body as string;
+      if (body === "") return done(null, undefined);
+      try {
+        done(null, JSON.parse(body as string));
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
 
   app.register(jwt, { secret: env.jwtSecret });
 
@@ -38,6 +57,7 @@ export function buildServer() {
   app.register(eventRoutes);
   app.register(scannerRoutes);
   app.register(publicRoutes);
+  app.register(billingRoutes, { provider: opts.provider ?? makeProvider() });
 
   // Smoke route proving the whole vertical slice works: issue-side data in
   // Postgres, verify-side logic from checkin-core. Dev only.

@@ -30,4 +30,6 @@ export const env = {
   isDev: process.env.NODE_ENV !== "production",
   /** Where guest pages live — used to build invitation links. */
   webUrl: process.env.WEB_URL ?? "http://localhost:3000",
+  /** Unset locally: checkout falls back to an offline stub provider. */
+  paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
 };

@@ -45,6 +45,13 @@ export const sqlPublic = postgres(roleUrl("app_public", "app_public_dev_only"), 
  */
 export const sqlVerify = postgres(roleUrl("app_verify", "app_verify_dev_only"), opts);
 
+/**
+ * Provider webhooks arrive with no session, so they cannot use asUser.
+ * app_billing reaches payments and the three billing columns of events,
+ * and only for events someone has started paying for.
+ */
+export const sqlBilling = postgres(roleUrl("app_billing", "app_billing_dev_only"), opts);
+
 /** The handle a route works with: a transaction carrying request context. */
 export type Db = postgres.TransactionSql<Record<string, never>>;
 
@@ -98,5 +105,6 @@ export async function closeDb(): Promise<void> {
     sqlUsher.end(),
     sqlPublic.end(),
     sqlVerify.end(),
+    sqlBilling.end(),
   ]);
 }
