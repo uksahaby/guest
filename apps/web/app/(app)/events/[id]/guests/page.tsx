@@ -44,7 +44,7 @@ export default async function GuestsPage({
         <div className="plan-line">
           <b>Imported {sp.imported} {sp.imported === "1" ? "household" : "households"}.</b>
           {sp.skipped && sp.skipped !== "0"
-            ? ` ${sp.skipped} were already on the list and were left alone.`
+            ? ` ${sp.skipped} ${sp.skipped === "1" ? "was" : "were"} already on the list and left alone.`
             : ""}
         </div>
       )}
