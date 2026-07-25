@@ -80,7 +80,8 @@ export function verifyToken(raw: string, keys: EventKey[]): VerifyOk | VerifyFai
   const parts = raw.trim().split(".");
   if (parts.length !== 4) return { ok: false, reason: "malformed" };
 
-  const [pass, event, verStr, sig] = parts;
+  // Length checked above; assertion is type-level only.
+  const [pass, event, verStr, sig] = parts as [string, string, string, string];
   const body = `${pass}.${event}.${verStr}`;
 
   let payload: TokenPayload;

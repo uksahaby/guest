@@ -1,3 +1,5 @@
+// testdb must be imported before anything that touches db.ts.
+import "./testdb.ts";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";

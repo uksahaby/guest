@@ -1,22 +1,38 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import jwt from "@fastify/jwt";
 import { env } from "./env.ts";
 import { sql, assertDbUp } from "./db.ts";
 import { verifyToken, type EventKey } from "checkin-core/token";
+import { checkinRoutes } from "./checkins.ts";
+
+declare module "fastify" {
+  interface FastifyInstance {
+    authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
 
 export function buildServer() {
-  const app = Fastify({ logger: env.isDev });
+  const app = Fastify({ logger: env.isDev && process.env.NODE_TEST_CONTEXT === undefined });
 
   app.register(jwt, { secret: env.jwtSecret });
+
+  app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+      await req.jwtVerify();
+    } catch {
+      reply.code(401).send({ code: "unauthenticated", message: "Missing or invalid token." });
+    }
+  });
 
   app.get("/health", async () => {
     await assertDbUp();
     return { ok: true };
   });
 
+  app.register(checkinRoutes);
+
   // Smoke route proving the whole vertical slice works: issue-side data in
-  // Postgres, verify-side logic from checkin-core. Dev only; removed when
-  // the real /scanner/check-ins endpoint lands.
+  // Postgres, verify-side logic from checkin-core. Dev only.
   if (env.isDev) {
     app.post<{ Body: { raw: string; event_id: string } }>(
       "/dev/verify-token",
