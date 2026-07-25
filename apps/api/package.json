@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "test": "tsx --test --test-concurrency=1 src/server.test.ts src/auth.test.ts src/checkins.test.ts src/scanner.test.ts src/public.test.ts src/events.test.ts",
+    "test": "tsx --test --test-concurrency=1 src/server.test.ts src/auth.test.ts src/checkins.test.ts src/scanner.test.ts src/public.test.ts src/events.test.ts src/rls.test.ts",
     "db:pull": "drizzle-kit pull"
   },
   "dependencies": {

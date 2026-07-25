@@ -85,7 +85,9 @@ Map<String, dynamic> adeyemi(String passId) => {
       'allowance': 4,
       'admitted': 0,
       'rsvp': 'attending',
-      'search_terms': 'mr & mrs adeyemi +2348034112098',
+      // The server ships only the last four digits — see usher_guest_list in
+      // db/migrations/003_rls.sql. A lost device is not a leaked guest list.
+      'search_terms': 'mr & mrs adeyemi 2098',
     };
 
 String tokenFor(String passId) => issueToken(
@@ -212,9 +214,9 @@ void main() {
     expect(await repo.search(legId, 'ad'), isEmpty);
     final byName = await repo.search(legId, 'adey');
     expect(byName.single.row.displayName, 'Mr & Mrs Adeyemi');
-    // E.164 drops the local leading zero — 0803… is stored as …8034….
-    // (Normalising usher-typed local format is a later nicety.)
-    final byPhone = await repo.search(legId, '8034');
+    // Only the last four digits are searchable; the full number never
+    // reaches the device.
+    final byPhone = await repo.search(legId, '2098');
     expect(byPhone, hasLength(1));
   });
 

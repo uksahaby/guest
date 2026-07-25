@@ -1,7 +1,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import jwt from "@fastify/jwt";
 import { env } from "./env.ts";
-import { sql, assertDbUp } from "./db.ts";
+import { sqlVerify, assertDbUp } from "./db.ts";
 import { verifyToken, type EventKey } from "checkin-core/token";
 import { authRoutes } from "./auth.ts";
 import { checkinRoutes } from "./checkins.ts";
@@ -45,7 +45,7 @@ export function buildServer() {
     app.post<{ Body: { raw: string; event_id: string } }>(
       "/dev/verify-token",
       async (req) => {
-        const rows = await sql`
+        const rows = await sqlVerify`
           select id, name, token_version, signing_key
           from events where id = ${req.body.event_id}`;
         const keys: EventKey[] = rows.map((r) => ({

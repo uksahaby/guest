@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { sql } from "./db.ts";
+import { asUser, sqlUsher, type Db } from "./db.ts";
 import { decide, type LocalInvitation, type Outcome } from "checkin-core";
 
 /**
@@ -84,18 +84,24 @@ export async function checkinRoutes(app: FastifyInstance) {
     }
 
     const staffUserId = (req.user as { sub: string }).sub;
-    const results: ItemOutcome[] = [];
-    // Sequential on purpose: a reversal may target an earlier item in the
-    // same batch, and each item's decide() re-run must see rows the batch
-    // already landed.
-    for (const raw of items) {
-      results.push(await processItem(staffUserId, raw as SubmitItem));
-    }
-    return { results };
+    return asUser(sqlUsher, staffUserId, async (db) => {
+      const results: ItemOutcome[] = [];
+      // Sequential on purpose: a reversal may target an earlier item in
+      // the same batch, and each item's decide() re-run must see rows the
+      // batch already landed.
+      for (const raw of items) {
+        results.push(await processItem(db, staffUserId, raw as SubmitItem));
+      }
+      return { results };
+    });
   });
 }
 
-async function processItem(staffUserId: string, item: SubmitItem): Promise<ItemOutcome> {
+async function processItem(
+  db: Db,
+  staffUserId: string,
+  item: SubmitItem,
+): Promise<ItemOutcome> {
   // ---- shape ------------------------------------------------------------
   if (!UUID_RE.test(item.client_uuid ?? "")) {
     return bad(item, "bad_client_uuid", "client_uuid must be a uuid.");
@@ -139,7 +145,7 @@ async function processItem(staffUserId: string, item: SubmitItem): Promise<ItemO
     UUID_RE.test(item.reverses_client_uuid ?? "") ? item.reverses_client_uuid! : null;
 
   // ---- replay? -----------------------------------------------------------
-  const existing = await sql`
+  const existing = await db`
     select id, note from check_in_events where client_uuid = ${item.client_uuid}`;
   if (existing.length > 0) {
     return {
@@ -152,17 +158,28 @@ async function processItem(staffUserId: string, item: SubmitItem): Promise<ItemO
   }
 
   // ---- leg, event policy, staff assignment -------------------------------
-  const legRows = await sql`
+  // Assignment first, and via the predicate rather than a table read: RLS
+  // hides an unassigned leg entirely, so a plain lookup would report "no
+  // such leg" to an usher whose assignment was simply removed. The
+  // predicate is SECURITY DEFINER and answers regardless of visibility,
+  // which keeps the error honest for a device that needs to know why its
+  // queue is stuck.
+  const [works] = await db`select app_works_leg(${item.leg_id}::uuid) as ok`;
+  if (works?.ok !== true) {
+    return bad(item, "forbidden", "No staff assignment on this leg.");
+  }
+
+  const legRows = await db`
     select l.id as leg_id, l.event_id, e.allow_overflow, e.require_rsvp
     from event_legs l join events e on e.id = l.event_id
     where l.id = ${item.leg_id}`;
   if (legRows.length === 0) return bad(item, "leg_not_found", "No such leg.");
   const leg = legRows[0]!;
 
-  const staffRows = await sql`
+  const staffRows = await db`
     select can_manual, can_walk_in, can_override
     from staff_assignments
-    where user_id = ${staffUserId} and leg_id = ${item.leg_id}`;
+    where leg_id = ${item.leg_id}`;
   if (staffRows.length === 0) {
     return bad(item, "forbidden", "No staff assignment on this leg.");
   }
@@ -171,7 +188,7 @@ async function processItem(staffUserId: string, item: SubmitItem): Promise<ItemO
   // ---- resolve pass → invitation ----------------------------------------
   let invitationId: string | null = null;
   if (passId) {
-    const passRows = await sql`
+    const passRows = await db`
       select invitation_id, event_id from passes where id = ${passId}`;
     if (passRows.length === 0) return bad(item, "pass_not_found", "No such pass.");
     if (passRows[0]!.event_id !== leg.event_id) {
@@ -187,7 +204,7 @@ async function processItem(staffUserId: string, item: SubmitItem): Promise<ItemO
   // ---- reversal target ----------------------------------------------------
   let reversesId: string | null = null;
   if (result === "reversal") {
-    const orig = await sql`
+    const orig = await db`
       select id, pass_id, invitation_id, leg_id, result, admitted_count
       from check_in_events where client_uuid = ${reversesClientUuid}`;
     if (orig.length === 0) {
@@ -204,7 +221,7 @@ async function processItem(staffUserId: string, item: SubmitItem): Promise<ItemO
       return bad(item, "reversal_count_mismatch",
         `Reversal must undo the full admission (expected ${-o.admitted_count}).`);
     }
-    const already = await sql`
+    const already = await db`
       select 1 from check_in_events where reverses_check_in_id = ${o.id}`;
     if (already.length > 0) {
       return bad(item, "already_reversed", "That check-in was already reversed.");
@@ -220,7 +237,7 @@ async function processItem(staffUserId: string, item: SubmitItem): Promise<ItemO
   let serverNote: string | null = null;
 
   if (ADMITTING.has(result)) {
-    const stateRows = await sql`
+    const stateRows = await db`
       select * from pass_state(${passId}::uuid, ${item.leg_id}::uuid)`;
 
     let inv: LocalInvitation | undefined;
@@ -277,7 +294,7 @@ async function processItem(staffUserId: string, item: SubmitItem): Promise<ItemO
     : item.note ?? null;
 
   try {
-    const inserted = await sql`
+    const inserted = await db`
       insert into check_in_events (
         client_uuid, event_id, leg_id, entrance_id, pass_id, invitation_id,
         staff_user_id, device_id, result, admitted_count, occupancy_delta,
@@ -295,7 +312,7 @@ async function processItem(staffUserId: string, item: SubmitItem): Promise<ItemO
 
     if (inserted.length === 0) {
       // Raced with a concurrent replay of the same client_uuid.
-      const row = await sql`
+      const row = await db`
         select id, note from check_in_events where client_uuid = ${item.client_uuid}`;
       return {
         client_uuid: item.client_uuid,

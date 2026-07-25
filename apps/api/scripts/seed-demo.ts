@@ -1,7 +1,7 @@
 // Demo data for local development — the mockup's own wedding, made real.
 // Idempotent: fixed ids, safe to run repeatedly. Prints the guest URL.
 //   npx tsx scripts/seed-demo.ts
-import { sql } from "../src/db.ts";
+import { sqlAdmin as sql, closeDb } from "../src/db.ts";
 import { issueToken } from "checkin-core/token";
 
 const IDS = {
@@ -87,4 +87,4 @@ console.log(`  Mr & Mrs Adeyemi (4):  http://localhost:3000/i/${tokenFor(IDS.ade
 console.log(`  Chidinma Okafor (1):   http://localhost:3000/i/${tokenFor(IDS.okaforPass)}`);
 console.log("Usher login: +2348030000002 (OTP shown by the API in dev)");
 
-await sql.end();
+await closeDb();

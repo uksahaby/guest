@@ -2,7 +2,7 @@
 // ./testdb.ts first — so this always runs against guest_test.
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { sql } from "./db.ts";
+import { sqlAdmin as sql } from "./db.ts";
 import { issueToken } from "checkin-core/token";
 
 export type Seeded = {

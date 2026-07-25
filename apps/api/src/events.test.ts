@@ -5,13 +5,13 @@ import { test, after, before } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { buildServer } from "./server.ts";
-import { sql } from "./db.ts";
+import { sqlAdmin as sql, closeDb } from "./db.ts";
 
 const app = buildServer();
 before(() => app.ready());
 after(async () => {
   await app.close();
-  await sql.end();
+  await closeDb();
 });
 
 const phone = () => `+234${String(Math.floor(Math.random() * 1e10)).padStart(10, "0")}`;

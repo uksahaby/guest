@@ -1,14 +1,24 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { sql } from "./db.ts";
+import { asPass, sqlVerify, type Db } from "./db.ts";
 import { verifyToken } from "checkin-core/token";
 
 /**
  * Guest-facing routes. Unauthenticated by design.
  *
- * The URL token IS the pass token: it is HMAC-signed, unguessable, carries
- * no personal data, and is exactly what the WhatsApp link and the QR code
+ * The URL token IS the pass token: HMAC-signed, unguessable, carrying no
+ * personal data, and exactly what the WhatsApp link and the QR code
  * already contain. One token, one household, everywhere. Failures are a
  * uniform 404 — a guesser learns nothing about why.
+ *
+ * Two database identities, deliberately split (db/migrations/003_rls.sql):
+ *
+ *   sqlVerify  reads the event signing key and NOTHING else in the
+ *              database, only to check the HMAC
+ *   asPass     reads one household, scoped by policy to the verified pass,
+ *              and cannot see a signing key at all
+ *
+ * So a leak of either credential alone cannot both forge passes and read
+ * guest data.
  *
  * The pass is available before any RSVP (architecture decision #1) — many
  * guests simply turn up, and the gate must recognise them.
@@ -22,13 +32,37 @@ function notFound(reply: FastifyReply) {
 function eventIdFromToken(raw: string): string | null {
   const parts = raw.trim().split(".");
   if (parts.length !== 4) return null;
-  const b = Buffer.from(parts[1]!, "base64url");
-  if (b.length !== 16) return null;
-  const h = b.toString("hex");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  try {
+    const b = Buffer.from(parts[1]!, "base64url");
+    if (b.length !== 16) return null;
+    const h = b.toString("hex");
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  } catch {
+    return null;
+  }
 }
 
-type Resolved = {
+/** Token → verified pass id, or null. Uses the verifier identity only. */
+async function verifiedPassId(raw: string): Promise<string | null> {
+  const eventId = eventIdFromToken(raw);
+  if (!eventId) return null;
+
+  const [event] = await sqlVerify`
+    select id, name, token_version, signing_key from events where id = ${eventId}`;
+  if (!event) return null;
+
+  const v = verifyToken(raw, [
+    {
+      eventId: event.id,
+      eventName: event.name,
+      tokenVersion: event.token_version,
+      key: Buffer.from(event.signing_key),
+    },
+  ]);
+  return v.ok ? v.payload.passId : null;
+}
+
+type Household = {
   invitationId: string;
   eventName: string;
   note: string | null;
@@ -36,41 +70,30 @@ type Resolved = {
   displayName: string;
 };
 
-/** Token → active pass → household, or null. */
-async function resolve(raw: string): Promise<Resolved | null> {
-  const eventId = eventIdFromToken(raw);
-  if (!eventId) return null;
-
-  const [event] = await sql`
-    select id, name, description, rsvp_deadline, token_version, signing_key
-    from events where id = ${eventId}`;
-  if (!event) return null;
-
-  const v = verifyToken(raw, [{
-    eventId: event.id,
-    eventName: event.name,
-    tokenVersion: event.token_version,
-    key: Buffer.from(event.signing_key),
-  }]);
-  if (!v.ok) return null;
-
-  const [row] = await sql`
-    select i.id as invitation_id, i.display_name
-    from passes p join invitations i on i.id = p.invitation_id
-    where p.id = ${v.payload.passId} and p.status = 'active'`;
+/**
+ * The household behind a verified pass. Policies do the scoping: an
+ * inactive pass yields no invitation, so a revoked link reads as 404
+ * without a status check here.
+ */
+async function household(db: Db): Promise<Household | null> {
+  const [row] = await db`
+    select i.id as invitation_id, i.display_name,
+           e.name as event_name, e.description, e.rsvp_deadline
+    from invitations i
+    join events e on e.id = i.event_id
+    where i.id = app_pass_invitation()`;
   if (!row) return null;
-
   return {
     invitationId: row.invitation_id,
-    eventName: event.name,
-    note: event.description,
-    rsvpDeadline: event.rsvp_deadline,
+    eventName: row.event_name,
+    note: row.description,
+    rsvpDeadline: row.rsvp_deadline,
     displayName: row.display_name,
   };
 }
 
-async function publicInvitation(raw: string, r: Resolved) {
-  const legs = await sql`
+async function publicInvitation(db: Db, raw: string, h: Household) {
+  const legs = await db`
     select
       il.leg_id,
       l.name,
@@ -87,13 +110,13 @@ async function publicInvitation(raw: string, r: Resolved) {
     from invitation_legs il
     join event_legs l on l.id = il.leg_id
     left join seating_tables st on st.id = il.table_id
-    where il.invitation_id = ${r.invitationId}
+    where il.invitation_id = ${h.invitationId}
     order by l.sequence`;
 
   return {
-    event_name: r.eventName,
-    note: r.note,
-    display_name: r.displayName,
+    event_name: h.eventName,
+    note: h.note,
+    display_name: h.displayName,
     pass_code: raw.trim(),
     legs,
   };
@@ -103,15 +126,20 @@ export async function publicRoutes(app: FastifyInstance) {
   app.get<{ Params: { token: string } }>(
     "/public/invitations/:token",
     async (req, reply) => {
-      const r = await resolve(req.params.token);
-      if (!r) return notFound(reply);
-      // The household opened its link — the closest thing a wa.me deep
-      // link has to a delivery receipt (state machine: never "delivered").
-      await sql`
-        update invitation_deliveries
-        set state = 'opened', opened_at = coalesce(opened_at, now())
-        where invitation_id = ${r.invitationId} and state = 'link_generated'`;
-      return publicInvitation(req.params.token, r);
+      const passId = await verifiedPassId(req.params.token);
+      if (!passId) return notFound(reply);
+
+      return asPass(passId, async (db) => {
+        const h = await household(db);
+        if (!h) return notFound(reply);
+        // The household opened its link — the closest thing a wa.me deep
+        // link has to a delivery receipt (state machine: never "delivered").
+        await db`
+          update invitation_deliveries
+          set state = 'opened', opened_at = coalesce(opened_at, now())
+          where invitation_id = ${h.invitationId} and state = 'link_generated'`;
+        return publicInvitation(db, req.params.token, h);
+      });
     },
   );
 
@@ -119,43 +147,57 @@ export async function publicRoutes(app: FastifyInstance) {
     Params: { token: string };
     Body: { leg_id?: string; attending?: boolean; count?: number };
   }>("/public/invitations/:token/rsvp", async (req, reply) => {
-    const r = await resolve(req.params.token);
-    if (!r) return notFound(reply);
-
     const { leg_id, attending, count } = req.body ?? {};
     if (typeof leg_id !== "string" || typeof attending !== "boolean") {
-      return reply.code(400).send({ code: "bad_request", message: "leg_id and attending are required." });
+      return reply
+        .code(400)
+        .send({ code: "bad_request", message: "leg_id and attending are required." });
     }
     if (count !== undefined && (!Number.isInteger(count) || count < 0)) {
-      return reply.code(400).send({ code: "bad_request", message: "count must be a non-negative integer." });
+      return reply.code(400).send({
+        code: "bad_request",
+        message: "count must be a non-negative integer.",
+      });
     }
 
-    if (r.rsvpDeadline && new Date(r.rsvpDeadline).getTime() + 86_400_000 < Date.now()) {
-      return reply.code(409).send({ code: "deadline_passed", message: "The reply deadline has passed." });
-    }
+    const passId = await verifiedPassId(req.params.token);
+    if (!passId) return notFound(reply);
 
-    const [legRow] = await sql`
-      select allowance from invitation_legs
-      where invitation_id = ${r.invitationId} and leg_id = ${leg_id}`;
-    if (!legRow) return notFound(reply);
+    return asPass(passId, async (db) => {
+      const h = await household(db);
+      if (!h) return notFound(reply);
 
-    // "Three of our four are coming" is a promise of three people —
-    // partial counts as confirmed (the caterer's number is sacred).
-    let rsvp: string;
-    let rsvpCount: number;
-    if (!attending || count === 0) {
-      rsvp = "declined";
-      rsvpCount = 0;
-    } else {
-      rsvpCount = Math.min(count ?? legRow.allowance, legRow.allowance);
-      rsvp = rsvpCount < legRow.allowance ? "partial" : "attending";
-    }
+      if (h.rsvpDeadline && new Date(h.rsvpDeadline).getTime() + 86_400_000 < Date.now()) {
+        return reply
+          .code(409)
+          .send({ code: "deadline_passed", message: "The reply deadline has passed." });
+      }
 
-    await sql`
-      update invitation_legs
-      set rsvp = ${rsvp}::rsvp_status, rsvp_count = ${rsvpCount}, responded_at = now()
-      where invitation_id = ${r.invitationId} and leg_id = ${leg_id}`;
+      // il_public scopes this to the caller's own household, so a forged
+      // leg_id belonging to someone else simply finds nothing.
+      const [legRow] = await db`
+        select allowance from invitation_legs
+        where invitation_id = ${h.invitationId} and leg_id = ${leg_id}`;
+      if (!legRow) return notFound(reply);
 
-    return publicInvitation(req.params.token, r);
+      // "Three of our four are coming" is a promise of three people —
+      // partial counts as confirmed (the caterer's number is sacred).
+      let rsvp: string;
+      let rsvpCount: number;
+      if (!attending || count === 0) {
+        rsvp = "declined";
+        rsvpCount = 0;
+      } else {
+        rsvpCount = Math.min(count ?? legRow.allowance, legRow.allowance);
+        rsvp = rsvpCount < legRow.allowance ? "partial" : "attending";
+      }
+
+      await db`
+        update invitation_legs
+        set rsvp = ${rsvp}::rsvp_status, rsvp_count = ${rsvpCount}, responded_at = now()
+        where invitation_id = ${h.invitationId} and leg_id = ${leg_id}`;
+
+      return publicInvitation(db, req.params.token, h);
+    });
   });
 }

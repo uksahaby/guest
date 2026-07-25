@@ -3,13 +3,13 @@ import "./testdb.ts";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { buildServer } from "./server.ts";
-import { sql } from "./db.ts";
+import { sqlAdmin as sql, closeDb } from "./db.ts";
 import { seedEvent, passTokenFor } from "./testutil.ts";
 
 const app = buildServer();
 after(async () => {
   await app.close();
-  await sql.end();
+  await closeDb();
 });
 
 test("a household opens its invitation with the pass token", async () => {

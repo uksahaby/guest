@@ -4,13 +4,13 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { buildServer } from "./server.ts";
-import { sql } from "./db.ts";
+import { sqlAdmin as sql, closeDb } from "./db.ts";
 import { seedEvent } from "./testutil.ts";
 
 const app = buildServer();
 after(async () => {
   await app.close();
-  await sql.end();
+  await closeDb();
 });
 
 function get(url: string, token: string) {
@@ -60,7 +60,23 @@ test("bootstrap returns policy, key, entrances and the leg's guest list", async 
   assert.equal(adeyemi.allowance, 4);
   assert.equal(adeyemi.admitted, 0);
   assert.equal(adeyemi.rsvp, "pending");
-  assert.ok(adeyemi.search_terms.includes("Adeyemi"));
+
+  // Search terms are lowercased for local matching, and carry only the
+  // LAST FOUR DIGITS of the phone — an usher can confirm a number read
+  // aloud to them, but a lost device is not a leaked guest list.
+  assert.ok(adeyemi.search_terms.includes("adeyemi"));
+  const [phone] = await sql`
+    select primary_phone from invitations where id = ${s.invitationId}`;
+  const full = phone!.primary_phone.replace(/\D/g, "");
+  assert.ok(
+    adeyemi.search_terms.includes(full.slice(-4)),
+    "last four digits should be searchable",
+  );
+  assert.ok(
+    !adeyemi.search_terms.includes(full),
+    "the full phone number must never reach a scanner device",
+  );
+  assert.ok(!JSON.stringify(b).includes(full));
 
   assert.deepEqual(b.revoked_pass_ids, []);
 });

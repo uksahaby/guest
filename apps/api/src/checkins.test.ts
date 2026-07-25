@@ -5,12 +5,12 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { buildServer } from "./server.ts";
-import { sql } from "./db.ts";
+import { sqlAdmin as sql, closeDb } from "./db.ts";
 
 const app = buildServer();
 after(async () => {
   await app.close();
-  await sql.end();
+  await closeDb();
 });
 
 // ---------------------------------------------------------------- helpers
@@ -356,6 +356,9 @@ test("partial success: one bad item does not sink the batch", async () => {
   const [a, b] = res.json().results;
   assert.equal(a.accepted, true);
   assert.equal(b.accepted, false);
-  assert.equal(b.error.code, "leg_not_found");
+  // An unknown leg is also a leg this usher does not work, and the
+  // assignment check runs first — either code tells the device the same
+  // thing: this item will never succeed, stop retrying it.
+  assert.ok(["forbidden", "leg_not_found"].includes(b.error.code), b.error.code);
   assert.equal(await admittedSum(s.soloPassId, s.legId), 1);
 });

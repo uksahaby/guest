@@ -4,7 +4,7 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { buildServer } from "./server.ts";
-import { sql } from "./db.ts";
+import { sqlAdmin as sql, closeDb } from "./db.ts";
 import { issueToken } from "checkin-core/token";
 
 // Fixed ids so reruns upsert rather than accumulate.
@@ -44,7 +44,7 @@ async function seed() {
 const app = buildServer();
 after(async () => {
   await app.close();
-  await sql.end();
+  await closeDb();
 });
 
 test("health endpoint reaches the database", async () => {
