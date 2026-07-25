@@ -1,0 +1,25 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "tsx --test src/server.test.ts",
+    "db:pull": "drizzle-kit pull"
+  },
+  "dependencies": {
+    "checkin-core": "*",
+    "drizzle-orm": "^0.36.4",
+    "fastify": "^5.1.0",
+    "@fastify/jwt": "^9.0.1",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "drizzle-kit": "^0.28.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

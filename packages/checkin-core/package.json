@@ -2,7 +2,14 @@
   "name": "checkin-core",
   "version": "1.0.0",
   "type": "module",
+  "exports": {
+    ".": "./src/checkin.ts",
+    "./token": "./src/token.ts"
+  },
   "scripts": {
-    "test": "node --experimental-strip-types --test src/*.test.ts"
+    "test": "tsx --test src/checkin.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
   }
 }
