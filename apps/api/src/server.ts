@@ -61,7 +61,8 @@ export function buildServer() {
 }
 
 // Only listen when run directly, so tests can build the server in-process.
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
+const { pathToFileURL } = await import("node:url");
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const app = buildServer();
   app.listen({ port: env.port, host: "127.0.0.1" }).catch((err) => {
     app.log.error(err);

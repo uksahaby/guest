@@ -19,7 +19,7 @@ android {
         applicationId = "ng.gtfd.scanner"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23 // mobile_scanner requires 23+
+        minSdk = flutter.minSdkVersion // mobile_scanner requires 23+
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

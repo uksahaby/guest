@@ -81,9 +81,12 @@ async function publicInvitation(raw: string, r: Resolved) {
            then 'https://maps.google.com/?q=' || l.latitude || ',' || l.longitude
            else null end as map_url,
       il.allowance,
-      il.rsvp
+      il.rsvp,
+      il.rsvp_count,
+      st.name as table_name
     from invitation_legs il
     join event_legs l on l.id = il.leg_id
+    left join seating_tables st on st.id = il.table_id
     where il.invitation_id = ${r.invitationId}
     order by l.sequence`;
 
