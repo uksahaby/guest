@@ -4,6 +4,8 @@ import { env } from "./env.ts";
 import { sql, assertDbUp } from "./db.ts";
 import { verifyToken, type EventKey } from "checkin-core/token";
 import { checkinRoutes } from "./checkins.ts";
+import { scannerRoutes } from "./scanner.ts";
+import { publicRoutes } from "./public.ts";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -30,6 +32,8 @@ export function buildServer() {
   });
 
   app.register(checkinRoutes);
+  app.register(scannerRoutes);
+  app.register(publicRoutes);
 
   // Smoke route proving the whole vertical slice works: issue-side data in
   // Postgres, verify-side logic from checkin-core. Dev only.
