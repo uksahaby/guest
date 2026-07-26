@@ -97,6 +97,9 @@ export default async function EventHome({
           <Link className="ghost" href={`/events/${id}/tables`}>
             Tables
           </Link>
+          <Link className="ghost" href={`/events/${id}/settings`}>
+            Settings
+          </Link>
           {att.arrived_people > 0 && (
             <Link className="ghost" href={`/events/${id}/report`}>
               See the report

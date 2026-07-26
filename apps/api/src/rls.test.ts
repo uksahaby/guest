@@ -224,7 +224,7 @@ test("no application role may rewrite the check-in log", async () => {
   const s = await seedEvent(app);
   await admitVia(s, 2);
 
-  // Grant-level: the first lock. (The append-only trigger is the second.)
+  // A scanner has no grant at all on either verb — the first lock.
   await refused(
     () => asUser(sqlUsher, s.usherId, (db) => db`update check_in_events set admitted_count = 99`),
     "usher updated check_in_events",
@@ -233,10 +233,32 @@ test("no application role may rewrite the check-in log", async () => {
     () => asUser(sqlUsher, s.usherId, (db) => db`delete from check_in_events`),
     "usher deleted check_in_events",
   );
+
+  // No role anywhere holds UPDATE on this table, so an admission can never
+  // be rewritten — the grant settles it before the trigger is consulted.
   await refused(
-    () => asUser(sqlRw, s.usherId, (db) => db`delete from check_in_events`),
-    "app_rw deleted check_in_events",
+    () => asUser(sqlRw, s.usherId, (db) => db`update check_in_events set admitted_count = 99`),
+    "app_rw rewrote history",
   );
+
+  // app_rw DOES hold delete, so a whole event can be erased when the
+  // organiser asks for it (db/migrations/006). The trigger is what keeps
+  // that narrow: a delete is refused unless the transaction has named the
+  // event it is erasing, so no single scan can be quietly dropped.
+  //
+  // This has to run as someone who genuinely MANAGES the event. As anyone
+  // else, RLS filters the delete to zero rows and it "succeeds" without
+  // touching anything — which proves nothing about the trigger.
+  const o = await organiserWithEvent();
+  await admit(o, 2);
+  await assert.rejects(
+    () => asUser(sqlRw, o.userId, (db) => db`delete from check_in_events`),
+    /append-only/,
+    "app_rw deleted a scan without naming an event to erase",
+  );
+  const [survived] = await sqlAdmin`
+    select count(*)::int as n from check_in_events where event_id = ${o.eventId}`;
+  assert.equal(survived!.n, 1, "the scan must still be there");
 });
 
 // -------------------------------------------------------- the guest promise
