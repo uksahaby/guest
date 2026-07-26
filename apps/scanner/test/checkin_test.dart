@@ -537,4 +537,69 @@ void main() {
       expect(mainGate.log && sideGate.log, isTrue);
     });
   });
+
+  group('a cancelled event', () {
+    // Mirrors the TypeScript suite exactly — decide() exists twice and the
+    // two must not drift. The gate has to refuse with no network, which is
+    // why this is policy carried in the offline payload.
+    const cancelled =
+        Policy(allowOverflow: true, requireRsvp: false, eventCancelled: true);
+
+    test('refuses a perfectly good pass', () {
+      final inv = household();
+      final d = decide(ctx([inv], policy: cancelled), ScanRaw(tokenFor(inv)));
+      expect(d.outcome, Outcome.eventCancelled);
+      expect(d.tone, Tone.deny);
+      expect(d.admittedCount, 0);
+      expect(d.log, isTrue);
+      expect(d.autoReturnMs, isNull);
+    });
+
+    test('refuses check-in by hand too', () {
+      final inv = household();
+      final d =
+          decide(ctx([inv], policy: cancelled), ManualInput(inv.passId));
+      expect(d.outcome, Outcome.eventCancelled);
+      expect(d.admittedCount, 0);
+    });
+
+    test('says why, rather than blaming the pass', () {
+      final d = decide(ctx([], policy: cancelled), ScanRaw('not-a-token'));
+      expect(d.outcome, Outcome.eventCancelled);
+      expect(d.headline.toLowerCase(), contains('cancelled'));
+      expect(d.actions, contains('Call manager'));
+    });
+
+    test('outranks every other refusal', () {
+      final full = household(allowance: 4, admitted: 4);
+      expect(
+        decide(ctx([full], policy: cancelled), ManualInput(full.passId)).outcome,
+        Outcome.eventCancelled,
+      );
+
+      final foreign = issueToken(
+        TokenPayload(
+          passId: household().passId,
+          eventId: otherWedding,
+          tokenVersion: 1,
+        ),
+        otherKey.key,
+      );
+      expect(
+        decide(ctx([], policy: cancelled), ScanRaw(foreign)).outcome,
+        Outcome.eventCancelled,
+      );
+    });
+
+    test('the wire value matches the server enum', () {
+      // check_in_events.result stores this string (migration 008).
+      expect(Outcome.eventCancelled.wire, 'event_cancelled');
+    });
+
+    test('an active event is unaffected', () {
+      final inv = household();
+      final d = decide(ctx([inv]), ScanRaw(tokenFor(inv)));
+      expect(d.outcome, isNot(Outcome.eventCancelled));
+    });
+  });
 }

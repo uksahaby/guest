@@ -60,7 +60,8 @@ export async function scannerRoutes(app: FastifyInstance) {
         }
 
         const [leg] = await db`
-          select l.event_id, e.name, e.allow_overflow, e.require_rsvp, e.allow_walkins
+          select l.event_id, e.name, e.allow_overflow, e.require_rsvp,
+                 e.allow_walkins, e.status
           from event_legs l join events e on e.id = l.event_id
           where l.id = ${legId}`;
         if (!leg) {
@@ -89,6 +90,10 @@ export async function scannerRoutes(app: FastifyInstance) {
             allow_overflow: leg.allow_overflow,
             require_rsvp: leg.require_rsvp,
             allow_walkins: leg.allow_walkins,
+            // The gate refuses everything when this is true, offline
+            // included — which is why it rides in the payload rather than
+            // being checked only on the server.
+            cancelled: leg.status === "cancelled",
           },
           keys: keys.map((k) => ({
             event_id: k.event_id,

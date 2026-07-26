@@ -26,6 +26,7 @@ enum Outcome {
   rsvpBlocked('rsvp_blocked'),
   rsvpDeclined('rsvp_declined'),
   overflowBlocked('overflow_blocked'),
+  eventCancelled('event_cancelled'),
   notFound('not_found');
 
   /// The string written to check_in_events.result on the server.
@@ -69,7 +70,22 @@ class LocalInvitation {
 class Policy {
   final bool allowOverflow;
   final bool requireRsvp;
-  const Policy({required this.allowOverflow, required this.requireRsvp});
+
+  /// The organiser called the event off. Settings promises the guest a
+  /// cancellation notice AND that passes stop opening the gate, so this
+  /// refuses everything — the one refusal that outranks identifying who is
+  /// standing there, because the answer is the same for all of them.
+  ///
+  /// Not a billing block (HANDOFF §3 forbids those). Cancelling is a
+  /// deliberate act by the organiser, and reversible: set the event back to
+  /// active and every pass works again, because nothing was reissued.
+  final bool eventCancelled;
+
+  const Policy({
+    required this.allowOverflow,
+    required this.requireRsvp,
+    this.eventCancelled = false,
+  });
 }
 
 class Context {
@@ -195,6 +211,21 @@ Decision _hold(
 
 Decision decide(Context ctx, ScanInput input) {
   LocalInvitation? inv;
+
+  // ---- 0. is there still an event? --------------------------------------
+  // Ahead of the token checks on purpose: a cancelled event admits nobody,
+  // so what they are holding does not matter, and an usher who has not
+  // heard the news needs to be told the reason rather than 'not a valid
+  // pass'. Manual check-in is refused too — otherwise Search by name is a
+  // way around it.
+  if (ctx.policy.eventCancelled) {
+    return _deny(
+      Outcome.eventCancelled,
+      'Event cancelled',
+      'This event was called off. Nobody is being admitted — send them to the organiser.',
+      const ['Call manager', 'Dismiss'],
+    );
+  }
 
   switch (input) {
     case ScanRaw(:final raw):

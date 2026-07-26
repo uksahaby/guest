@@ -118,6 +118,7 @@ class _ResultOverlayState extends State<ResultOverlay> {
         Outcome.wrongLeg => 'Not invited to this one',
         Outcome.invalid => 'Not a valid pass',
         Outcome.overflowBlocked => 'More people than invited',
+        Outcome.eventCancelled => 'Event cancelled',
         Outcome.notFound => 'No matching guest',
       };
 

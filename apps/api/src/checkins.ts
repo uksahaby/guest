@@ -31,6 +31,7 @@ const ADMITTING = new Set(["admitted", "partial", "manual", "overflow_admitted"]
 const REFUSING = new Set([
   "allowance_exhausted", "invalid", "wrong_event", "wrong_leg", "revoked",
   "rsvp_blocked", "rsvp_declined", "overflow_blocked", "not_found",
+  "event_cancelled",
 ]);
 const SERVER_ADMITS: ReadonlySet<Outcome> = new Set([
   "admitted", "partial", "manual", "overflow_admitted",
@@ -170,7 +171,8 @@ async function processItem(
   }
 
   const legRows = await db`
-    select l.id as leg_id, l.event_id, e.allow_overflow, e.require_rsvp
+    select l.id as leg_id, l.event_id, e.allow_overflow, e.require_rsvp,
+           e.status
     from event_legs l join events e on e.id = l.event_id
     where l.id = ${item.leg_id}`;
   if (legRows.length === 0) return bad(item, "leg_not_found", "No such leg.");
@@ -262,7 +264,11 @@ async function processItem(
       {
         currentEventId: leg.event_id,
         currentLegId: item.leg_id,
-        policy: { allowOverflow: leg.allow_overflow, requireRsvp: leg.require_rsvp },
+        policy: {
+          allowOverflow: leg.allow_overflow,
+          requireRsvp: leg.require_rsvp,
+          eventCancelled: leg.status === "cancelled",
+        },
         keys: [], // manual-kind input skips token checks; no keys needed
         find: () => inv,
         canOverrideRsvp: staff.can_override,

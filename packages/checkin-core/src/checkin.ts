@@ -29,6 +29,7 @@ export type Outcome =
   | "rsvp_blocked"
   | "rsvp_declined"
   | "overflow_blocked"
+  | "event_cancelled"
   | "not_found";
 
 export type Tone = "admit" | "hold" | "deny" | "ask";
@@ -52,6 +53,17 @@ export type LocalInvitation = {
 export type Policy = {
   allowOverflow: boolean;
   requireRsvp: boolean;
+  /**
+   * The organiser called the event off. Settings promises the guest a
+   * cancellation notice AND that passes stop opening the gate, so this
+   * refuses everything — the one refusal that outranks identifying who is
+   * standing there, because the answer is the same for all of them.
+   *
+   * Not a billing block (HANDOFF §3 forbids those). Cancelling is a
+   * deliberate act by the organiser, and reversible: set the event back to
+   * active and every pass works again, because nothing was reissued.
+   */
+  eventCancelled: boolean;
 };
 
 export type Context = {
@@ -135,6 +147,21 @@ function hold(
 
 export function decide(ctx: Context, input: ScanInput): Decision {
   let inv: LocalInvitation | undefined;
+
+  // ---- 0. is there still an event? --------------------------------------
+  // Ahead of the token checks on purpose: a cancelled event admits nobody,
+  // so what they are holding does not matter, and an usher who has not
+  // heard the news needs to be told the reason rather than "not a valid
+  // pass". Manual check-in is refused too — otherwise Search by name is a
+  // way around it.
+  if (ctx.policy.eventCancelled) {
+    return deny(
+      "event_cancelled",
+      "Event cancelled",
+      "This event was called off. Nobody is being admitted — send them to the organiser.",
+      ["Call manager", "Dismiss"],
+    );
+  }
 
   if (input.kind === "scan") {
     // ---- 1. decode + signature, against every held key -----------------

@@ -68,6 +68,8 @@ type Household = {
   note: string | null;
   rsvpDeadline: string | null;
   displayName: string;
+  /** Settings promises the guest a notice; this is what carries it. */
+  cancelled: boolean;
 };
 
 /**
@@ -78,7 +80,8 @@ type Household = {
 async function household(db: Db): Promise<Household | null> {
   const [row] = await db`
     select i.id as invitation_id, i.display_name,
-           e.name as event_name, e.description, e.rsvp_deadline
+           e.name as event_name, e.description, e.rsvp_deadline,
+           e.status
     from invitations i
     join events e on e.id = i.event_id
     where i.id = app_pass_invitation()`;
@@ -89,6 +92,7 @@ async function household(db: Db): Promise<Household | null> {
     note: row.description,
     rsvpDeadline: row.rsvp_deadline,
     displayName: row.display_name,
+    cancelled: row.status === "cancelled",
   };
 }
 
@@ -118,6 +122,11 @@ async function publicInvitation(db: Db, raw: string, h: Household) {
     note: h.note,
     display_name: h.displayName,
     pass_code: raw.trim(),
+    // Still 200, still carrying the pass: cancelling is reversible, and a
+    // guest who opens the link after it is undone should find their
+    // invitation intact rather than a 404 they have already been taught to
+    // read as "this link is dead".
+    cancelled: h.cancelled,
     legs,
   };
 }
@@ -166,6 +175,13 @@ export async function publicRoutes(app: FastifyInstance) {
     return asPass(passId, async (db) => {
       const h = await household(db);
       if (!h) return notFound(reply);
+
+      if (h.cancelled) {
+        return reply.code(409).send({
+          code: "event_cancelled",
+          message: "This event has been cancelled.",
+        });
+      }
 
       if (h.rsvpDeadline && new Date(h.rsvpDeadline).getTime() + 86_400_000 < Date.now()) {
         return reply

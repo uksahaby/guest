@@ -144,6 +144,8 @@ class Repository {
         allowOverflow: event['allow_overflow'] as bool,
         requireRsvp: event['require_rsvp'] as bool,
         allowWalkins: event['allow_walkins'] as bool,
+        // Older API builds omit it; absent means not cancelled.
+        cancelled: Value(event['cancelled'] as bool? ?? false),
         syncedAt: DateTime.now(),
       ));
 
@@ -255,6 +257,7 @@ class Repository {
       policy: Policy(
         allowOverflow: m.allowOverflow,
         requireRsvp: m.requireRsvp,
+        eventCancelled: m.cancelled,
       ),
       keys: keys,
       find: (id) => candidate?.passId == id ? candidate : null,

@@ -100,6 +100,13 @@ class LegMeta extends Table {
   BoolColumn get allowOverflow => boolean()();
   BoolColumn get requireRsvp => boolean()();
   BoolColumn get allowWalkins => boolean()();
+
+  /// The organiser called the event off. Carried in the offline payload
+  /// because the gate has to refuse with no network too — the settings
+  /// page promises the guest that passes stop working, not that they stop
+  /// working when the scanner happens to have signal.
+  BoolColumn get cancelled =>
+      boolean().withDefault(const Constant(false))();
   DateTimeColumn get syncedAt => dateTime()();
 
   @override
@@ -121,7 +128,7 @@ class ScannerDb extends _$ScannerDb {
   ScannerDb.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -134,6 +141,8 @@ class ScannerDb extends _$ScannerDb {
           // gate is reachable offline and not merely openable once reached.
           if (from < 2) await m.createTable(signingKeys);
           if (from < 3) await m.createTable(cachedAssignments);
+          // v4 carries event cancellation to the gate.
+          if (from < 4) await m.addColumn(legMeta, legMeta.cancelled);
         },
       );
 

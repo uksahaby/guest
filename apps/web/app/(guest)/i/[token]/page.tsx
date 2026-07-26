@@ -49,6 +49,7 @@ export default async function GuestPage({
   return (
     <div className="frame">
       <Hero inv={inv} leg={leg} />
+      {inv.cancelled && <CancelledNotice />}
       <nav className="tabs" aria-label="Invitation sections">
         <Tab token={token} id="invite" current={tab} label="Invitation" />
         <Tab token={token} id="details" current={tab} label="Details" />
@@ -56,7 +57,7 @@ export default async function GuestPage({
       </nav>
       {tab === "invite" && (
         <section className="panel">
-          {leg ? (
+          {leg && !inv.cancelled ? (
             <Rsvp token={token} leg={leg} forceForm={sp.change === "1"} />
           ) : null}
         </section>
@@ -71,6 +72,24 @@ export default async function GuestPage({
           <Pass inv={inv} leg={leg} token={token} />
         </section>
       )}
+    </div>
+  );
+}
+
+/**
+ * Settings promises the guest a cancellation notice. It leads the page,
+ * appears on every tab, and is deliberately plain — someone reading this
+ * has probably already booked a flight.
+ */
+function CancelledNotice() {
+  return (
+    <div className="cancelled" role="status">
+      <h2>This event has been cancelled</h2>
+      <p>
+        The organiser has called it off. Your pass will not open the gate,
+        and there is nothing to reply to. Please contact them directly if
+        you need to know more.
+      </p>
     </div>
   );
 }
@@ -315,6 +334,21 @@ async function Pass({
   leg?: PublicLeg;
   token: string;
 }) {
+  // No QR for a cancelled event. Printing one that the gate is guaranteed
+  // to refuse sends a guest to a venue to be turned away at the door.
+  if (inv.cancelled) {
+    return (
+      <div className="done">
+        <div className="mark">✕</div>
+        <h3>This pass is not active</h3>
+        <p>
+          {inv.event_name} was cancelled, so there is no pass to scan. If the
+          event is put back on, your pass here starts working again.
+        </p>
+      </div>
+    );
+  }
+
   // The QR encodes the pass token — verified offline at the gate.
   const qrSvg = await QRCode.toString(token, {
     type: "svg",

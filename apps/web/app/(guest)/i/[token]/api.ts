@@ -23,6 +23,8 @@ export type PublicInvitation = {
   note: string | null;
   display_name: string;
   pass_code: string;
+  /** The organiser called it off. The page leads with this. */
+  cancelled: boolean;
   legs: PublicLeg[];
 };
 

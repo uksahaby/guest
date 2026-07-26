@@ -48,7 +48,7 @@ function ctx(list: LocalInvitation[], over: Partial<Context> = {}): Context {
   return {
     currentEventId: WEDDING,
     currentLegId: LAGOS_LEG,
-    policy: { allowOverflow: true, requireRsvp: false },
+    policy: { allowOverflow: true, requireRsvp: false, eventCancelled: false },
     keys: [weddingKey, otherKey],
     find: (id) => byId.get(id),
     canOverrideRsvp: false,
@@ -180,7 +180,7 @@ describe("admitting", () => {
 describe("allowance exhausted", () => {
   test("with overflow off, a fully admitted party is held", () => {
     const inv = household({ admitted: 4 });
-    const d = decide(ctx([inv], { policy: { allowOverflow: false, requireRsvp: false } }), {
+    const d = decide(ctx([inv], { policy: { allowOverflow: false, requireRsvp: false, eventCancelled: false } }), {
       kind: "scan",
       raw: tokenFor(inv),
     });
@@ -217,7 +217,7 @@ describe("overflow", () => {
 
   test("blocked when the organiser turned overflow off", () => {
     const inv = household();
-    const d = decide(ctx([inv], { policy: { allowOverflow: false, requireRsvp: false } }), {
+    const d = decide(ctx([inv], { policy: { allowOverflow: false, requireRsvp: false, eventCancelled: false } }), {
       kind: "scan",
       raw: tokenFor(inv),
       requestedCount: 5,
@@ -295,7 +295,7 @@ describe("the RSVP gate", () => {
   for (const [rsvp, requireRsvp, expected] of cases) {
     test(`rsvp=${rsvp}, required=${requireRsvp} → ${expected}`, () => {
       const inv = household({ rsvp, allowance: rsvp === "pending" ? 1 : 4 });
-      const d = decide(ctx([inv], { policy: { allowOverflow: true, requireRsvp } }), {
+      const d = decide(ctx([inv], { policy: { allowOverflow: true, requireRsvp, eventCancelled: false } }), {
         kind: "scan",
         raw: tokenFor(inv),
       });
@@ -305,7 +305,7 @@ describe("the RSVP gate", () => {
 
   test("declining is refused whatever the policy says", () => {
     const inv = household({ rsvp: "declined" });
-    const d = decide(ctx([inv], { policy: { allowOverflow: true, requireRsvp: false } }), {
+    const d = decide(ctx([inv], { policy: { allowOverflow: true, requireRsvp: false, eventCancelled: false } }), {
       kind: "scan",
       raw: tokenFor(inv),
     });
@@ -361,7 +361,7 @@ describe("invariants that must hold everywhere", () => {
       decide(ctx([good]), { kind: "scan", raw: tokenFor(good) }),
       decide(ctx([good]), { kind: "scan", raw: tokenFor(good), requestedCount: 2 }),
       decide(ctx([good]), { kind: "scan", raw: tokenFor(good), requestedCount: 9 }),
-      decide(ctx([done], { policy: { allowOverflow: false, requireRsvp: false } }), {
+      decide(ctx([done], { policy: { allowOverflow: false, requireRsvp: false, eventCancelled: false } }), {
         kind: "scan",
         raw: tokenFor(done),
       }),
@@ -445,5 +445,63 @@ describe("two phones, both offline, same pass", () => {
     // server flags the overlap, and nobody already inside is thrown out.
     assert.equal(mainGate.admittedCount + sideGate.admittedCount, 5);
     assert.ok(mainGate.log && sideGate.log);
+  });
+});
+
+describe("a cancelled event", () => {
+  // The settings page promises the guest that passes stop opening the
+  // gate. This is where that promise is kept, and it has to hold with no
+  // network — which is why it is policy carried in the offline payload
+  // rather than a server-side check.
+  const cancelled = { policy: { allowOverflow: true, requireRsvp: false, eventCancelled: true } };
+
+  test("refuses a perfectly good pass", () => {
+    const inv = household();
+    const d = decide(ctx([inv], cancelled), { kind: "scan", raw: tokenFor(inv) });
+    assert.equal(d.outcome, "event_cancelled");
+    assert.equal(d.tone, "deny");
+    assert.equal(d.admittedCount, 0);
+    assert.equal(d.log, true, "the organiser should see who turned up anyway");
+    assert.equal(d.autoReturnMs, null, "someone is standing there — wait for a human");
+  });
+
+  test("refuses check-in by hand too", () => {
+    // Otherwise Search by name is a way straight around the cancellation.
+    const inv = household();
+    const d = decide(ctx([inv], cancelled), { kind: "manual", passId: inv.passId });
+    assert.equal(d.outcome, "event_cancelled");
+    assert.equal(d.admittedCount, 0);
+  });
+
+  test("says why, rather than blaming the pass", () => {
+    // An usher who has not heard the news must not be told "not a valid
+    // pass" — they would spend the evening arguing with guests about it.
+    const d = decide(ctx([], cancelled), { kind: "scan", raw: "not-a-token" });
+    assert.equal(d.outcome, "event_cancelled");
+    assert.match(d.headline, /cancelled/i);
+    assert.ok(d.actions.includes("Call manager"));
+  });
+
+  test("outranks every other refusal", () => {
+    // Whatever they are holding, the answer is the same, so the reason
+    // given should be the one that is actually true.
+    const inv = household({ admitted: 4, allowance: 4 });
+    const exhausted = decide(ctx([inv], cancelled), { kind: "manual", passId: inv.passId });
+    assert.equal(exhausted.outcome, "event_cancelled");
+
+    const foreign = decide(ctx([], cancelled), {
+      kind: "scan",
+      raw: issueToken(
+        { passId: household().passId, eventId: OTHER_WEDDING, tokenVersion: 1 },
+        otherKey.key,
+      ),
+    });
+    assert.equal(foreign.outcome, "event_cancelled");
+  });
+
+  test("an active event is unaffected", () => {
+    const inv = household();
+    const d = decide(ctx([inv]), { kind: "scan", raw: tokenFor(inv) });
+    assert.notEqual(d.outcome, "event_cancelled");
   });
 });

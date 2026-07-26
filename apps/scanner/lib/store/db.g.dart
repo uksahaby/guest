@@ -1547,6 +1547,21 @@ class $LegMetaTable extends LegMeta with TableInfo<$LegMetaTable, LegMetaData> {
       'CHECK ("allow_walkins" IN (0, 1))',
     ),
   );
+  static const VerificationMeta _cancelledMeta = const VerificationMeta(
+    'cancelled',
+  );
+  @override
+  late final GeneratedColumn<bool> cancelled = GeneratedColumn<bool>(
+    'cancelled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("cancelled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _syncedAtMeta = const VerificationMeta(
     'syncedAt',
   );
@@ -1566,6 +1581,7 @@ class $LegMetaTable extends LegMeta with TableInfo<$LegMetaTable, LegMetaData> {
     allowOverflow,
     requireRsvp,
     allowWalkins,
+    cancelled,
     syncedAt,
   ];
   @override
@@ -1637,6 +1653,12 @@ class $LegMetaTable extends LegMeta with TableInfo<$LegMetaTable, LegMetaData> {
     } else if (isInserting) {
       context.missing(_allowWalkinsMeta);
     }
+    if (data.containsKey('cancelled')) {
+      context.handle(
+        _cancelledMeta,
+        cancelled.isAcceptableOrUnknown(data['cancelled']!, _cancelledMeta),
+      );
+    }
     if (data.containsKey('synced_at')) {
       context.handle(
         _syncedAtMeta,
@@ -1678,6 +1700,10 @@ class $LegMetaTable extends LegMeta with TableInfo<$LegMetaTable, LegMetaData> {
         DriftSqlType.bool,
         data['${effectivePrefix}allow_walkins'],
       )!,
+      cancelled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}cancelled'],
+      )!,
       syncedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}synced_at'],
@@ -1698,6 +1724,12 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
   final bool allowOverflow;
   final bool requireRsvp;
   final bool allowWalkins;
+
+  /// The organiser called the event off. Carried in the offline payload
+  /// because the gate has to refuse with no network too — the settings
+  /// page promises the guest that passes stop working, not that they stop
+  /// working when the scanner happens to have signal.
+  final bool cancelled;
   final DateTime syncedAt;
   const LegMetaData({
     required this.legId,
@@ -1706,6 +1738,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     required this.allowOverflow,
     required this.requireRsvp,
     required this.allowWalkins,
+    required this.cancelled,
     required this.syncedAt,
   });
   @override
@@ -1717,6 +1750,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     map['allow_overflow'] = Variable<bool>(allowOverflow);
     map['require_rsvp'] = Variable<bool>(requireRsvp);
     map['allow_walkins'] = Variable<bool>(allowWalkins);
+    map['cancelled'] = Variable<bool>(cancelled);
     map['synced_at'] = Variable<DateTime>(syncedAt);
     return map;
   }
@@ -1729,6 +1763,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
       allowOverflow: Value(allowOverflow),
       requireRsvp: Value(requireRsvp),
       allowWalkins: Value(allowWalkins),
+      cancelled: Value(cancelled),
       syncedAt: Value(syncedAt),
     );
   }
@@ -1745,6 +1780,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
       allowOverflow: serializer.fromJson<bool>(json['allowOverflow']),
       requireRsvp: serializer.fromJson<bool>(json['requireRsvp']),
       allowWalkins: serializer.fromJson<bool>(json['allowWalkins']),
+      cancelled: serializer.fromJson<bool>(json['cancelled']),
       syncedAt: serializer.fromJson<DateTime>(json['syncedAt']),
     );
   }
@@ -1758,6 +1794,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
       'allowOverflow': serializer.toJson<bool>(allowOverflow),
       'requireRsvp': serializer.toJson<bool>(requireRsvp),
       'allowWalkins': serializer.toJson<bool>(allowWalkins),
+      'cancelled': serializer.toJson<bool>(cancelled),
       'syncedAt': serializer.toJson<DateTime>(syncedAt),
     };
   }
@@ -1769,6 +1806,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     bool? allowOverflow,
     bool? requireRsvp,
     bool? allowWalkins,
+    bool? cancelled,
     DateTime? syncedAt,
   }) => LegMetaData(
     legId: legId ?? this.legId,
@@ -1777,6 +1815,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     allowOverflow: allowOverflow ?? this.allowOverflow,
     requireRsvp: requireRsvp ?? this.requireRsvp,
     allowWalkins: allowWalkins ?? this.allowWalkins,
+    cancelled: cancelled ?? this.cancelled,
     syncedAt: syncedAt ?? this.syncedAt,
   );
   LegMetaData copyWithCompanion(LegMetaCompanion data) {
@@ -1793,6 +1832,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
       allowWalkins: data.allowWalkins.present
           ? data.allowWalkins.value
           : this.allowWalkins,
+      cancelled: data.cancelled.present ? data.cancelled.value : this.cancelled,
       syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
     );
   }
@@ -1806,6 +1846,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
           ..write('allowOverflow: $allowOverflow, ')
           ..write('requireRsvp: $requireRsvp, ')
           ..write('allowWalkins: $allowWalkins, ')
+          ..write('cancelled: $cancelled, ')
           ..write('syncedAt: $syncedAt')
           ..write(')'))
         .toString();
@@ -1819,6 +1860,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     allowOverflow,
     requireRsvp,
     allowWalkins,
+    cancelled,
     syncedAt,
   );
   @override
@@ -1831,6 +1873,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
           other.allowOverflow == this.allowOverflow &&
           other.requireRsvp == this.requireRsvp &&
           other.allowWalkins == this.allowWalkins &&
+          other.cancelled == this.cancelled &&
           other.syncedAt == this.syncedAt);
 }
 
@@ -1841,6 +1884,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
   final Value<bool> allowOverflow;
   final Value<bool> requireRsvp;
   final Value<bool> allowWalkins;
+  final Value<bool> cancelled;
   final Value<DateTime> syncedAt;
   final Value<int> rowid;
   const LegMetaCompanion({
@@ -1850,6 +1894,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     this.allowOverflow = const Value.absent(),
     this.requireRsvp = const Value.absent(),
     this.allowWalkins = const Value.absent(),
+    this.cancelled = const Value.absent(),
     this.syncedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1860,6 +1905,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     required bool allowOverflow,
     required bool requireRsvp,
     required bool allowWalkins,
+    this.cancelled = const Value.absent(),
     required DateTime syncedAt,
     this.rowid = const Value.absent(),
   }) : legId = Value(legId),
@@ -1876,6 +1922,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     Expression<bool>? allowOverflow,
     Expression<bool>? requireRsvp,
     Expression<bool>? allowWalkins,
+    Expression<bool>? cancelled,
     Expression<DateTime>? syncedAt,
     Expression<int>? rowid,
   }) {
@@ -1886,6 +1933,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
       if (allowOverflow != null) 'allow_overflow': allowOverflow,
       if (requireRsvp != null) 'require_rsvp': requireRsvp,
       if (allowWalkins != null) 'allow_walkins': allowWalkins,
+      if (cancelled != null) 'cancelled': cancelled,
       if (syncedAt != null) 'synced_at': syncedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1898,6 +1946,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     Value<bool>? allowOverflow,
     Value<bool>? requireRsvp,
     Value<bool>? allowWalkins,
+    Value<bool>? cancelled,
     Value<DateTime>? syncedAt,
     Value<int>? rowid,
   }) {
@@ -1908,6 +1957,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
       allowOverflow: allowOverflow ?? this.allowOverflow,
       requireRsvp: requireRsvp ?? this.requireRsvp,
       allowWalkins: allowWalkins ?? this.allowWalkins,
+      cancelled: cancelled ?? this.cancelled,
       syncedAt: syncedAt ?? this.syncedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1934,6 +1984,9 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     if (allowWalkins.present) {
       map['allow_walkins'] = Variable<bool>(allowWalkins.value);
     }
+    if (cancelled.present) {
+      map['cancelled'] = Variable<bool>(cancelled.value);
+    }
     if (syncedAt.present) {
       map['synced_at'] = Variable<DateTime>(syncedAt.value);
     }
@@ -1952,6 +2005,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
           ..write('allowOverflow: $allowOverflow, ')
           ..write('requireRsvp: $requireRsvp, ')
           ..write('allowWalkins: $allowWalkins, ')
+          ..write('cancelled: $cancelled, ')
           ..write('syncedAt: $syncedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3425,6 +3479,7 @@ typedef $$LegMetaTableCreateCompanionBuilder =
       required bool allowOverflow,
       required bool requireRsvp,
       required bool allowWalkins,
+      Value<bool> cancelled,
       required DateTime syncedAt,
       Value<int> rowid,
     });
@@ -3436,6 +3491,7 @@ typedef $$LegMetaTableUpdateCompanionBuilder =
       Value<bool> allowOverflow,
       Value<bool> requireRsvp,
       Value<bool> allowWalkins,
+      Value<bool> cancelled,
       Value<DateTime> syncedAt,
       Value<int> rowid,
     });
@@ -3476,6 +3532,11 @@ class $$LegMetaTableFilterComposer
 
   ColumnFilters<bool> get allowWalkins => $composableBuilder(
     column: $table.allowWalkins,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get cancelled => $composableBuilder(
+    column: $table.cancelled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3524,6 +3585,11 @@ class $$LegMetaTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get cancelled => $composableBuilder(
+    column: $table.cancelled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get syncedAt => $composableBuilder(
     column: $table.syncedAt,
     builder: (column) => ColumnOrderings(column),
@@ -3562,6 +3628,9 @@ class $$LegMetaTableAnnotationComposer
     column: $table.allowWalkins,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get cancelled =>
+      $composableBuilder(column: $table.cancelled, builder: (column) => column);
 
   GeneratedColumn<DateTime> get syncedAt =>
       $composableBuilder(column: $table.syncedAt, builder: (column) => column);
@@ -3604,6 +3673,7 @@ class $$LegMetaTableTableManager
                 Value<bool> allowOverflow = const Value.absent(),
                 Value<bool> requireRsvp = const Value.absent(),
                 Value<bool> allowWalkins = const Value.absent(),
+                Value<bool> cancelled = const Value.absent(),
                 Value<DateTime> syncedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LegMetaCompanion(
@@ -3613,6 +3683,7 @@ class $$LegMetaTableTableManager
                 allowOverflow: allowOverflow,
                 requireRsvp: requireRsvp,
                 allowWalkins: allowWalkins,
+                cancelled: cancelled,
                 syncedAt: syncedAt,
                 rowid: rowid,
               ),
@@ -3624,6 +3695,7 @@ class $$LegMetaTableTableManager
                 required bool allowOverflow,
                 required bool requireRsvp,
                 required bool allowWalkins,
+                Value<bool> cancelled = const Value.absent(),
                 required DateTime syncedAt,
                 Value<int> rowid = const Value.absent(),
               }) => LegMetaCompanion.insert(
@@ -3633,6 +3705,7 @@ class $$LegMetaTableTableManager
                 allowOverflow: allowOverflow,
                 requireRsvp: requireRsvp,
                 allowWalkins: allowWalkins,
+                cancelled: cancelled,
                 syncedAt: syncedAt,
                 rowid: rowid,
               ),

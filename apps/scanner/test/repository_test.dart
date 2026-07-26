@@ -416,4 +416,62 @@ void main() {
     final d = await restarted.handle(legId, raw: tokenFor(passId));
     expect(d.decision.invitation!.displayName, 'Mr & Mrs Adeyemi');
   });
+
+  test('a cancelled event refuses at the gate, offline', () async {
+    // The whole point of carrying it in the payload: the phone must refuse
+    // on its own, with no network to ask.
+    api.bootstrapPayload = bootstrapFor([adeyemi(passId)])
+      ..['event']['cancelled'] = true;
+    await repo.openLeg(legId);
+
+    final d = await repo.handle(legId, raw: tokenFor(passId));
+    expect(d.decision.outcome, Outcome.eventCancelled);
+    expect(d.decision.admittedCount, 0);
+
+    // Refusals are logged — the organiser wants to know who still turned up.
+    expect(d.clientUuid, isNotNull);
+    final queued = await db.select(db.pendingScans).get();
+    expect(queued.single.result, 'event_cancelled');
+    expect(queued.single.admittedCount, 0);
+  });
+
+  test('cancellation survives a restart with no network', () async {
+    api.bootstrapPayload = bootstrapFor([adeyemi(passId)])
+      ..['event']['cancelled'] = true;
+    await repo.openLeg(legId);
+
+    final restarted = Repository(db: db, api: api, deviceId: 'test-device');
+    api.bootstrapError = ApiException(0, 'unreachable', 'no signal');
+    await restarted.openLeg(legId);
+
+    final d = await restarted.handle(legId, raw: tokenFor(passId));
+    expect(d.decision.outcome, Outcome.eventCancelled,
+        reason: 'a cached leg must not forget the event was called off');
+  });
+
+  test('reinstating the event lets the gate work again', () async {
+    api.bootstrapPayload = bootstrapFor([adeyemi(passId)])
+      ..['event']['cancelled'] = true;
+    await repo.openLeg(legId);
+    expect((await repo.handle(legId, raw: tokenFor(passId))).decision.outcome,
+        Outcome.eventCancelled);
+
+    // Nothing was reissued, so the same token works the moment the
+    // organiser sets the event back to active and the phone re-bootstraps.
+    api.bootstrapPayload = bootstrapFor([adeyemi(passId)]);
+    await repo.openLeg(legId);
+    expect((await repo.handle(legId, raw: tokenFor(passId))).decision.outcome,
+        isNot(Outcome.eventCancelled));
+  });
+
+  test('a payload without the flag is treated as not cancelled', () async {
+    // Older API builds omit it; the gate must not start refusing everyone.
+    final payload = bootstrapFor([adeyemi(passId)]);
+    (payload['event'] as Map).remove('cancelled');
+    api.bootstrapPayload = payload;
+    await repo.openLeg(legId);
+
+    final d = await repo.handle(legId, raw: tokenFor(passId));
+    expect(d.decision.outcome, isNot(Outcome.eventCancelled));
+  });
 }

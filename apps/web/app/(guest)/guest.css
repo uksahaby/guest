@@ -508,3 +508,27 @@
   color: var(--muted);
   text-align: center;
 }
+
+/* Cancellation notice. Sits directly under the hero, above the tabs, so it
+   is the first thing read on every tab. Muted rather than alarming — the
+   news is bad enough without the page shouting it. */
+.cancelled {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-left: 3px solid var(--forest);
+  padding: 18px 20px;
+  margin: 0 0 2px;
+}
+.cancelled h2 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 21px;
+  font-weight: 400;
+  color: var(--forest);
+  margin: 0 0 6px;
+}
+.cancelled p {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+}
