@@ -165,6 +165,49 @@ export async function authRoutes(
     "auth routes ready",
   );
 
+  /**
+   * Name yourself. Sign-in is phone-only, so this is the one place a user
+   * ever gets a name — nothing in the OTP flow can invent one.
+   *
+   * Worth doing before the first event: the implicit workspace is created
+   * lazily on that first event and takes its name from full_name at that
+   * moment (events.ts), so naming yourself first is what stops everyone's
+   * workspace being called "My events".
+   */
+  app.patch<{ Body: { full_name?: string; email?: string } }>(
+    "/me",
+    { preHandler: [app.authenticate] },
+    async (req, reply) => {
+      const userId = (req.user as { sub: string }).sub;
+
+      const rawName = req.body?.full_name;
+      const name = typeof rawName === "string" ? rawName.trim() : undefined;
+      if (name !== undefined && (name.length === 0 || name.length > 120)) {
+        return reply
+          .code(400)
+          .send({ code: "bad_name", message: "A name is required." });
+      }
+
+      const rawEmail = req.body?.email;
+      const email = typeof rawEmail === "string" ? rawEmail.trim() : undefined;
+      if (email !== undefined && email !== "" && !email.includes("@")) {
+        return reply
+          .code(400)
+          .send({ code: "bad_email", message: "That email doesn't look right." });
+      }
+
+      return asUser(sqlRw, userId, async (db) => {
+        const [user] = await db`
+          update users set
+            full_name = coalesce(${name ?? null}, full_name),
+            email     = coalesce(${email ?? null}, email)
+          where id = ${userId}
+          returning id, full_name, phone, email`;
+        return { user };
+      });
+    },
+  );
+
   app.get("/me", { preHandler: [app.authenticate] }, async (req) => {
     const userId = (req.user as { sub: string }).sub;
     return asUser(sqlRw, userId, async (db) => {

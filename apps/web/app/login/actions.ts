@@ -62,6 +62,11 @@ export async function verifyCode(formData: FormData): Promise<void> {
   });
   jar.delete("login_phone");
   jar.delete("login_hint");
+
+  // Sign-in is phone-only, so a first-time user has no name and nothing
+  // else will ever ask. Do it before /events: the implicit workspace is
+  // named from full_name when the first event is created.
+  if (!String(session.user?.full_name ?? "").trim()) redirect("/welcome");
   redirect("/events");
 }
 

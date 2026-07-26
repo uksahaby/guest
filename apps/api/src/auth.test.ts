@@ -131,3 +131,122 @@ test("/me lists owned and member workspaces with roles", async () => {
   assert.equal(ws.find((w: { id: string }) => w.id === owned).role, "owner");
   assert.equal(ws.find((w: { id: string }) => w.id === memberWs).role, "event_manager");
 });
+
+// ---- naming yourself -----------------------------------------------------
+//
+// Sign-in is phone-only, so PATCH /me is the only thing that can ever give
+// a user a name.
+
+async function signedIn() {
+  const p = phone();
+  const { dev_code } = (await request(p)).json();
+  const session = (await verify(p, dev_code)).json();
+  return { phone: p, ...session } as {
+    phone: string;
+    access_token: string;
+    user: { id: string; full_name: string };
+  };
+}
+
+function patchMe(token: string, body: unknown) {
+  return app.inject({
+    method: "PATCH",
+    url: "/me",
+    headers: { authorization: `Bearer ${token}` },
+    payload: body as Record<string, unknown>,
+  });
+}
+
+test("a new user has no name until they give one", async () => {
+  const s = await signedIn();
+  assert.equal(s.user.full_name, "");
+
+  const res = await patchMe(s.access_token, { full_name: "Ahmed Bello" });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.json().user.full_name, "Ahmed Bello");
+
+  const me = await app.inject({
+    method: "GET",
+    url: "/me",
+    headers: { authorization: `Bearer ${s.access_token}` },
+  });
+  assert.equal(me.json().user.full_name, "Ahmed Bello");
+});
+
+test("a name is trimmed, and an empty one is refused", async () => {
+  const s = await signedIn();
+  assert.equal((await patchMe(s.access_token, { full_name: "   " })).statusCode, 400);
+  assert.equal((await patchMe(s.access_token, { full_name: "" })).statusCode, 400);
+
+  const res = await patchMe(s.access_token, { full_name: "  Aisha Bello  " });
+  assert.equal(res.json().user.full_name, "Aisha Bello");
+});
+
+test("email is optional, validated, and independent of the name", async () => {
+  const s = await signedIn();
+  await patchMe(s.access_token, { full_name: "Chidi Okafor" });
+
+  assert.equal((await patchMe(s.access_token, { email: "nope" })).statusCode, 400);
+
+  const res = await patchMe(s.access_token, { email: "chidi@example.com" });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.json().user.email, "chidi@example.com");
+  // Sending only an email must not blank the name.
+  assert.equal(res.json().user.full_name, "Chidi Okafor");
+});
+
+test("naming yourself before the first event names the workspace", async () => {
+  // events.ts builds the implicit workspace from full_name, falling back to
+  // "My events" — so the order matters, and this is why onboarding asks
+  // before the dashboard.
+  const s = await signedIn();
+  await patchMe(s.access_token, { full_name: "Folake Adeyemi" });
+
+  const created = await app.inject({
+    method: "POST",
+    url: "/events",
+    headers: { authorization: `Bearer ${s.access_token}` },
+    payload: {
+      name: "Folake & Tunde",
+      leg: { name: "Reception", starts_at: "2026-12-12T16:00:00+01:00" },
+    },
+  });
+  assert.equal(created.statusCode, 201);
+
+  const me = await app.inject({
+    method: "GET",
+    url: "/me",
+    headers: { authorization: `Bearer ${s.access_token}` },
+  });
+  assert.equal(me.json().workspaces[0].name, "Folake Adeyemi");
+});
+
+test("an unnamed user still gets a usable workspace, not a blank one", async () => {
+  const s = await signedIn();
+  const created = await app.inject({
+    method: "POST",
+    url: "/events",
+    headers: { authorization: `Bearer ${s.access_token}` },
+    payload: {
+      name: "Someone & Someone",
+      leg: { name: "Reception", starts_at: "2026-12-12T16:00:00+01:00" },
+    },
+  });
+  assert.equal(created.statusCode, 201);
+
+  const me = await app.inject({
+    method: "GET",
+    url: "/me",
+    headers: { authorization: `Bearer ${s.access_token}` },
+  });
+  assert.equal(me.json().workspaces[0].name, "My events");
+});
+
+test("PATCH /me needs a session", async () => {
+  const res = await app.inject({
+    method: "PATCH",
+    url: "/me",
+    payload: { full_name: "Nobody" },
+  });
+  assert.equal(res.statusCode, 401);
+});
