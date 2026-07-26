@@ -252,6 +252,8 @@ hot-reload new registrations, and the symptom is a confusing 404.
 ## 7. Commit history
 
 ```
+a27187d  SMS delivery for OTP login
+f349a66  STATE.md, expanded
 c8552d9  STATE.md
 8e938c1  gates and team — the launch blocker
 8093660  event settings + delete vs the append-only log
