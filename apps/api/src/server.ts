@@ -14,6 +14,7 @@ import { importRoutes } from "./import.ts";
 import { tableRoutes } from "./tables.ts";
 import { liveRoutes } from "./live.ts";
 import { settingsRoutes } from "./settings.ts";
+import { teamRoutes } from "./team.ts";
 import multipart from "@fastify/multipart";
 import { makeProvider, type PaymentProvider } from "./paystack.ts";
 
@@ -70,6 +71,7 @@ export function buildServer(opts: { provider?: PaymentProvider } = {}) {
   app.register(tableRoutes);
   app.register(liveRoutes);
   app.register(settingsRoutes);
+  app.register(teamRoutes);
 
   // Smoke route proving the whole vertical slice works: issue-side data in
   // Postgres, verify-side logic from checkin-core. Dev only.

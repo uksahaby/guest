@@ -97,6 +97,9 @@ export default async function EventHome({
           <Link className="ghost" href={`/events/${id}/tables`}>
             Tables
           </Link>
+          <Link className="ghost" href={`/events/${id}/team`}>
+            Gates &amp; team
+          </Link>
           <Link className="ghost" href={`/events/${id}/settings`}>
             Settings
           </Link>
