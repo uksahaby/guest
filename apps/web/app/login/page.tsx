@@ -37,6 +37,14 @@ export default async function LoginPage({
         {sp.error === "code" && (
           <p className="form-error">That code didn&rsquo;t work. Try again.</p>
         )}
+        {sp.error === "sms" && (
+          <p className="form-error">
+            We couldn&rsquo;t send your code just now. Try again in a moment.
+          </p>
+        )}
+        {sp.error === "unknown" && (
+          <p className="form-error">Something went wrong. Try again.</p>
+        )}
 
         {step === "phone" ? (
           <form action={requestCode}>

@@ -19,7 +19,12 @@ export async function requestCode(formData: FormData): Promise<void> {
   const data = await res.json();
 
   if (!res.ok && res.status !== 429) {
-    redirect(`/login?error=${res.status === 400 ? "phone" : "unknown"}`);
+    // 502 means the SMS provider refused or was unreachable. The API has
+    // already dropped the code, so "try again" is honest advice — there is
+    // nothing throttling an immediate retry.
+    const kind =
+      res.status === 400 ? "phone" : res.status === 502 ? "sms" : "unknown";
+    redirect(`/login?error=${kind}`);
   }
 
   const jar = await cookies();

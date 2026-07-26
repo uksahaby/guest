@@ -17,6 +17,7 @@ import { settingsRoutes } from "./settings.ts";
 import { teamRoutes } from "./team.ts";
 import multipart from "@fastify/multipart";
 import { makeProvider, type PaymentProvider } from "./paystack.ts";
+import { makeSender, type SmsSender } from "./sms.ts";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -24,7 +25,9 @@ declare module "fastify" {
   }
 }
 
-export function buildServer(opts: { provider?: PaymentProvider } = {}) {
+export function buildServer(
+  opts: { provider?: PaymentProvider; sms?: SmsSender } = {},
+) {
   const app = Fastify({ logger: env.isDev && process.env.NODE_TEST_CONTEXT === undefined });
 
   // Webhook signatures are HMACs over the EXACT bytes the provider sent.
@@ -60,7 +63,7 @@ export function buildServer(opts: { provider?: PaymentProvider } = {}) {
     return { ok: true };
   });
 
-  app.register(authRoutes);
+  app.register(authRoutes, { sms: opts.sms ?? makeSender() });
   app.register(checkinRoutes);
   app.register(eventRoutes);
   app.register(scannerRoutes);

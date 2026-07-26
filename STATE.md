@@ -26,12 +26,14 @@ npm run dev   --workspace web                 # :3000
 
 Sign in at `http://localhost:3000/login` as `+2348030000001` (organiser) or
 `+2348030000002` (usher). **The OTP is printed on the login page in dev** —
-SMS is not wired up, see §4.
+with `TERMII_API_KEY` unset the API falls back to a `LogSender` and returns
+the code as `dev_code`. Set the key and both the log line and `dev_code`
+stop; see §5 *SMS*.
 
 `.claude/launch.json` defines both servers for the Browser pane.
 
 ```bash
-npm test --workspace api            # 194
+npm test --workspace api            # 207
 npm test --workspace checkin-core   # 35
 cd apps/scanner && flutter test     # 47
 ```
@@ -46,11 +48,11 @@ could never be cleaned out.
 ## 2. Shape
 
 ```
-apps/api        Fastify 5 + postgres.js (raw SQL, no ORM)   ~9,400 lines · 194 tests
+apps/api        Fastify 5 + postgres.js (raw SQL, no ORM)   ~9,600 lines · 207 tests
 apps/web        Next.js 16 App Router                        ~6,500 lines · 15 pages
 apps/scanner    Flutter 3.44 + drift + mobile_scanner         ~6,100 lines ·  47 tests
 packages/checkin-core   the handoff's own state machine                    ·  35 tests
-db/migrations   6 migrations layered on spec/schema-v1.sql
+db/migrations   7 migrations layered on spec/schema-v1.sql
 spec/           untouched handoff artefacts — schema, OpenAPI, architecture
 design/mockups/ untouched; the dashboard copies their tokens by hand
 ```
@@ -102,6 +104,10 @@ Both the web app and the Flutter scanner talk to the **one** backend,
   never an amount.
 - **Only a signed webhook upgrades a plan**, and it re-checks the amount
   against our own quoted row.
+- **`dev_code` is gated on the sender, not on `NODE_ENV`.** `SmsSender`
+  carries `echoesCodes`, and only a sender that genuinely delivers nothing
+  sets it. A staging box with `NODE_ENV` unset and a real Termii key must
+  not hand login codes back over HTTP.
 - **Dashboard CSS is hand-rolled from the mockup tokens**, not shadcn.
   Guest pages ship near-zero client JS; the dashboard may use client
   components freely (the no-JS rule is guest-surface only).
@@ -112,23 +118,17 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 
 ### Blocks a real wedding
 
-1. **SMS — nothing is sent.** OTP codes only reach `app.log.info`
-   (`TODO(launch)` in `apps/api/src/auth.ts`). **In production nobody can
-   sign in.** Design worked out but not written:
-   - Termii primary (stack rec §4), behind an `SmsSender` interface mirroring
-     the `PaymentProvider` pattern in `paystack.ts`, with a dev `LogSender`
-     and room for Africa's Talking beside it.
-   - `POST https://api.ng.termii.com/api/sms/send` with
-     `{ api_key, to, from, sms, type: "plain", channel }`.
-   - **Use `channel: "dnd"`.** Many Nigerian numbers sit on the
-     Do-Not-Disturb list and the generic route silently won't deliver —
-     this is the single detail most likely to waste a day.
-   - Keep our own hashed code; don't use Termii's token endpoint.
-   - On send failure: **delete the just-stored code row** and return 502, so
-     the user isn't left waiting for a code that never comes *and* isn't
-     rate-limited out of retrying.
-   - `dev_code` must never appear in a response when a real sender is
-     configured. Add a test for exactly that.
+1. **SMS is built, but has never sent a real message.** The code is done
+   (`apps/api/src/sms.ts`, 13 tests in `sms.test.ts`) and the whole design
+   below is implemented; what is missing is a Termii account. Nobody has
+   watched a code land on a handset, and the sender ID has not been
+   registered. Until someone does, treat delivery as unproven — the
+   provider contract is pinned by tests against a stubbed `fetch`, which
+   proves the payload shape and nothing about Termii's behaviour.
+   - **Still to do by hand:** open a Termii account, fund it, register a
+     sender ID (or use their pre-approved `N-Alert`), set `TERMII_API_KEY`,
+     then send one real code to a real Nigerian number — ideally one on the
+     DND list.
 2. **The scanner has never run on a phone.** No device, no emulator. Logic
    is heavily tested; camera, permissions, drift-on-device and real offline
    behaviour are unverified. Highest-risk unknown in the project.
@@ -207,6 +207,19 @@ the dependable signal — `req.raw`'s doesn't reliably fire, and a leaked
 subscription grows all through event day. Enrichment must be serialised per
 connection or rapid scans render out of order. Both fixed in `live.ts`.
 
+**Termii's `channel` is not cosmetic.** A large share of Nigerian numbers
+sit on the Do-Not-Disturb list. On the `generic` route Termii accepts the
+message, answers `code: "ok"`, and never delivers it — there is no error to
+find. `dnd` is the default in `env.ts`; changing it needs a whitelisted
+sender ID and a reason. Termii also wants the MSISDN bare (`234…`), and a
+leading `+` fails the same silent way.
+
+**A failed SMS must delete the code row, not consume it.** The resend
+rate-limit reads the newest row for the phone *regardless of `consumed_at`*,
+so a consumed row would lock the user out for 30 seconds over our outage.
+That delete needed a new grant (`db/migrations/007_otp_delete.sql`) —
+`app_rw` had select/insert/update on `auth_otp_codes` and nothing more.
+
 **A hidden field and a checkbox sharing a name never turns on** —
 `FormData.get()` returns the *first* value. Give the checkbox its own name
 and treat absence as false.
@@ -227,7 +240,7 @@ hot-reload new registrations, and the symptom is a confusing 404.
 
 ## 6. Suggested order
 
-1. **SMS** (design in §4.1) — small, and nothing works in production without it.
+1. ~~SMS~~ — built. Left to do: a Termii account and one real delivery (§4.1).
 2. **Scanner on a real device** — find out what breaks *before* building
    walk-in, Recent and audio on top of it.
 3. **Cancellation + onboarding** — two small honesty fixes.

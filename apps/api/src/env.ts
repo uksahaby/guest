@@ -32,4 +32,13 @@ export const env = {
   webUrl: process.env.WEB_URL ?? "http://localhost:3000",
   /** Unset locally: checkout falls back to an offline stub provider. */
   paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
+  /** Unset locally: OTP codes go to the log instead of a phone. */
+  termiiApiKey: process.env.TERMII_API_KEY ?? "",
+  /**
+   * The sender ID recipients see. "N-Alert" is Termii's own pre-approved
+   * DND-capable ID; a branded one has to be registered with them first.
+   */
+  smsSenderId: process.env.SMS_SENDER_ID ?? "N-Alert",
+  /** See TermiiSender — "dnd" or the message may never arrive. */
+  smsChannel: process.env.SMS_CHANNEL ?? "dnd",
 };

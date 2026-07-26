@@ -2,6 +2,7 @@ import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { asAnon, asUser, sqlRw } from "./db.ts";
 import { env } from "./env.ts";
+import type { SmsSender } from "./sms.ts";
 
 /**
  * Phone-first OTP auth (architecture decision #7: phone is the primary
@@ -12,9 +13,10 @@ import { env } from "./env.ts";
  * so users and auth_otp_codes are the two tables deliberately left out of
  * RLS and reachable only by app_rw (see db/migrations/003_rls.sql).
  *
- * SMS delivery is behind sendSms() — Termii or Africa's Talking in
- * production (better delivery in Nigeria than Twilio, per the stack rec).
- * In dev the code is logged and returned in the response as dev_code.
+ * SMS delivery is behind SmsSender (sms.ts) — Termii in production, a
+ * LogSender in dev. dev_code comes back in the response only while the
+ * sender is one that does not really deliver; the moment a real provider
+ * is configured a code can never leave the server over HTTP.
  */
 
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -33,12 +35,19 @@ function hashCode(phone: string, code: string): string {
   return createHash("sha256").update(`${phone}:${code}:${env.jwtSecret}`).digest("hex");
 }
 
-async function sendSms(app: FastifyInstance, phone: string, code: string): Promise<void> {
-  // TODO(launch): Termii / Africa's Talking integration.
-  app.log.info({ phone, code }, "OTP (dev delivery: log only)");
+/**
+ * Kept short and boring on purpose: it is read aloud across a noisy hall
+ * as often as it is tapped in, and a long message costs a second SMS page.
+ */
+function codeMessage(code: string): string {
+  return `${code} is your sign-in code. It expires in 10 minutes. Do not share it with anyone.`;
 }
 
-export async function authRoutes(app: FastifyInstance) {
+export async function authRoutes(
+  app: FastifyInstance,
+  opts: { sms: SmsSender },
+) {
+  const { sms } = opts;
   app.post<{ Body: { phone?: string } }>("/auth/otp/request", async (req, reply) => {
     const phone = normalisePhone(req.body?.phone);
     if (!phone) {
@@ -61,10 +70,11 @@ export async function authRoutes(app: FastifyInstance) {
       await db`
         update auth_otp_codes set consumed_at = now()
         where phone = ${phone} and consumed_at is null`;
-      await db`
+      const [row] = await db`
         insert into auth_otp_codes (phone, code_hash, expires_at)
-        values (${phone}, ${hashCode(phone, code)}, ${new Date(Date.now() + CODE_TTL_MS)})`;
-      return { code };
+        values (${phone}, ${hashCode(phone, code)}, ${new Date(Date.now() + CODE_TTL_MS)})
+        returning id`;
+      return { code, id: row!.id as string };
     });
 
     if ("retryIn" in outcome) {
@@ -75,11 +85,26 @@ export async function authRoutes(app: FastifyInstance) {
       });
     }
 
-    await sendSms(app, phone, outcome.code);
+    try {
+      await sms.send({ to: phone, text: codeMessage(outcome.code) });
+    } catch (err) {
+      // Roll the code back rather than leave it standing. Otherwise the
+      // user waits for an SMS that is never coming, and the resend window
+      // (which reads the newest row regardless of consumed_at) locks them
+      // out of trying again for half a minute over our failure.
+      await asAnon((db) => db`delete from auth_otp_codes where id = ${outcome.id}`);
+      app.log.error({ err, phone, sender: sms.name }, "OTP delivery failed");
+      return reply.code(502).send({
+        code: "sms_failed",
+        message: "We couldn't send your code. Try again in a moment.",
+      });
+    }
 
     return reply.code(202).send({
       retry_after_seconds: RESEND_SECONDS,
-      ...(env.isDev ? { dev_code: outcome.code } : {}),
+      // Gated on the sender, not on isDev: a staging box running with
+      // NODE_ENV unset but a real Termii key must not echo codes.
+      ...(env.isDev && sms.echoesCodes ? { dev_code: outcome.code } : {}),
     });
   });
 
@@ -132,6 +157,13 @@ export async function authRoutes(app: FastifyInstance) {
       },
     };
   });
+
+  // Loud on purpose. "Nobody can sign in" is the failure mode of a deploy
+  // that forgot the API key, and it is invisible until a customer reports it.
+  app.log.info(
+    { sender: sms.name, delivers: !sms.echoesCodes },
+    "auth routes ready",
+  );
 
   app.get("/me", { preHandler: [app.authenticate] }, async (req) => {
     const userId = (req.user as { sub: string }).sub;
