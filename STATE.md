@@ -4,7 +4,7 @@ Companion to `HANDOFF.md`, which remains the source of truth for *why*
 anything is the way it is. This file records *what exists*, what doesn't,
 and what will bite whoever picks it up next — including me, later.
 
-Written 26 July 2026 · branch `main` · 21 commits · **nothing deployed**.
+Written 26 July 2026 · branch `main` · 25 commits · **nothing deployed**.
 
 ---
 
@@ -32,10 +32,28 @@ stop; see §5 *SMS*.
 
 `.claude/launch.json` defines both servers for the Browser pane.
 
+### On a real Android phone
+
+The API binds loopback, so a USB-attached phone reaches it through adb
+rather than the LAN:
+
+```bash
+adb reverse tcp:3001 tcp:3001
+cd apps/scanner && flutter run --dart-define=API_URL=http://localhost:3001
+```
+
+The tunnel dies quietly when the `flutter run` session ends or USB
+re-enumerates: `adb reverse --list` still shows it while nothing gets
+through. Symptom is every request failing for no visible reason. Re-add it,
+and if that does not help, `adb kill-server && adb start-server` — which
+re-triggers the "Allow USB debugging?" prompt on the handset.
+
+### Tests
+
 ```bash
 npm test --workspace api            # 207
 npm test --workspace checkin-core   # 35
-cd apps/scanner && flutter test     # 47
+cd apps/scanner && flutter test     # 64
 ```
 
 Tests rebuild a disposable `guest_test` from `spec/schema-v1.sql` plus every
@@ -50,7 +68,7 @@ could never be cleaned out.
 ```
 apps/api        Fastify 5 + postgres.js (raw SQL, no ORM)   ~9,600 lines · 207 tests
 apps/web        Next.js 16 App Router                        ~6,500 lines · 15 pages
-apps/scanner    Flutter 3.44 + drift + mobile_scanner         ~6,100 lines ·  47 tests
+apps/scanner    Flutter 3.44 + drift + mobile_scanner         ~6,300 lines ·  64 tests
 packages/checkin-core   the handoff's own state machine                    ·  35 tests
 db/migrations   7 migrations layered on spec/schema-v1.sql
 spec/           untouched handoff artefacts — schema, OpenAPI, architecture
@@ -108,6 +126,11 @@ Both the web app and the Flutter scanner talk to the **one** backend,
   carries `echoesCodes`, and only a sender that genuinely delivers nothing
   sets it. A staging box with `NODE_ENV` unset and a real Termii key must
   not hand login codes back over HTTP.
+- **Only a transport failure falls back to local data.** `ApiException
+  .isTransport` (timeout, unreachable, 5xx) is the single gate on the
+  scanner's offline paths. A 403 must always fail hard: it means the usher
+  was taken off the leg, and serving a stale local copy would let a removed
+  usher keep admitting people.
 - **Dashboard CSS is hand-rolled from the mockup tokens**, not shadcn.
   Guest pages ship near-zero client JS; the dashboard may use client
   components freely (the no-JS rule is guest-surface only).
@@ -129,14 +152,31 @@ Both the web app and the Flutter scanner talk to the **one** backend,
      sender ID (or use their pre-approved `N-Alert`), set `TERMII_API_KEY`,
      then send one real code to a real Nigerian number — ideally one on the
      DND list.
-2. **The scanner has never run on a phone.** No device, no emulator. Logic
-   is heavily tested; camera, permissions, drift-on-device and real offline
-   behaviour are unverified. Highest-risk unknown in the project.
+2. **The scanner has run on a phone — but has never read a real QR code.**
+   Verified 26 July 2026 on a Xiaomi 23106RN0DA, Android 14, arm64, against
+   the API over `adb reverse`. What is now proven on hardware: build and
+   install, OTP login, camera preview and the runtime permission prompt,
+   bootstrap into drift, offline search, manual check-in reaching Postgres
+   with a real `device_id`, the offline queue, and reconnect sync. Release
+   APK builds and its merged manifest carries `CAMERA` and `INTERNET` (both
+   arrive from plugins; the app's own manifest declares neither).
+   - **Still unproven: the decode path.** Every check-in in that session
+     went through *Search by name*. No QR has been put in front of the lens,
+     so `mobile_scanner` reading a real pass — focus, low light, a phone
+     screen behind glass, a printed card at a Lagos reception — is still
+     untested. That is now the highest-risk unknown.
+   - **No error path for a denied camera.** `MobileScanner` is constructed
+     with no `errorBuilder` (`scan_screen.dart` ~line 260), so an usher who
+     taps Deny gets the plugin's own bare error box and no route to
+     settings.
 3. **Scanner gaps.** "Add walk-in" and "Call manager" dismiss without doing
    anything (`apps/scanner/lib/ui/scan_screen.dart` ~line 193); the "Recent"
    button does nothing; no audio tones (phase-4c §5 specifies sound, we ship
    haptics only); no undo from a recent list. **A walk-in also needs an API
-   endpoint — it doesn't exist.**
+   endpoint — it doesn't exist.** Two more found on the device: a back-press
+   on the scan screen drops the usher out of the leg entirely with no
+   confirm, even mid-result; and the app installs under the label
+   `scanner` (`android:label`, never set).
 4. **Cancelling an event does nothing visible.** `status = 'cancelled'`
    saves, but the guest page shows no notice and passes still verify at the
    gate — while the settings page promises both. Honour it or change the copy.
@@ -220,6 +260,24 @@ so a consumed row would lock the user out for 30 seconds over our outage.
 That delete needed a new grant (`db/migrations/007_otp_delete.sql`) —
 `app_rw` had select/insert/update on `auth_otp_codes` and nothing more.
 
+**An HTTP call with no deadline does not fail — it hangs.** The scanner had
+none, and a half-open socket (the phone leaving Wi-Fi mid-request) froze the
+calling screen permanently; restoring signal did not recover it, because
+nothing ever failed and so nothing ever retried. The card being tapped is
+disabled while it opens, so the only escape was force-quitting. Deadlines
+live in `client.dart` and cover reading the body too — a response that
+starts and then stalls is the same problem as one that never starts.
+
+**"Works offline" has to be tested from a cold start, not a warm one.**
+Two separate things were only in memory: the event signing keys, and the
+assignments list. Each looked fine while the app stayed open. Persisting
+the keys alone fixed a screen the usher could never reach, because
+"Which event?" was still a live request — the second bug was invisible
+until the first was fixed *and* the app was restarted on a dead network.
+Unit tests missed both because they build a `Repository` directly and call
+`openLeg` themselves. Android kills backgrounded apps freely; treat an
+app restart at a venue with no signal as the ordinary case.
+
 **A hidden field and a checkbox sharing a name never turns on** —
 `FormData.get()` returns the *first* value. Give the checkbox its own name
 and treat absence as false.
@@ -241,8 +299,9 @@ hot-reload new registrations, and the symptom is a confusing 404.
 ## 6. Suggested order
 
 1. ~~SMS~~ — built. Left to do: a Termii account and one real delivery (§4.1).
-2. **Scanner on a real device** — find out what breaks *before* building
-   walk-in, Recent and audio on top of it.
+2. ~~Scanner on a real device~~ — done, and it paid for itself (§4.2).
+   What remains is **putting a real QR in front of the lens**; do that
+   before building walk-in, Recent and audio on top of it.
 3. **Cancellation + onboarding** — two small honesty fixes.
 4. **Deploy to staging** with Paystack test keys.
 5. Web scanner fallback → setup wizard → super admin.
@@ -252,6 +311,8 @@ hot-reload new registrations, and the symptom is a confusing 404.
 ## 7. Commit history
 
 ```
+1c594fc  scanner: survive a phone with no signal
+72ea027  STATE.md history
 a27187d  SMS delivery for OTP login
 f349a66  STATE.md, expanded
 c8552d9  STATE.md
