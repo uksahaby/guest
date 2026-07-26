@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -17,28 +18,69 @@ class ApiException implements Exception {
   final String code;
   final String message;
   ApiException(this.status, this.code, this.message);
+
+  /// The request never got an answer — as opposed to being refused by the
+  /// server. Callers fall back to the local copy on this, and only on this.
+  bool get isTransport => status == 0 || status == 408 || status >= 500;
+
   @override
   String toString() => 'ApiException($status $code): $message';
 }
 
+/// Nothing at a gate may wait forever. Without these, a half-open socket —
+/// the phone walking out of Wi-Fi range mid-request — hangs the calling
+/// screen indefinitely, and restoring signal does not recover it, because
+/// nothing ever fails and nothing ever retries. Found on a real device.
+const _requestTimeout = Duration(seconds: 12);
+
+/// The queue replay carries up to 500 rows and runs in the background, so
+/// it gets longer before we call it lost.
+const _syncTimeout = Duration(seconds: 30);
+
 class ApiClient {
   final String baseUrl;
   final http.Client _http;
+  final Duration requestTimeout;
+  final Duration syncTimeout;
   String? token;
 
-  ApiClient({this.baseUrl = apiUrl, http.Client? httpClient, this.token})
-      : _http = httpClient ?? http.Client();
+  ApiClient({
+    this.baseUrl = apiUrl,
+    http.Client? httpClient,
+    this.token,
+    // Overridable so tests can assert the deadline without waiting for it.
+    this.requestTimeout = _requestTimeout,
+    this.syncTimeout = _syncTimeout,
+  }) : _http = httpClient ?? http.Client();
 
   Map<String, String> get _headers => {
         'content-type': 'application/json',
         if (token != null) 'authorization': 'Bearer $token',
       };
 
-  Future<dynamic> _send(String method, String path, {Object? body}) async {
+  Future<dynamic> _send(
+    String method,
+    String path, {
+    Object? body,
+    Duration? timeout,
+  }) async {
+    final deadline = timeout ?? requestTimeout;
     final uri = Uri.parse('$baseUrl$path');
     final req = http.Request(method, uri)..headers.addAll(_headers);
     if (body != null) req.body = jsonEncode(body);
-    final res = await http.Response.fromStream(await _http.send(req));
+
+    final http.Response res;
+    try {
+      // The deadline covers reading the body too: a response that starts
+      // and then stalls is the same problem as one that never starts.
+      final streamed = await _http.send(req).timeout(deadline);
+      res = await http.Response.fromStream(streamed).timeout(deadline);
+    } on TimeoutException {
+      throw ApiException(408, 'timeout', "The network didn't answer.");
+    } on http.ClientException catch (e) {
+      throw ApiException(0, 'unreachable', e.message);
+    }
+
     final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
     if (res.statusCode >= 400) {
       final map = decoded is Map<String, dynamic> ? decoded : const {};
@@ -77,7 +119,7 @@ class ApiClient {
   Future<List<dynamic>> submitCheckIns(
       List<Map<String, dynamic>> items) async {
     final res = (await _send('POST', '/scanner/check-ins',
-        body: {'items': items})) as Map<String, dynamic>;
+        body: {'items': items}, timeout: syncTimeout)) as Map<String, dynamic>;
     return res['results'] as List<dynamic>;
   }
 

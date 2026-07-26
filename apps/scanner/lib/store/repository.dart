@@ -29,13 +29,91 @@ class Repository {
 
   // ---- bootstrap ----------------------------------------------------------
 
+  /// The usher's legs, from the server when it answers and from the last
+  /// answer when it does not.
+  ///
+  /// Persisting keys alone left the gate unreachable: this list is the only
+  /// way into a leg, so offline it has to come from somewhere. `fromCache`
+  /// tells the screen which it got — "downloaded an hour ago" and "live"
+  /// are different promises.
+  Future<({List<dynamic> rows, bool fromCache})> assignments() async {
+    try {
+      final rows = await api.assignments();
+      await db.transaction(() async {
+        await db.delete(db.cachedAssignments).go();
+        for (var i = 0; i < rows.length; i++) {
+          final a = rows[i] as Map<String, dynamic>;
+          await db.cachedAssignments
+              .insertOne(CachedAssignmentsCompanion.insert(
+            legId: a['leg_id'] as String,
+            payload: jsonEncode(a),
+            position: i,
+            fetchedAt: DateTime.now(),
+          ));
+        }
+      });
+      return (rows: rows, fromCache: false);
+    } on ApiException catch (e) {
+      if (!e.isTransport) rethrow;
+      final cached = await (db.select(db.cachedAssignments)
+            ..orderBy([(c) => OrderingTerm.asc(c.position)]))
+          .get();
+      if (cached.isEmpty) rethrow;
+      return (
+        rows: [for (final c in cached) jsonDecode(c.payload)],
+        fromCache: true,
+      );
+    }
+  }
+
+  /// Opens a leg for scanning: refreshes the offline payload when the
+  /// network allows, and otherwise reopens the copy already on disk.
+  ///
+  /// The fallback is the whole point of an offline scanner. An usher whose
+  /// app restarts at a venue with no signal — Android kills backgrounded
+  /// apps freely — must still be able to work the gate with the guest list
+  /// downloaded earlier.
+  ///
+  /// It is deliberately narrow: only a transport failure falls back. A 403
+  /// means this usher was taken off the leg, and honouring a stale local
+  /// copy would let a removed usher keep admitting people.
+  Future<void> openLeg(String legId) async {
+    try {
+      await _bootstrapLeg(legId);
+    } on ApiException catch (e) {
+      if (!e.isTransport) rethrow;
+      if (!await _openFromCache(legId)) rethrow;
+    }
+  }
+
+  /// True when a previously downloaded copy of this leg was loaded.
+  Future<bool> _openFromCache(String legId) async {
+    if (await meta(legId) == null) return false;
+    final rows = await (db.select(db.signingKeys)
+          ..where((k) => k.legId.equals(legId)))
+        .get();
+    // No keys means no pass can be verified, which is worse than saying so.
+    if (rows.isEmpty) return false;
+
+    keys = [
+      for (final k in rows)
+        EventKey(
+          eventId: k.eventId,
+          eventName: k.eventName,
+          tokenVersion: k.tokenVersion,
+          key: base64Decode(k.keyB64),
+        ),
+    ];
+    return true;
+  }
+
   /// Downloads the offline payload for a leg and caches it locally.
   /// After this returns, the gate works with no network at all.
-  Future<void> openLeg(String legId) async {
+  Future<void> _bootstrapLeg(String legId) async {
     final b = await api.bootstrap(legId);
 
     final event = b['event'] as Map<String, dynamic>;
-    keys = [
+    final fetched = [
       for (final k in b['keys'] as List<dynamic>)
         EventKey(
           eventId: k['event_id'] as String,
@@ -44,8 +122,21 @@ class Repository {
           key: base64Decode(k['key'] as String),
         ),
     ];
+    keys = fetched;
 
     await db.transaction(() async {
+      await (db.delete(db.signingKeys)..where((k) => k.legId.equals(legId)))
+          .go();
+      for (final k in fetched) {
+        await db.signingKeys.insertOne(SigningKeysCompanion.insert(
+          legId: legId,
+          eventId: k.eventId,
+          eventName: k.eventName,
+          tokenVersion: k.tokenVersion,
+          keyB64: base64Encode(k.key),
+        ));
+      }
+
       await db.legMeta.insertOnConflictUpdate(LegMetaCompanion.insert(
         legId: legId,
         eventId: event['id'] as String,

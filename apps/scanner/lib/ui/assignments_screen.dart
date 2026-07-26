@@ -27,6 +27,9 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   String? _error;
   String? _openingLeg;
 
+  /// True when the list came off the disk rather than the server.
+  bool _offline = false;
+
   @override
   void initState() {
     super.initState();
@@ -35,8 +38,12 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
 
   Future<void> _load() async {
     try {
-      final rows = await widget.api.assignments();
-      setState(() => _assignments = rows);
+      final res = await widget.repo.assignments();
+      setState(() {
+        _assignments = res.rows;
+        _offline = res.fromCache;
+        _error = null;
+      });
     } catch (_) {
       setState(() => _error = "Couldn't load your events.");
     }
@@ -54,9 +61,15 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         a['event_name'] as String,
         'Main Gate',
       );
-    } catch (_) {
+    } catch (e) {
+      // openLeg already reopens a downloaded copy when the network is the
+      // only thing missing, so reaching here means there is nothing local
+      // to fall back to — or the server actively refused.
       setState(() {
-        _error = "Couldn't download the guest list.";
+        _error = e is ApiException && e.isTransport
+            ? "No signal, and this gate hasn't been downloaded yet. "
+                "Get online once, then it works offline."
+            : "Couldn't download the guest list.";
         _openingLeg = null;
       });
     }
@@ -78,7 +91,21 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                   ? const Center(
                       child: Text('No events assigned to you yet.',
                           style: TextStyle(color: Palette.muted)))
-                  : ListView.separated(
+                  : Column(children: [
+                      if (_offline)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          color: Palette.hold.withValues(alpha: .15),
+                          child: const Text(
+                            'Offline — showing gates already downloaded.',
+                            style: TextStyle(
+                                fontSize: 12.5, color: Palette.hold),
+                          ),
+                        ),
+                      Expanded(
+                        child: ListView.separated(
                       padding: const EdgeInsets.all(16),
                       itemCount: _assignments!.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -130,7 +157,9 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                           ),
                         );
                       },
-                    ),
+                        ),
+                      ),
+                    ]),
     );
   }
 }

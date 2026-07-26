@@ -51,6 +51,48 @@ class PendingScans extends Table {
   Set<Column> get primaryKey => {clientUuid};
 }
 
+/// The signing keys a leg's bootstrap handed us, on disk rather than in
+/// memory alone.
+///
+/// Without this the keys die with the process, and an app restart with no
+/// signal leaves the scanner unable to verify a single pass — every QR
+/// reads as forged. Android kills backgrounded apps freely, so that is an
+/// ordinary event at a gate, not an edge case.
+///
+/// More than one event's keys arrive per leg on purpose: that is what lets
+/// a pass from the wrong wedding be *named* rather than shrugged at.
+class SigningKeys extends Table {
+  /// Whose bootstrap payload this key arrived in.
+  TextColumn get legId => text()();
+  TextColumn get eventId => text()();
+  TextColumn get eventName => text()();
+  IntColumn get tokenVersion => integer()();
+
+  /// base64 — the same encoding the API sends, decoded on load.
+  TextColumn get keyB64 => text()();
+
+  @override
+  Set<Column> get primaryKey => {legId, eventId, tokenVersion};
+}
+
+/// The "Which event?" list, as the server last sent it.
+///
+/// Persisting the signing keys was not enough on its own: offline, the
+/// usher never reached the gate at all, because the list they tap through
+/// was a live request with no fallback. Caching the rows verbatim keeps
+/// every field the screen renders without a second shape to maintain.
+class CachedAssignments extends Table {
+  TextColumn get legId => text()();
+
+  /// The assignment object exactly as the API returned it.
+  TextColumn get payload => text()();
+  IntColumn get position => integer()();
+  DateTimeColumn get fetchedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {legId};
+}
+
 class LegMeta extends Table {
   TextColumn get legId => text()();
   TextColumn get eventId => text()();
@@ -64,7 +106,14 @@ class LegMeta extends Table {
   Set<Column> get primaryKey => {legId};
 }
 
-@DriftDatabase(tables: [Invitations, RevokedPasses, PendingScans, LegMeta])
+@DriftDatabase(tables: [
+  Invitations,
+  RevokedPasses,
+  PendingScans,
+  LegMeta,
+  SigningKeys,
+  CachedAssignments,
+])
 class ScannerDb extends _$ScannerDb {
   ScannerDb() : super(driftDatabase(name: 'scanner'));
 
@@ -72,7 +121,21 @@ class ScannerDb extends _$ScannerDb {
   ScannerDb.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 3;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          // Phones already in the field carry an unsynced queue, so every
+          // step here adds and never recreates.
+          //
+          // v2 persists signing keys; v3 caches the assignments list, so a
+          // gate is reachable offline and not merely openable once reached.
+          if (from < 2) await m.createTable(signingKeys);
+          if (from < 3) await m.createTable(cachedAssignments);
+        },
+      );
 
   /// Local view of how many of this household are in at this leg:
   /// server truth + everything queued on this phone (reversals included —

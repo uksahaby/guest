@@ -1959,6 +1959,694 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
   }
 }
 
+class $SigningKeysTable extends SigningKeys
+    with TableInfo<$SigningKeysTable, SigningKey> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SigningKeysTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _legIdMeta = const VerificationMeta('legId');
+  @override
+  late final GeneratedColumn<String> legId = GeneratedColumn<String>(
+    'leg_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _eventIdMeta = const VerificationMeta(
+    'eventId',
+  );
+  @override
+  late final GeneratedColumn<String> eventId = GeneratedColumn<String>(
+    'event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _eventNameMeta = const VerificationMeta(
+    'eventName',
+  );
+  @override
+  late final GeneratedColumn<String> eventName = GeneratedColumn<String>(
+    'event_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tokenVersionMeta = const VerificationMeta(
+    'tokenVersion',
+  );
+  @override
+  late final GeneratedColumn<int> tokenVersion = GeneratedColumn<int>(
+    'token_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _keyB64Meta = const VerificationMeta('keyB64');
+  @override
+  late final GeneratedColumn<String> keyB64 = GeneratedColumn<String>(
+    'key_b64',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    legId,
+    eventId,
+    eventName,
+    tokenVersion,
+    keyB64,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'signing_keys';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SigningKey> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('leg_id')) {
+      context.handle(
+        _legIdMeta,
+        legId.isAcceptableOrUnknown(data['leg_id']!, _legIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_legIdMeta);
+    }
+    if (data.containsKey('event_id')) {
+      context.handle(
+        _eventIdMeta,
+        eventId.isAcceptableOrUnknown(data['event_id']!, _eventIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventIdMeta);
+    }
+    if (data.containsKey('event_name')) {
+      context.handle(
+        _eventNameMeta,
+        eventName.isAcceptableOrUnknown(data['event_name']!, _eventNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventNameMeta);
+    }
+    if (data.containsKey('token_version')) {
+      context.handle(
+        _tokenVersionMeta,
+        tokenVersion.isAcceptableOrUnknown(
+          data['token_version']!,
+          _tokenVersionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_tokenVersionMeta);
+    }
+    if (data.containsKey('key_b64')) {
+      context.handle(
+        _keyB64Meta,
+        keyB64.isAcceptableOrUnknown(data['key_b64']!, _keyB64Meta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyB64Meta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {legId, eventId, tokenVersion};
+  @override
+  SigningKey map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SigningKey(
+      legId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}leg_id'],
+      )!,
+      eventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}event_id'],
+      )!,
+      eventName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}event_name'],
+      )!,
+      tokenVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}token_version'],
+      )!,
+      keyB64: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key_b64'],
+      )!,
+    );
+  }
+
+  @override
+  $SigningKeysTable createAlias(String alias) {
+    return $SigningKeysTable(attachedDatabase, alias);
+  }
+}
+
+class SigningKey extends DataClass implements Insertable<SigningKey> {
+  /// Whose bootstrap payload this key arrived in.
+  final String legId;
+  final String eventId;
+  final String eventName;
+  final int tokenVersion;
+
+  /// base64 — the same encoding the API sends, decoded on load.
+  final String keyB64;
+  const SigningKey({
+    required this.legId,
+    required this.eventId,
+    required this.eventName,
+    required this.tokenVersion,
+    required this.keyB64,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['leg_id'] = Variable<String>(legId);
+    map['event_id'] = Variable<String>(eventId);
+    map['event_name'] = Variable<String>(eventName);
+    map['token_version'] = Variable<int>(tokenVersion);
+    map['key_b64'] = Variable<String>(keyB64);
+    return map;
+  }
+
+  SigningKeysCompanion toCompanion(bool nullToAbsent) {
+    return SigningKeysCompanion(
+      legId: Value(legId),
+      eventId: Value(eventId),
+      eventName: Value(eventName),
+      tokenVersion: Value(tokenVersion),
+      keyB64: Value(keyB64),
+    );
+  }
+
+  factory SigningKey.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SigningKey(
+      legId: serializer.fromJson<String>(json['legId']),
+      eventId: serializer.fromJson<String>(json['eventId']),
+      eventName: serializer.fromJson<String>(json['eventName']),
+      tokenVersion: serializer.fromJson<int>(json['tokenVersion']),
+      keyB64: serializer.fromJson<String>(json['keyB64']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'legId': serializer.toJson<String>(legId),
+      'eventId': serializer.toJson<String>(eventId),
+      'eventName': serializer.toJson<String>(eventName),
+      'tokenVersion': serializer.toJson<int>(tokenVersion),
+      'keyB64': serializer.toJson<String>(keyB64),
+    };
+  }
+
+  SigningKey copyWith({
+    String? legId,
+    String? eventId,
+    String? eventName,
+    int? tokenVersion,
+    String? keyB64,
+  }) => SigningKey(
+    legId: legId ?? this.legId,
+    eventId: eventId ?? this.eventId,
+    eventName: eventName ?? this.eventName,
+    tokenVersion: tokenVersion ?? this.tokenVersion,
+    keyB64: keyB64 ?? this.keyB64,
+  );
+  SigningKey copyWithCompanion(SigningKeysCompanion data) {
+    return SigningKey(
+      legId: data.legId.present ? data.legId.value : this.legId,
+      eventId: data.eventId.present ? data.eventId.value : this.eventId,
+      eventName: data.eventName.present ? data.eventName.value : this.eventName,
+      tokenVersion: data.tokenVersion.present
+          ? data.tokenVersion.value
+          : this.tokenVersion,
+      keyB64: data.keyB64.present ? data.keyB64.value : this.keyB64,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SigningKey(')
+          ..write('legId: $legId, ')
+          ..write('eventId: $eventId, ')
+          ..write('eventName: $eventName, ')
+          ..write('tokenVersion: $tokenVersion, ')
+          ..write('keyB64: $keyB64')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(legId, eventId, eventName, tokenVersion, keyB64);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SigningKey &&
+          other.legId == this.legId &&
+          other.eventId == this.eventId &&
+          other.eventName == this.eventName &&
+          other.tokenVersion == this.tokenVersion &&
+          other.keyB64 == this.keyB64);
+}
+
+class SigningKeysCompanion extends UpdateCompanion<SigningKey> {
+  final Value<String> legId;
+  final Value<String> eventId;
+  final Value<String> eventName;
+  final Value<int> tokenVersion;
+  final Value<String> keyB64;
+  final Value<int> rowid;
+  const SigningKeysCompanion({
+    this.legId = const Value.absent(),
+    this.eventId = const Value.absent(),
+    this.eventName = const Value.absent(),
+    this.tokenVersion = const Value.absent(),
+    this.keyB64 = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SigningKeysCompanion.insert({
+    required String legId,
+    required String eventId,
+    required String eventName,
+    required int tokenVersion,
+    required String keyB64,
+    this.rowid = const Value.absent(),
+  }) : legId = Value(legId),
+       eventId = Value(eventId),
+       eventName = Value(eventName),
+       tokenVersion = Value(tokenVersion),
+       keyB64 = Value(keyB64);
+  static Insertable<SigningKey> custom({
+    Expression<String>? legId,
+    Expression<String>? eventId,
+    Expression<String>? eventName,
+    Expression<int>? tokenVersion,
+    Expression<String>? keyB64,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (legId != null) 'leg_id': legId,
+      if (eventId != null) 'event_id': eventId,
+      if (eventName != null) 'event_name': eventName,
+      if (tokenVersion != null) 'token_version': tokenVersion,
+      if (keyB64 != null) 'key_b64': keyB64,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SigningKeysCompanion copyWith({
+    Value<String>? legId,
+    Value<String>? eventId,
+    Value<String>? eventName,
+    Value<int>? tokenVersion,
+    Value<String>? keyB64,
+    Value<int>? rowid,
+  }) {
+    return SigningKeysCompanion(
+      legId: legId ?? this.legId,
+      eventId: eventId ?? this.eventId,
+      eventName: eventName ?? this.eventName,
+      tokenVersion: tokenVersion ?? this.tokenVersion,
+      keyB64: keyB64 ?? this.keyB64,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (legId.present) {
+      map['leg_id'] = Variable<String>(legId.value);
+    }
+    if (eventId.present) {
+      map['event_id'] = Variable<String>(eventId.value);
+    }
+    if (eventName.present) {
+      map['event_name'] = Variable<String>(eventName.value);
+    }
+    if (tokenVersion.present) {
+      map['token_version'] = Variable<int>(tokenVersion.value);
+    }
+    if (keyB64.present) {
+      map['key_b64'] = Variable<String>(keyB64.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SigningKeysCompanion(')
+          ..write('legId: $legId, ')
+          ..write('eventId: $eventId, ')
+          ..write('eventName: $eventName, ')
+          ..write('tokenVersion: $tokenVersion, ')
+          ..write('keyB64: $keyB64, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CachedAssignmentsTable extends CachedAssignments
+    with TableInfo<$CachedAssignmentsTable, CachedAssignment> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedAssignmentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _legIdMeta = const VerificationMeta('legId');
+  @override
+  late final GeneratedColumn<String> legId = GeneratedColumn<String>(
+    'leg_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fetchedAtMeta = const VerificationMeta(
+    'fetchedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> fetchedAt = GeneratedColumn<DateTime>(
+    'fetched_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [legId, payload, position, fetchedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_assignments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedAssignment> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('leg_id')) {
+      context.handle(
+        _legIdMeta,
+        legId.isAcceptableOrUnknown(data['leg_id']!, _legIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_legIdMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('fetched_at')) {
+      context.handle(
+        _fetchedAtMeta,
+        fetchedAt.isAcceptableOrUnknown(data['fetched_at']!, _fetchedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fetchedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {legId};
+  @override
+  CachedAssignment map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedAssignment(
+      legId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}leg_id'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+      fetchedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}fetched_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedAssignmentsTable createAlias(String alias) {
+    return $CachedAssignmentsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedAssignment extends DataClass
+    implements Insertable<CachedAssignment> {
+  final String legId;
+
+  /// The assignment object exactly as the API returned it.
+  final String payload;
+  final int position;
+  final DateTime fetchedAt;
+  const CachedAssignment({
+    required this.legId,
+    required this.payload,
+    required this.position,
+    required this.fetchedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['leg_id'] = Variable<String>(legId);
+    map['payload'] = Variable<String>(payload);
+    map['position'] = Variable<int>(position);
+    map['fetched_at'] = Variable<DateTime>(fetchedAt);
+    return map;
+  }
+
+  CachedAssignmentsCompanion toCompanion(bool nullToAbsent) {
+    return CachedAssignmentsCompanion(
+      legId: Value(legId),
+      payload: Value(payload),
+      position: Value(position),
+      fetchedAt: Value(fetchedAt),
+    );
+  }
+
+  factory CachedAssignment.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedAssignment(
+      legId: serializer.fromJson<String>(json['legId']),
+      payload: serializer.fromJson<String>(json['payload']),
+      position: serializer.fromJson<int>(json['position']),
+      fetchedAt: serializer.fromJson<DateTime>(json['fetchedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'legId': serializer.toJson<String>(legId),
+      'payload': serializer.toJson<String>(payload),
+      'position': serializer.toJson<int>(position),
+      'fetchedAt': serializer.toJson<DateTime>(fetchedAt),
+    };
+  }
+
+  CachedAssignment copyWith({
+    String? legId,
+    String? payload,
+    int? position,
+    DateTime? fetchedAt,
+  }) => CachedAssignment(
+    legId: legId ?? this.legId,
+    payload: payload ?? this.payload,
+    position: position ?? this.position,
+    fetchedAt: fetchedAt ?? this.fetchedAt,
+  );
+  CachedAssignment copyWithCompanion(CachedAssignmentsCompanion data) {
+    return CachedAssignment(
+      legId: data.legId.present ? data.legId.value : this.legId,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      position: data.position.present ? data.position.value : this.position,
+      fetchedAt: data.fetchedAt.present ? data.fetchedAt.value : this.fetchedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedAssignment(')
+          ..write('legId: $legId, ')
+          ..write('payload: $payload, ')
+          ..write('position: $position, ')
+          ..write('fetchedAt: $fetchedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(legId, payload, position, fetchedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedAssignment &&
+          other.legId == this.legId &&
+          other.payload == this.payload &&
+          other.position == this.position &&
+          other.fetchedAt == this.fetchedAt);
+}
+
+class CachedAssignmentsCompanion extends UpdateCompanion<CachedAssignment> {
+  final Value<String> legId;
+  final Value<String> payload;
+  final Value<int> position;
+  final Value<DateTime> fetchedAt;
+  final Value<int> rowid;
+  const CachedAssignmentsCompanion({
+    this.legId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.position = const Value.absent(),
+    this.fetchedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedAssignmentsCompanion.insert({
+    required String legId,
+    required String payload,
+    required int position,
+    required DateTime fetchedAt,
+    this.rowid = const Value.absent(),
+  }) : legId = Value(legId),
+       payload = Value(payload),
+       position = Value(position),
+       fetchedAt = Value(fetchedAt);
+  static Insertable<CachedAssignment> custom({
+    Expression<String>? legId,
+    Expression<String>? payload,
+    Expression<int>? position,
+    Expression<DateTime>? fetchedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (legId != null) 'leg_id': legId,
+      if (payload != null) 'payload': payload,
+      if (position != null) 'position': position,
+      if (fetchedAt != null) 'fetched_at': fetchedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedAssignmentsCompanion copyWith({
+    Value<String>? legId,
+    Value<String>? payload,
+    Value<int>? position,
+    Value<DateTime>? fetchedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedAssignmentsCompanion(
+      legId: legId ?? this.legId,
+      payload: payload ?? this.payload,
+      position: position ?? this.position,
+      fetchedAt: fetchedAt ?? this.fetchedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (legId.present) {
+      map['leg_id'] = Variable<String>(legId.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (fetchedAt.present) {
+      map['fetched_at'] = Variable<DateTime>(fetchedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedAssignmentsCompanion(')
+          ..write('legId: $legId, ')
+          ..write('payload: $payload, ')
+          ..write('position: $position, ')
+          ..write('fetchedAt: $fetchedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$ScannerDb extends GeneratedDatabase {
   _$ScannerDb(QueryExecutor e) : super(e);
   $ScannerDbManager get managers => $ScannerDbManager(this);
@@ -1966,6 +2654,9 @@ abstract class _$ScannerDb extends GeneratedDatabase {
   late final $RevokedPassesTable revokedPasses = $RevokedPassesTable(this);
   late final $PendingScansTable pendingScans = $PendingScansTable(this);
   late final $LegMetaTable legMeta = $LegMetaTable(this);
+  late final $SigningKeysTable signingKeys = $SigningKeysTable(this);
+  late final $CachedAssignmentsTable cachedAssignments =
+      $CachedAssignmentsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1975,6 +2666,8 @@ abstract class _$ScannerDb extends GeneratedDatabase {
     revokedPasses,
     pendingScans,
     legMeta,
+    signingKeys,
+    cachedAssignments,
   ];
 }
 
@@ -2965,6 +3658,395 @@ typedef $$LegMetaTableProcessedTableManager =
       LegMetaData,
       PrefetchHooks Function()
     >;
+typedef $$SigningKeysTableCreateCompanionBuilder =
+    SigningKeysCompanion Function({
+      required String legId,
+      required String eventId,
+      required String eventName,
+      required int tokenVersion,
+      required String keyB64,
+      Value<int> rowid,
+    });
+typedef $$SigningKeysTableUpdateCompanionBuilder =
+    SigningKeysCompanion Function({
+      Value<String> legId,
+      Value<String> eventId,
+      Value<String> eventName,
+      Value<int> tokenVersion,
+      Value<String> keyB64,
+      Value<int> rowid,
+    });
+
+class $$SigningKeysTableFilterComposer
+    extends Composer<_$ScannerDb, $SigningKeysTable> {
+  $$SigningKeysTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get legId => $composableBuilder(
+    column: $table.legId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventName => $composableBuilder(
+    column: $table.eventName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get tokenVersion => $composableBuilder(
+    column: $table.tokenVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get keyB64 => $composableBuilder(
+    column: $table.keyB64,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SigningKeysTableOrderingComposer
+    extends Composer<_$ScannerDb, $SigningKeysTable> {
+  $$SigningKeysTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get legId => $composableBuilder(
+    column: $table.legId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventName => $composableBuilder(
+    column: $table.eventName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get tokenVersion => $composableBuilder(
+    column: $table.tokenVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get keyB64 => $composableBuilder(
+    column: $table.keyB64,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SigningKeysTableAnnotationComposer
+    extends Composer<_$ScannerDb, $SigningKeysTable> {
+  $$SigningKeysTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get legId =>
+      $composableBuilder(column: $table.legId, builder: (column) => column);
+
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
+
+  GeneratedColumn<String> get eventName =>
+      $composableBuilder(column: $table.eventName, builder: (column) => column);
+
+  GeneratedColumn<int> get tokenVersion => $composableBuilder(
+    column: $table.tokenVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get keyB64 =>
+      $composableBuilder(column: $table.keyB64, builder: (column) => column);
+}
+
+class $$SigningKeysTableTableManager
+    extends
+        RootTableManager<
+          _$ScannerDb,
+          $SigningKeysTable,
+          SigningKey,
+          $$SigningKeysTableFilterComposer,
+          $$SigningKeysTableOrderingComposer,
+          $$SigningKeysTableAnnotationComposer,
+          $$SigningKeysTableCreateCompanionBuilder,
+          $$SigningKeysTableUpdateCompanionBuilder,
+          (
+            SigningKey,
+            BaseReferences<_$ScannerDb, $SigningKeysTable, SigningKey>,
+          ),
+          SigningKey,
+          PrefetchHooks Function()
+        > {
+  $$SigningKeysTableTableManager(_$ScannerDb db, $SigningKeysTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SigningKeysTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SigningKeysTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SigningKeysTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> legId = const Value.absent(),
+                Value<String> eventId = const Value.absent(),
+                Value<String> eventName = const Value.absent(),
+                Value<int> tokenVersion = const Value.absent(),
+                Value<String> keyB64 = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SigningKeysCompanion(
+                legId: legId,
+                eventId: eventId,
+                eventName: eventName,
+                tokenVersion: tokenVersion,
+                keyB64: keyB64,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String legId,
+                required String eventId,
+                required String eventName,
+                required int tokenVersion,
+                required String keyB64,
+                Value<int> rowid = const Value.absent(),
+              }) => SigningKeysCompanion.insert(
+                legId: legId,
+                eventId: eventId,
+                eventName: eventName,
+                tokenVersion: tokenVersion,
+                keyB64: keyB64,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SigningKeysTableProcessedTableManager =
+    ProcessedTableManager<
+      _$ScannerDb,
+      $SigningKeysTable,
+      SigningKey,
+      $$SigningKeysTableFilterComposer,
+      $$SigningKeysTableOrderingComposer,
+      $$SigningKeysTableAnnotationComposer,
+      $$SigningKeysTableCreateCompanionBuilder,
+      $$SigningKeysTableUpdateCompanionBuilder,
+      (SigningKey, BaseReferences<_$ScannerDb, $SigningKeysTable, SigningKey>),
+      SigningKey,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedAssignmentsTableCreateCompanionBuilder =
+    CachedAssignmentsCompanion Function({
+      required String legId,
+      required String payload,
+      required int position,
+      required DateTime fetchedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedAssignmentsTableUpdateCompanionBuilder =
+    CachedAssignmentsCompanion Function({
+      Value<String> legId,
+      Value<String> payload,
+      Value<int> position,
+      Value<DateTime> fetchedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedAssignmentsTableFilterComposer
+    extends Composer<_$ScannerDb, $CachedAssignmentsTable> {
+  $$CachedAssignmentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get legId => $composableBuilder(
+    column: $table.legId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get fetchedAt => $composableBuilder(
+    column: $table.fetchedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedAssignmentsTableOrderingComposer
+    extends Composer<_$ScannerDb, $CachedAssignmentsTable> {
+  $$CachedAssignmentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get legId => $composableBuilder(
+    column: $table.legId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get fetchedAt => $composableBuilder(
+    column: $table.fetchedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedAssignmentsTableAnnotationComposer
+    extends Composer<_$ScannerDb, $CachedAssignmentsTable> {
+  $$CachedAssignmentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get legId =>
+      $composableBuilder(column: $table.legId, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get fetchedAt =>
+      $composableBuilder(column: $table.fetchedAt, builder: (column) => column);
+}
+
+class $$CachedAssignmentsTableTableManager
+    extends
+        RootTableManager<
+          _$ScannerDb,
+          $CachedAssignmentsTable,
+          CachedAssignment,
+          $$CachedAssignmentsTableFilterComposer,
+          $$CachedAssignmentsTableOrderingComposer,
+          $$CachedAssignmentsTableAnnotationComposer,
+          $$CachedAssignmentsTableCreateCompanionBuilder,
+          $$CachedAssignmentsTableUpdateCompanionBuilder,
+          (
+            CachedAssignment,
+            BaseReferences<
+              _$ScannerDb,
+              $CachedAssignmentsTable,
+              CachedAssignment
+            >,
+          ),
+          CachedAssignment,
+          PrefetchHooks Function()
+        > {
+  $$CachedAssignmentsTableTableManager(
+    _$ScannerDb db,
+    $CachedAssignmentsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedAssignmentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedAssignmentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedAssignmentsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> legId = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<int> position = const Value.absent(),
+                Value<DateTime> fetchedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedAssignmentsCompanion(
+                legId: legId,
+                payload: payload,
+                position: position,
+                fetchedAt: fetchedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String legId,
+                required String payload,
+                required int position,
+                required DateTime fetchedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedAssignmentsCompanion.insert(
+                legId: legId,
+                payload: payload,
+                position: position,
+                fetchedAt: fetchedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedAssignmentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$ScannerDb,
+      $CachedAssignmentsTable,
+      CachedAssignment,
+      $$CachedAssignmentsTableFilterComposer,
+      $$CachedAssignmentsTableOrderingComposer,
+      $$CachedAssignmentsTableAnnotationComposer,
+      $$CachedAssignmentsTableCreateCompanionBuilder,
+      $$CachedAssignmentsTableUpdateCompanionBuilder,
+      (
+        CachedAssignment,
+        BaseReferences<_$ScannerDb, $CachedAssignmentsTable, CachedAssignment>,
+      ),
+      CachedAssignment,
+      PrefetchHooks Function()
+    >;
 
 class $ScannerDbManager {
   final _$ScannerDb _db;
@@ -2977,4 +4059,8 @@ class $ScannerDbManager {
       $$PendingScansTableTableManager(_db, _db.pendingScans);
   $$LegMetaTableTableManager get legMeta =>
       $$LegMetaTableTableManager(_db, _db.legMeta);
+  $$SigningKeysTableTableManager get signingKeys =>
+      $$SigningKeysTableTableManager(_db, _db.signingKeys);
+  $$CachedAssignmentsTableTableManager get cachedAssignments =>
+      $$CachedAssignmentsTableTableManager(_db, _db.cachedAssignments);
 }
