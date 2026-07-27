@@ -27,6 +27,12 @@ export const env = {
   databaseUrl: required("DATABASE_URL"),
   jwtSecret: required("JWT_SECRET"),
   port: Number(process.env.PORT ?? 3001),
+  /**
+   * Loopback locally; a container has to accept traffic from outside
+   * itself or the platform's health check never gets an answer and the
+   * deploy is rolled back with nothing useful in the log.
+   */
+  host: process.env.HOST ?? (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1"),
   isDev: process.env.NODE_ENV !== "production",
   /** Where guest pages live — used to build invitation links. */
   webUrl: process.env.WEB_URL ?? "http://localhost:3000",

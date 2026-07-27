@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The three suites that exist. They are the whole safety net — nothing is
+# deployed yet, so a red build here is the only thing standing between a
+# mistake and a wedding.
+jobs:
+  api:
+    name: api + checkin-core
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Match local development: the schema uses gen_random_bytes and
+        # enum features that are not worth discovering a version gap over.
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # testdb.ts rebuilds guest_test from spec/schema-v1.sql plus every
+      # migration on each run, and shells out to psql to do it.
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - run: npx tsc --noEmit -p apps/api
+      - run: npm test --workspace checkin-core
+      - run: npm test --workspace api
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit -p apps/web
+      - run: npm run build --workspace web
+
+  scanner:
+    name: scanner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.1"
+          channel: stable
+      - run: flutter pub get
+        working-directory: apps/scanner
+      - run: flutter analyze
+        working-directory: apps/scanner
+      - run: flutter test
+        working-directory: apps/scanner

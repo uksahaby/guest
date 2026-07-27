@@ -28,7 +28,24 @@ declare module "fastify" {
 export function buildServer(
   opts: { provider?: PaymentProvider; sms?: SmsSender } = {},
 ) {
-  const app = Fastify({ logger: env.isDev && process.env.NODE_TEST_CONTEXT === undefined });
+  // Logging is off only under test. Production is where logs matter most —
+  // there is no other way to find out what happened at someone's wedding.
+  const app = Fastify({
+    logger: process.env.NODE_TEST_CONTEXT === undefined && {
+      level: process.env.LOG_LEVEL ?? "info",
+      // Never let a phone number or a login code reach the log sink.
+      redact: {
+        paths: [
+          "req.headers.authorization",
+          "req.headers.cookie",
+          "phone",
+          "code",
+          "dev_code",
+        ],
+        censor: "[redacted]",
+      },
+    },
+  });
 
   // Webhook signatures are HMACs over the EXACT bytes the provider sent.
   // Re-serialising the parsed object changes key order and whitespace and
@@ -103,7 +120,7 @@ export function buildServer(
 const { pathToFileURL } = await import("node:url");
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const app = buildServer();
-  app.listen({ port: env.port, host: "127.0.0.1" }).catch((err) => {
+  app.listen({ port: env.port, host: env.host }).catch((err) => {
     app.log.error(err);
     process.exit(1);
   });

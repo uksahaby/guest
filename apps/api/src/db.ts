@@ -25,6 +25,18 @@ const opts = { max: 10, onnotice: () => {} } as const;
 function roleUrl(role: string, password: string): string {
   const explicit = process.env[`DATABASE_URL_${role.toUpperCase()}`];
   if (explicit) return explicit;
+
+  // The dev passwords are in 003_rls.sql, which is public. Falling back to
+  // them in production would either fail at connect time with something
+  // opaque, or — worse, if someone reused them — quietly work. Neither is
+  // a thing to discover on event day.
+  if (!env.isDev) {
+    throw new Error(
+      `Missing DATABASE_URL_${role.toUpperCase()}. Production must set a URL ` +
+        `for every RLS role; the superuser URL bypasses every policy.`,
+    );
+  }
+
   const u = new URL(env.databaseUrl);
   u.username = role;
   u.password = password;
