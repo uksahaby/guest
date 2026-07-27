@@ -45,7 +45,11 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
         _error = null;
       });
     } catch (_) {
-      setState(() => _error = "Couldn't load your events.");
+      // Name the server it tried. A build made without
+      // --dart-define=API_URL falls back to the emulator's 10.0.2.2, which
+      // means nothing on a real handset — the app then sits on OFFLINE
+      // forever with no clue why, and the queue silently piles up.
+      setState(() => _error = "Couldn't reach $apiUrl");
     }
   }
 
