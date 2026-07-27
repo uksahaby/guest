@@ -4,7 +4,7 @@ Companion to `HANDOFF.md`, which remains the source of truth for *why*
 anything is the way it is. This file records *what exists*, what doesn't,
 and what will bite whoever picks it up next — including me, later.
 
-Written 26 July 2026 · branch `main` · 25 commits · **nothing deployed**.
+Written 26 July 2026 · branch `main` · 29 commits · **nothing deployed**.
 
 ---
 
@@ -51,9 +51,9 @@ re-triggers the "Allow USB debugging?" prompt on the handset.
 ### Tests
 
 ```bash
-npm test --workspace api            # 207
-npm test --workspace checkin-core   # 35
-cd apps/scanner && flutter test     # 64
+npm test --workspace api            # 220
+npm test --workspace checkin-core   # 40
+cd apps/scanner && flutter test     # 74
 ```
 
 Tests rebuild a disposable `guest_test` from `spec/schema-v1.sql` plus every
@@ -66,11 +66,11 @@ could never be cleaned out.
 ## 2. Shape
 
 ```
-apps/api        Fastify 5 + postgres.js (raw SQL, no ORM)   ~9,600 lines · 207 tests
+apps/api        Fastify 5 + postgres.js (raw SQL, no ORM)   ~9,900 lines · 220 tests
 apps/web        Next.js 16 App Router                        ~6,500 lines · 15 pages
-apps/scanner    Flutter 3.44 + drift + mobile_scanner         ~6,300 lines ·  64 tests
-packages/checkin-core   the handoff's own state machine                    ·  35 tests
-db/migrations   7 migrations layered on spec/schema-v1.sql
+apps/scanner    Flutter 3.44 + drift + mobile_scanner         ~6,400 lines ·  74 tests
+packages/checkin-core   the handoff's own state machine                    ·  40 tests
+db/migrations   8 migrations layered on spec/schema-v1.sql
 spec/           untouched handoff artefacts — schema, OpenAPI, architecture
 design/mockups/ untouched; the dashboard copies their tokens by hand
 ```
@@ -82,7 +82,7 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /auth/otp/request` · `POST /auth/otp/verify` · `GET /me` |
+| Auth | `POST /auth/otp/request` · `POST /auth/otp/verify` · `GET/PATCH /me` |
 | Events | `GET/POST /events` · `GET/PATCH/DELETE /events/:id` · `GET /events/:id/settings` · `POST /events/:id/reissue-passes` · `PATCH /legs/:id` |
 | Guest list | `GET/POST /events/:id/invitations` · `POST /events/:id/invitations/import` · `PUT/DELETE /invitations/:id/legs/:legId` |
 | Sending | `POST /events/:id/delivery-links` (wa.me — **the billing gate**) |
@@ -96,7 +96,8 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 
 ### Web pages
 
-`/` marketing · `/login` · `/i/[token]` guest invitation · `/events` ·
+`/` marketing · `/login` · `/welcome` name yourself ·
+`/i/[token]` guest invitation · `/events` ·
 `/events/[id]` countdown home · `…/guests` · `…/guests/import` ·
 `…/guests/[invId]/link` · `…/tables` · `…/team` · `…/live` · `…/report`
 (+ `/export`) · `…/billing` · `…/settings`
@@ -113,7 +114,12 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 - **The paywall is on *sending*, not storing.** Importing 500 people onto a
   150-person plan is deliberate and tested.
 - **Nothing at the gate is ever blocked over billing.** Walk-ins and
-  overflow are admitted and flagged.
+  overflow are admitted and flagged. A *cancelled* event is the one
+  refusal that is not about money: the organiser called it off, the
+  settings page promises the guest that passes stop working, and
+  `event_cancelled` is checked ahead of the token so an usher hears the
+  real reason rather than "not a valid pass". It stays reversible —
+  nothing is reissued and no token version moves.
 - **`decide()` is never reimplemented.** TS in `packages/checkin-core`,
   ported once to Dart, with a pinned cross-language token vector
   (`apps/scanner/test/token_interop_test.dart`). If those two disagree,
@@ -177,15 +183,10 @@ Both the web app and the Flutter scanner talk to the **one** backend,
    on the scan screen drops the usher out of the leg entirely with no
    confirm, even mid-result; and the app installs under the label
    `scanner` (`android:label`, never set).
-4. **Cancelling an event does nothing visible.** `status = 'cancelled'`
-   saves, but the guest page shows no notice and passes still verify at the
-   gate — while the settings page promises both. Honour it or change the copy.
-5. **Onboarding.** Users are created with `full_name = ''` and nothing ever
-   asks; a first workspace can end up named after an empty string.
-6. **Deployment.** Nothing anywhere. No CI, hosting, domain, secrets
+4. **Deployment.** Nothing anywhere. No CI, hosting, domain, secrets
    management, backups or migration runner. Target: Vercel (web) +
    Railway/Fly (API), EU region.
-7. **Event creation is one thin form.** The setup mockup has five steps
+5. **Event creation is one thin form.** The setup mockup has five steps
    (details, venue, guests & entry, tables, review).
 
 ### Wanted before charging strangers
@@ -260,6 +261,13 @@ so a consumed row would lock the user out for 30 seconds over our outage.
 That delete needed a new grant (`db/migrations/007_otp_delete.sql`) —
 `app_rw` had select/insert/update on `auth_otp_codes` and nothing more.
 
+**Grants on `events` are per-column, so a new column is invisible until
+granted.** Reading `events.status` from the guest page and the scanner
+bootstrap failed with "permission denied for column status" — a message
+that points at Postgres rather than at the migration that forgot
+`grant select (status) ... to app_public, app_usher` (008). Any new column
+those two roles read needs the same line.
+
 **An HTTP call with no deadline does not fail — it hangs.** The scanner had
 none, and a half-open socket (the phone leaving Wi-Fi mid-request) froze the
 calling screen permanently; restoring signal did not recover it, because
@@ -302,7 +310,8 @@ hot-reload new registrations, and the symptom is a confusing 404.
 2. ~~Scanner on a real device~~ — done, and it paid for itself (§4.2).
    What remains is **putting a real QR in front of the lens**; do that
    before building walk-in, Recent and audio on top of it.
-3. **Cancellation + onboarding** — two small honesty fixes.
+3. ~~Cancellation + onboarding~~ — done; the UI no longer promises more
+   than it does.
 4. **Deploy to staging** with Paystack test keys.
 5. Web scanner fallback → setup wizard → super admin.
 
@@ -311,6 +320,9 @@ hot-reload new registrations, and the symptom is a confusing 404.
 ## 7. Commit history
 
 ```
+b2b6605  ask an organiser their name
+d0c7b01  cancelling an event actually cancels it
+2c84380  STATE.md after the first hardware run
 1c594fc  scanner: survive a phone with no signal
 72ea027  STATE.md history
 a27187d  SMS delivery for OTP login
