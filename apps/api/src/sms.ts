@@ -100,8 +100,13 @@ export class TermiiSender implements SmsSender {
  * loop can be exercised offline — the code goes to the server log and back
  * in the response as dev_code.
  *
- * Deliberately refuses to exist in production: without it, a deploy that
- * forgot the API key would look healthy and quietly send nobody anything.
+ * Refuses to exist in production unless ALLOW_SMS_LOG_SENDER=true says
+ * otherwise: without that guard, a deploy that forgot the API key would
+ * look healthy and quietly send nobody anything.
+ *
+ * The opt-out is for standing staging up before the Termii account exists.
+ * It is loud on purpose, and it does not weaken the HTTP surface — dev_code
+ * is gated on isDev, so codes reach the log and never a caller.
  */
 export class LogSender implements SmsSender {
   readonly name = "log";
@@ -110,9 +115,17 @@ export class LogSender implements SmsSender {
   readonly sent: SmsMessage[] = [];
 
   constructor() {
-    if (!env.isDev) {
+    if (!env.isDev && !env.allowSmsLogSender) {
       throw new Error(
-        "No SMS provider configured. Set TERMII_API_KEY — nobody can sign in without it.",
+        "No SMS provider configured. Set TERMII_API_KEY — nobody can sign in " +
+          "without it. To stand this box up anyway, with login codes going to " +
+          "the log instead of a phone, set ALLOW_SMS_LOG_SENDER=true.",
+      );
+    }
+    if (!env.isDev) {
+      console.warn(
+        "[sms] ALLOW_SMS_LOG_SENDER is set: no SMS is being delivered, and " +
+          "every login code is written to this log in clear text. Staging only.",
       );
     }
   }

@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { buildServer } from "./server.ts";
 import { sqlAdmin as sql, closeDb } from "./db.ts";
 import { LogSender, FailingSender, TermiiSender, SmsSendError, type SmsSender } from "./sms.ts";
+import { env } from "./env.ts";
 
 const logSender = new LogSender();
 const app = buildServer({ sms: logSender });
@@ -209,4 +210,82 @@ test("an unreachable Termii is a failure, not a hang", async () => {
   } finally {
     globalThis.fetch = original;
   }
+});
+
+// ---- standing staging up before Termii exists ---------------------------
+//
+// The API refuses to boot without a real sender, which is right: a deploy
+// that forgot the key would look healthy while nobody could sign in. But it
+// also means infrastructure cannot be stood up first, so there is one
+// explicit, loud opt-out.
+
+/**
+ * Runs fn as though NODE_ENV=production. Awaits it — restoring the flags
+ * while a request is still in flight puts the process back into dev before
+ * the route reads them, which quietly passes whatever you were asserting.
+ */
+async function inProduction<T>(
+  allowLogSender: boolean,
+  fn: () => T | Promise<T>,
+): Promise<T> {
+  const wasDev = env.isDev;
+  const wasAllowed = env.allowSmsLogSender;
+  env.isDev = false;
+  env.allowSmsLogSender = allowLogSender;
+  try {
+    return await fn();
+  } finally {
+    env.isDev = wasDev;
+    env.allowSmsLogSender = wasAllowed;
+  }
+}
+
+test("production refuses the log sender, and says how to override", async () => {
+  await inProduction(false, () => {
+    assert.throws(() => new LogSender(), (err: Error) => {
+      assert.match(err.message, /TERMII_API_KEY/);
+      // The message has to carry the way out, or the next person only
+      // learns it exists by reading this file.
+      assert.match(err.message, /ALLOW_SMS_LOG_SENDER=true/);
+      return true;
+    });
+  });
+});
+
+test("the opt-out lets it run, loudly", async () => {
+  const warnings: string[] = [];
+  const original = console.warn;
+  console.warn = (msg: string) => void warnings.push(msg);
+  try {
+    await inProduction(true, () => {
+      const sender = new LogSender();
+      assert.equal(sender.name, "log");
+    });
+  } finally {
+    console.warn = original;
+  }
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0]!, /clear text/);
+});
+
+test("the opt-out still never returns a code over HTTP", async () => {
+  // The whole point: it moves codes to the log, not back into responses.
+  // A staging box with this set must still be unable to hand a caller a
+  // login code.
+  const p = phone();
+  const res = await inProduction(true, () => request(app, p));
+
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.json().dev_code, undefined,
+    "dev_code is gated on isDev, and the opt-out must not reopen it");
+
+  // It did deliver to the log, so staging is usable.
+  assert.equal(logSender.sent.at(-1)!.to, p);
+});
+
+test("a real sender is unaffected by the opt-out", async () => {
+  await inProduction(true, () => {
+    const termii = new TermiiSender("k", "N-Alert", "dnd");
+    assert.equal(termii.echoesCodes, false);
+  });
 });

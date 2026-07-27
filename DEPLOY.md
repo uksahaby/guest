@@ -20,9 +20,10 @@ card, or a decision:
   the web app.
 - **Paystack test keys** — a Paystack business account. Test keys are
   enough for staging; `sk_test_…` never moves real money.
-- **A Termii account, funded, with a sender ID.** Without
-  `TERMII_API_KEY` the API refuses to boot (see below), so staging cannot
-  come up without it.
+- **A Termii account, funded, with a sender ID.** Needed before anyone
+  outside the team can sign in. To stand the infrastructure up first, set
+  `ALLOW_SMS_LOG_SENDER=true` and read login codes out of the API log —
+  then remove it once the Termii key is in place.
 - **A domain**, if staging should have a real name. `WEB_URL` is used to
   build the invitation links guests receive, so it wants to be the URL
   people will actually open.
@@ -78,13 +79,14 @@ DATABASE_URL="$SUPERUSER_URL" npm run migrate --workspace api
 | `DATABASE_URL_APP_VERIFY` | yes | Signing keys, nothing else. |
 | `DATABASE_URL_APP_BILLING` | yes | Webhook path. |
 | `JWT_SECRET` | yes | Strong and unique. Rotating it signs everyone out. |
-| `TERMII_API_KEY` | yes | Without it the API **refuses to boot**: a deploy that forgot it would look healthy while nobody could sign in. |
+| `TERMII_API_KEY` | yes* | Without it the API **refuses to boot**: a deploy that forgot it would look healthy while nobody could sign in. See `ALLOW_SMS_LOG_SENDER` to stand a box up before the Termii account exists. |
 | `PAYSTACK_SECRET_KEY` | yes | `sk_test_…` for staging. Without it checkout tries the offline stub, which refuses to exist in production. |
 | `WEB_URL` | yes | Public URL of the web app; builds guest invitation links. |
 | `SMS_SENDER_ID` | no | Default `N-Alert` (Termii's pre-approved, DND-capable). |
 | `SMS_CHANNEL` | no | Leave as `dnd`. |
 | `PORT` / `HOST` | no | Platform sets `PORT`; `HOST` defaults to `0.0.0.0` in production. |
 | `LOG_LEVEL` | no | Default `info`. |
+| `ALLOW_SMS_LOG_SENDER` | no | `true` lets the box boot with no SMS provider. Login codes go to the **log** instead of a phone, in clear text, and it warns loudly at startup. Staging only — and it does *not* put codes back in HTTP responses. |
 
 ### Web
 
@@ -93,6 +95,12 @@ DATABASE_URL="$SUPERUSER_URL" npm run migrate --workspace api
 | `API_URL` | yes | Internal URL of the API. The browser never calls it — every request is server-side. |
 
 ## 5. Order
+
+If you are bringing infrastructure up before the Termii account exists,
+set `ALLOW_SMS_LOG_SENDER=true` for steps 3–6 and sign in by reading the
+API log. Codes never appear in a response either way. Remove it as soon as
+`TERMII_API_KEY` is set — a staging box anyone can reach whose logs contain
+live login codes is a real account takeover, not a theoretical one.
 
 1. Create the database, load `spec/schema-v1.sql`, run the migrations.
 2. Change the five role passwords, build the role URLs.

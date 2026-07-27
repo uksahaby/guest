@@ -41,6 +41,16 @@ export const env = {
   /** Unset locally: OTP codes go to the log instead of a phone. */
   termiiApiKey: process.env.TERMII_API_KEY ?? "",
   /**
+   * Escape hatch for standing infrastructure up before the Termii account
+   * exists. Lets the log-only sender run in production, so a staging box
+   * can boot and be signed into by reading its log.
+   *
+   * It does NOT put codes back in the HTTP response — dev_code stays gated
+   * on isDev, so a box with this set still never hands a login code to a
+   * caller. Anyone who can read the log could already read the database.
+   */
+  allowSmsLogSender: process.env.ALLOW_SMS_LOG_SENDER === "true",
+  /**
    * The sender ID recipients see. "N-Alert" is Termii's own pre-approved
    * DND-capable ID; a branded one has to be registered with them first.
    */
