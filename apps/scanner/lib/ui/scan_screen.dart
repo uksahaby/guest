@@ -7,6 +7,7 @@ import '../core/checkin.dart';
 import '../store/repository.dart';
 import 'result_overlay.dart';
 import 'search_sheet.dart';
+import 'walk_in_sheet.dart';
 import 'theme.dart';
 
 /// The gate. Camera resting state with the reticle sweep; a result takes
@@ -147,6 +148,42 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
+  /// Someone not on the list. Works with no signal: the household is
+  /// created locally and the queue carries it up when the network returns,
+  /// exactly like any other scan.
+  Future<void> _openWalkIn() async {
+    final m = await widget.repo.meta(widget.legId);
+    if (!mounted) return;
+    if (m != null && !m.allowWalkins) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('This event does not admit walk-ins.'),
+      ));
+      return;
+    }
+
+    final result = await showWalkInSheet(context);
+    if (result == null || !mounted) return;
+
+    try {
+      final rec = await widget.repo.addWalkIn(
+        widget.legId,
+        displayName: result.name,
+        count: result.count,
+        entranceId: widget.entranceId,
+      );
+      await _refreshPending();
+      if (!mounted) return;
+      setState(() {
+        _current = rec;
+        _sourceRaw = null;
+      });
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   Future<void> _openSearch() async {
     final picked = await showSearchSheet(context, widget.repo, widget.legId);
     if (picked != null) {
@@ -189,9 +226,11 @@ class _ScanScreenState extends State<ScanScreen> {
                   if (a == 'Search by name') {
                     _close();
                     _openSearch();
+                  } else if (a == 'Add walk-in') {
+                    _close();
+                    _openWalkIn();
                   } else {
-                    // 'Call manager' / 'Add walk-in' arrive with their
-                    // features; for now they dismiss.
+                    // 'Call manager' still arrives with its feature.
                     _close();
                   }
                 },
@@ -276,10 +315,19 @@ class _ScanScreenState extends State<ScanScreen> {
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
         decoration: const BoxDecoration(
             border: Border(top: BorderSide(color: Palette.line))),
-        child: Row(children: [
-          Expanded(child: _barButton('Search by name', _openSearch)),
-          const SizedBox(width: 10),
-          Expanded(child: _barButton('Sync now', _sync)),
+        child: Column(children: [
+          Row(children: [
+            Expanded(child: _barButton('Search by name', _openSearch)),
+            const SizedBox(width: 10),
+            Expanded(child: _barButton('Sync now', _sync)),
+          ]),
+          const SizedBox(height: 10),
+          // Full width: at a Nigerian gate this is reached for constantly,
+          // and it is the button an usher hits one-handed in the dark.
+          SizedBox(
+            width: double.infinity,
+            child: _barButton('Add walk-in', _openWalkIn),
+          ),
         ]),
       );
 

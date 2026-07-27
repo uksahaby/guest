@@ -452,3 +452,49 @@ test("a retried walk-in does not invent a second household", async () => {
     where event_id = ${s.eventId} and is_walk_in = true`;
   assert.equal(rows!.n, 1, "a retry must not double the guest list");
 });
+
+test("a phone's own walk-in ids are replayed verbatim, and twice is free", async () => {
+  // A scanner with no signal has to create the household on the spot — the
+  // guest is standing there — so it mints the uuids and this replays them.
+  // A flaky sync then retries the same payload.
+  const s = await seedEvent(app);
+  await allowWalkIns(s);
+  const invitationId = randomUUID();
+  const passId = randomUUID();
+  const clientUuid = randomUUID();
+
+  const body = {
+    client_uuid: clientUuid,
+    display_name: "Late Cousin",
+    count: 2,
+    invitation_id: invitationId,
+    pass_id: passId,
+  };
+
+  const first = await walkIn(s, body);
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.json().invitation_id, invitationId);
+  assert.equal(first.json().pass_id, passId);
+
+  const replay = await walkIn(s, body);
+  assert.equal(replay.statusCode, 200);
+  assert.equal(replay.json().duplicate, true);
+
+  const [invs] = await sql`
+    select count(*)::int as n from invitations where id = ${invitationId}`;
+  assert.equal(invs!.n, 1);
+  const [rows] = await sql`
+    select count(*)::int as n from check_in_events where client_uuid = ${clientUuid}`;
+  assert.equal(rows!.n, 1, "the log has no UPDATE — a replay must not append");
+});
+
+test("the pass a phone minted verifies at the gate afterwards", async () => {
+  const s = await seedEvent(app);
+  await allowWalkIns(s);
+  const passId = randomUUID();
+  await walkIn(s, { pass_id: passId, invitation_id: randomUUID(), count: 3 });
+
+  const { decision } = (await scan(s, { pass_id: passId })).json();
+  assert.equal(decision.invitation.displayName, "Uninvited Uncle");
+  assert.equal(decision.invitation.allowance, 3);
+});

@@ -129,6 +129,14 @@ export async function webScanRoutes(app: FastifyInstance) {
       display_name?: string;
       count?: number;
       entrance_id?: string | null;
+      /**
+       * Device-supplied ids. A phone with no signal has to create the
+       * household there and then — the guest is standing at the gate — so
+       * it mints the uuids itself and this replays them verbatim. The web
+       * scanner omits them and lets Postgres decide.
+       */
+      invitation_id?: string;
+      pass_id?: string;
     };
   }>(
     "/scanner/legs/:legId/walk-ins",
@@ -154,6 +162,18 @@ export async function webScanRoutes(app: FastifyInstance) {
         return reply
           .code(400)
           .send({ code: "bad_request", message: "count must be 1 to 50." });
+      }
+      const givenInvitationId = req.body?.invitation_id;
+      const givenPassId = req.body?.pass_id;
+      for (const [name, v] of [
+        ["invitation_id", givenInvitationId],
+        ["pass_id", givenPassId],
+      ] as const) {
+        if (v !== undefined && (typeof v !== "string" || !UUID_RE.test(v))) {
+          return reply
+            .code(400)
+            .send({ code: "bad_request", message: `${name} must be a uuid.` });
+        }
       }
 
       return asUser(sqlUsher, uid(req), async (db) => {
@@ -203,17 +223,53 @@ export async function webScanRoutes(app: FastifyInstance) {
           return { recorded: existing.id, duplicate: true };
         }
 
-        const [inv] = await db`
-          insert into invitations (event_id, display_name, is_walk_in)
-          values (${leg.event_id}, ${displayName}, true)
+        // A replayed walk-in from a phone brings its own ids; do nothing
+        // if they already landed, so a retry after a flaky sync is free.
+        // DO NOTHING, never DO UPDATE: app_usher holds insert on these
+        // tables and nothing more (003_rls.sql), and an usher being able to
+        // rewrite an existing invitation would be a worse bug than the
+        // replay this guards against. On a conflict the row is already
+        // ours, so read it back instead.
+        //
+        // coalesce rather than a bare null, too: passing null for id
+        // overrides the column default instead of falling back to it.
+        const [insertedInv] = await db`
+          insert into invitations (id, event_id, display_name, is_walk_in)
+          values (
+            coalesce(${givenInvitationId ?? null}::uuid, gen_random_uuid()),
+            ${leg.event_id}, ${displayName}, true
+          )
+          on conflict (id) do nothing
           returning id`;
+        const invitationId =
+          insertedInv?.id ??
+          (
+            await db`select id from invitations
+              where id = ${givenInvitationId ?? null} and is_walk_in = true`
+          )[0]?.id;
+        if (!invitationId) {
+          return reply.code(409).send({
+            code: "conflict",
+            message: "That walk-in id belongs to something else.",
+          });
+        }
+
         await db`
           insert into invitation_legs (invitation_id, leg_id, allowance, rsvp)
-          values (${inv!.id}, ${legId}, ${count}, 'attending')`;
-        const [pass] = await db`
-          insert into passes (invitation_id, event_id)
-          values (${inv!.id}, ${leg.event_id})
+          values (${invitationId}, ${legId}, ${count}, 'attending')
+          on conflict (invitation_id, leg_id) do nothing`;
+
+        const [insertedPass] = await db`
+          insert into passes (id, invitation_id, event_id)
+          values (
+            coalesce(${givenPassId ?? null}::uuid, gen_random_uuid()),
+            ${invitationId}, ${leg.event_id}
+          )
+          on conflict (id) do nothing
           returning id`;
+        const passId =
+          insertedPass?.id ??
+          (await db`select id from passes where invitation_id = ${invitationId}`)[0]?.id;
 
         const [row] = await db`
           insert into check_in_events (
@@ -222,7 +278,7 @@ export async function webScanRoutes(app: FastifyInstance) {
             scanned_at, synced_at
           ) values (
             ${clientUuid}, ${leg.event_id}, ${legId},
-            ${req.body?.entrance_id ?? null}, ${pass!.id}, ${inv!.id},
+            ${req.body?.entrance_id ?? null}, ${passId}, ${invitationId},
             ${uid(req)}, 'web', 'manual'::checkin_result, ${count}, ${count},
             now(), now()
           )
@@ -231,8 +287,8 @@ export async function webScanRoutes(app: FastifyInstance) {
         return {
           recorded: row!.id,
           duplicate: false,
-          invitation_id: inv!.id,
-          pass_id: pass!.id,
+          invitation_id: invitationId,
+          pass_id: passId,
           display_name: displayName,
           admitted: count,
         };

@@ -47,6 +47,11 @@ class PendingScans extends Table {
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
   BoolColumn get contested => boolean().withDefault(const Constant(false))();
 
+  /// Set when this row created a household rather than admitting one that
+  /// was already invited. The name has to ride along: the server cannot
+  /// know it, and the queue may not drain until hours later.
+  TextColumn get walkInName => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {clientUuid};
 }
@@ -128,7 +133,7 @@ class ScannerDb extends _$ScannerDb {
   ScannerDb.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -143,6 +148,10 @@ class ScannerDb extends _$ScannerDb {
           if (from < 3) await m.createTable(cachedAssignments);
           // v4 carries event cancellation to the gate.
           if (from < 4) await m.addColumn(legMeta, legMeta.cancelled);
+          // v5 lets a walk-in be created with no signal.
+          if (from < 5) {
+            await m.addColumn(pendingScans, pendingScans.walkInName);
+          }
         },
       );
 

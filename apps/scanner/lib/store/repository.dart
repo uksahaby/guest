@@ -288,6 +288,71 @@ class Repository {
     return ScanRecord(decision: decision, clientUuid: clientUuid);
   }
 
+  /// Someone not on the list, added at the gate with or without signal.
+  ///
+  /// The device mints the ids because the guest is standing there and the
+  /// server may be unreachable for hours. It writes the household into the
+  /// local list too, so search finds them and a second scan on the way back
+  /// from the car park is an ordinary re-entry rather than a stranger.
+  Future<ScanRecord> addWalkIn(
+    String legId, {
+    required String displayName,
+    required int count,
+    String? entranceId,
+  }) async {
+    final m = await meta(legId);
+    if (m == null) throw StateError('leg not bootstrapped');
+    if (!m.allowWalkins) throw StateError('this event does not admit walk-ins');
+    if (m.cancelled) throw StateError('this event was cancelled');
+
+    final name = displayName.trim();
+    if (name.isEmpty) throw ArgumentError('a walk-in needs a name');
+
+    final passId = randomUuid();
+    final clientUuid = randomUuid();
+
+    await db.transaction(() async {
+      await db.invitations.insertOne(InvitationsCompanion.insert(
+        passId: passId,
+        legId: legId,
+        displayName: name,
+        allowance: count,
+        // Nothing is admitted yet by the count below — the queued row is
+        // what admits them, exactly as for an invited household.
+        admittedSynced: 0,
+        rsvp: 'attending',
+        searchTerms: name.toLowerCase(),
+      ));
+      await db.pendingScans.insertOne(PendingScansCompanion.insert(
+        clientUuid: clientUuid,
+        legId: legId,
+        entranceId: Value(entranceId),
+        passId: Value(passId),
+        result: 'manual',
+        admittedCount: count,
+        scannedAt: DateTime.now(),
+        walkInName: Value(name),
+      ));
+    });
+
+    final inv = await find(passId, legId);
+    return ScanRecord(
+      decision: Decision(
+        outcome: Outcome.manual,
+        tone: Tone.admit,
+        admittedCount: count,
+        headline: 'Walked in',
+        detail: name,
+        invitation: inv,
+        remaining: 0,
+        log: true,
+        autoReturnMs: 1500,
+        actions: const ['Undo'],
+      ),
+      clientUuid: clientUuid,
+    );
+  }
+
   /// Undo the admission written by [clientUuid]: a reversal row, never a
   /// delete. Works offline; the server validates the pairing on sync.
   Future<void> undo(String clientUuid) async {
@@ -333,8 +398,47 @@ class Repository {
         .get();
     if (pending.isEmpty) return 0;
 
+    // Walk-ins first, and one at a time. Each one has to create a household
+    // on the server before any check-in row can reference its pass, and the
+    // batch endpoint has no way to say "make this person up". A failure
+    // here leaves the row queued, which is the same promise as every other
+    // unsynced scan.
+    var walkInsDone = 0;
+    for (final p in pending.where((p) => p.walkInName != null)) {
+      try {
+        await api.submitWalkIn(
+          legId: p.legId,
+          clientUuid: p.clientUuid,
+          displayName: p.walkInName!,
+          count: p.admittedCount,
+          entranceId: p.entranceId,
+          passId: p.passId,
+        );
+        await (db.update(db.pendingScans)
+              ..where((q) => q.clientUuid.equals(p.clientUuid)))
+            .write(const PendingScansCompanion(synced: Value(true)));
+        walkInsDone++;
+      } on ApiException catch (e) {
+        // A refusal is final — the organiser turned walk-ins off, or this
+        // usher lost the permission. Settle it rather than retrying every
+        // twelve seconds for the rest of the evening.
+        if (!e.isTransport) {
+          await (db.update(db.pendingScans)
+                ..where((q) => q.clientUuid.equals(p.clientUuid)))
+              .write(PendingScansCompanion(
+            synced: const Value(true),
+            contested: const Value(true),
+            note: Value('refused: ${e.message}'),
+          ));
+        }
+      }
+    }
+
+    final rest = pending.where((p) => p.walkInName == null).toList();
+    if (rest.isEmpty) return walkInsDone;
+
     final results = await api.submitCheckIns([
-      for (final p in pending)
+      for (final p in rest)
         {
           'client_uuid': p.clientUuid,
           'leg_id': p.legId,
@@ -348,7 +452,7 @@ class Repository {
         },
     ]);
 
-    var accepted = 0;
+    var accepted = walkInsDone;
     for (final r in results) {
       final map = r as Map<String, dynamic>;
       final ok = map['accepted'] == true;

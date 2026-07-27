@@ -920,6 +920,17 @@ class $PendingScansTable extends PendingScans
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _walkInNameMeta = const VerificationMeta(
+    'walkInName',
+  );
+  @override
+  late final GeneratedColumn<String> walkInName = GeneratedColumn<String>(
+    'walk_in_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     clientUuid,
@@ -933,6 +944,7 @@ class $PendingScansTable extends PendingScans
     note,
     synced,
     contested,
+    walkInName,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1028,6 +1040,15 @@ class $PendingScansTable extends PendingScans
         contested.isAcceptableOrUnknown(data['contested']!, _contestedMeta),
       );
     }
+    if (data.containsKey('walk_in_name')) {
+      context.handle(
+        _walkInNameMeta,
+        walkInName.isAcceptableOrUnknown(
+          data['walk_in_name']!,
+          _walkInNameMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1081,6 +1102,10 @@ class $PendingScansTable extends PendingScans
         DriftSqlType.bool,
         data['${effectivePrefix}contested'],
       )!,
+      walkInName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}walk_in_name'],
+      ),
     );
   }
 
@@ -1102,6 +1127,11 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
   final String? note;
   final bool synced;
   final bool contested;
+
+  /// Set when this row created a household rather than admitting one that
+  /// was already invited. The name has to ride along: the server cannot
+  /// know it, and the queue may not drain until hours later.
+  final String? walkInName;
   const PendingScan({
     required this.clientUuid,
     required this.legId,
@@ -1114,6 +1144,7 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
     this.note,
     required this.synced,
     required this.contested,
+    this.walkInName,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1137,6 +1168,9 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
     }
     map['synced'] = Variable<bool>(synced);
     map['contested'] = Variable<bool>(contested);
+    if (!nullToAbsent || walkInName != null) {
+      map['walk_in_name'] = Variable<String>(walkInName);
+    }
     return map;
   }
 
@@ -1159,6 +1193,9 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       synced: Value(synced),
       contested: Value(contested),
+      walkInName: walkInName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(walkInName),
     );
   }
 
@@ -1181,6 +1218,7 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
       note: serializer.fromJson<String?>(json['note']),
       synced: serializer.fromJson<bool>(json['synced']),
       contested: serializer.fromJson<bool>(json['contested']),
+      walkInName: serializer.fromJson<String?>(json['walkInName']),
     );
   }
   @override
@@ -1198,6 +1236,7 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
       'note': serializer.toJson<String?>(note),
       'synced': serializer.toJson<bool>(synced),
       'contested': serializer.toJson<bool>(contested),
+      'walkInName': serializer.toJson<String?>(walkInName),
     };
   }
 
@@ -1213,6 +1252,7 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
     Value<String?> note = const Value.absent(),
     bool? synced,
     bool? contested,
+    Value<String?> walkInName = const Value.absent(),
   }) => PendingScan(
     clientUuid: clientUuid ?? this.clientUuid,
     legId: legId ?? this.legId,
@@ -1227,6 +1267,7 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
     note: note.present ? note.value : this.note,
     synced: synced ?? this.synced,
     contested: contested ?? this.contested,
+    walkInName: walkInName.present ? walkInName.value : this.walkInName,
   );
   PendingScan copyWithCompanion(PendingScansCompanion data) {
     return PendingScan(
@@ -1249,6 +1290,9 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
       note: data.note.present ? data.note.value : this.note,
       synced: data.synced.present ? data.synced.value : this.synced,
       contested: data.contested.present ? data.contested.value : this.contested,
+      walkInName: data.walkInName.present
+          ? data.walkInName.value
+          : this.walkInName,
     );
   }
 
@@ -1265,7 +1309,8 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
           ..write('scannedAt: $scannedAt, ')
           ..write('note: $note, ')
           ..write('synced: $synced, ')
-          ..write('contested: $contested')
+          ..write('contested: $contested, ')
+          ..write('walkInName: $walkInName')
           ..write(')'))
         .toString();
   }
@@ -1283,6 +1328,7 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
     note,
     synced,
     contested,
+    walkInName,
   );
   @override
   bool operator ==(Object other) =>
@@ -1298,7 +1344,8 @@ class PendingScan extends DataClass implements Insertable<PendingScan> {
           other.scannedAt == this.scannedAt &&
           other.note == this.note &&
           other.synced == this.synced &&
-          other.contested == this.contested);
+          other.contested == this.contested &&
+          other.walkInName == this.walkInName);
 }
 
 class PendingScansCompanion extends UpdateCompanion<PendingScan> {
@@ -1313,6 +1360,7 @@ class PendingScansCompanion extends UpdateCompanion<PendingScan> {
   final Value<String?> note;
   final Value<bool> synced;
   final Value<bool> contested;
+  final Value<String?> walkInName;
   final Value<int> rowid;
   const PendingScansCompanion({
     this.clientUuid = const Value.absent(),
@@ -1326,6 +1374,7 @@ class PendingScansCompanion extends UpdateCompanion<PendingScan> {
     this.note = const Value.absent(),
     this.synced = const Value.absent(),
     this.contested = const Value.absent(),
+    this.walkInName = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PendingScansCompanion.insert({
@@ -1340,6 +1389,7 @@ class PendingScansCompanion extends UpdateCompanion<PendingScan> {
     this.note = const Value.absent(),
     this.synced = const Value.absent(),
     this.contested = const Value.absent(),
+    this.walkInName = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : clientUuid = Value(clientUuid),
        legId = Value(legId),
@@ -1358,6 +1408,7 @@ class PendingScansCompanion extends UpdateCompanion<PendingScan> {
     Expression<String>? note,
     Expression<bool>? synced,
     Expression<bool>? contested,
+    Expression<String>? walkInName,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1373,6 +1424,7 @@ class PendingScansCompanion extends UpdateCompanion<PendingScan> {
       if (note != null) 'note': note,
       if (synced != null) 'synced': synced,
       if (contested != null) 'contested': contested,
+      if (walkInName != null) 'walk_in_name': walkInName,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1389,6 +1441,7 @@ class PendingScansCompanion extends UpdateCompanion<PendingScan> {
     Value<String?>? note,
     Value<bool>? synced,
     Value<bool>? contested,
+    Value<String?>? walkInName,
     Value<int>? rowid,
   }) {
     return PendingScansCompanion(
@@ -1403,6 +1456,7 @@ class PendingScansCompanion extends UpdateCompanion<PendingScan> {
       note: note ?? this.note,
       synced: synced ?? this.synced,
       contested: contested ?? this.contested,
+      walkInName: walkInName ?? this.walkInName,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1443,6 +1497,9 @@ class PendingScansCompanion extends UpdateCompanion<PendingScan> {
     if (contested.present) {
       map['contested'] = Variable<bool>(contested.value);
     }
+    if (walkInName.present) {
+      map['walk_in_name'] = Variable<String>(walkInName.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1463,6 +1520,7 @@ class PendingScansCompanion extends UpdateCompanion<PendingScan> {
           ..write('note: $note, ')
           ..write('synced: $synced, ')
           ..write('contested: $contested, ')
+          ..write('walkInName: $walkInName, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3162,6 +3220,7 @@ typedef $$PendingScansTableCreateCompanionBuilder =
       Value<String?> note,
       Value<bool> synced,
       Value<bool> contested,
+      Value<String?> walkInName,
       Value<int> rowid,
     });
 typedef $$PendingScansTableUpdateCompanionBuilder =
@@ -3177,6 +3236,7 @@ typedef $$PendingScansTableUpdateCompanionBuilder =
       Value<String?> note,
       Value<bool> synced,
       Value<bool> contested,
+      Value<String?> walkInName,
       Value<int> rowid,
     });
 
@@ -3241,6 +3301,11 @@ class $$PendingScansTableFilterComposer
 
   ColumnFilters<bool> get contested => $composableBuilder(
     column: $table.contested,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get walkInName => $composableBuilder(
+    column: $table.walkInName,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3308,6 +3373,11 @@ class $$PendingScansTableOrderingComposer
     column: $table.contested,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get walkInName => $composableBuilder(
+    column: $table.walkInName,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PendingScansTableAnnotationComposer
@@ -3359,6 +3429,11 @@ class $$PendingScansTableAnnotationComposer
 
   GeneratedColumn<bool> get contested =>
       $composableBuilder(column: $table.contested, builder: (column) => column);
+
+  GeneratedColumn<String> get walkInName => $composableBuilder(
+    column: $table.walkInName,
+    builder: (column) => column,
+  );
 }
 
 class $$PendingScansTableTableManager
@@ -3403,6 +3478,7 @@ class $$PendingScansTableTableManager
                 Value<String?> note = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<bool> contested = const Value.absent(),
+                Value<String?> walkInName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PendingScansCompanion(
                 clientUuid: clientUuid,
@@ -3416,6 +3492,7 @@ class $$PendingScansTableTableManager
                 note: note,
                 synced: synced,
                 contested: contested,
+                walkInName: walkInName,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3431,6 +3508,7 @@ class $$PendingScansTableTableManager
                 Value<String?> note = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
                 Value<bool> contested = const Value.absent(),
+                Value<String?> walkInName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PendingScansCompanion.insert(
                 clientUuid: clientUuid,
@@ -3444,6 +3522,7 @@ class $$PendingScansTableTableManager
                 note: note,
                 synced: synced,
                 contested: contested,
+                walkInName: walkInName,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

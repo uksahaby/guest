@@ -78,6 +78,31 @@ class FakeApi extends ApiClient {
     ];
   }
 
+  /// Walk-ins the fake server was asked to create.
+  final walkIns = <Map<String, dynamic>>[];
+  ApiException? walkInError;
+
+  @override
+  Future<Map<String, dynamic>> submitWalkIn({
+    required String legId,
+    required String clientUuid,
+    required String displayName,
+    required int count,
+    String? entranceId,
+    String? passId,
+  }) async {
+    final err = walkInError;
+    if (err != null) throw err;
+    final row = {
+      'client_uuid': clientUuid,
+      'display_name': displayName,
+      'count': count,
+      'pass_id': passId,
+    };
+    walkIns.add(row);
+    return {'recorded': randomUuid(), 'duplicate': false, ...row};
+  }
+
   @override
   Future<void> testPing(String legId) async {}
 }
@@ -473,5 +498,108 @@ void main() {
 
     final d = await repo.handle(legId, raw: tokenFor(passId));
     expect(d.decision.outcome, isNot(Outcome.eventCancelled));
+  });
+
+  // ---- walk-ins, with no signal ------------------------------------------
+
+  test('a walk-in is admitted, queued, and findable offline', () async {
+    api.bootstrapError = ApiException(0, 'unreachable', 'no signal');
+    final rec = await repo.addWalkIn(legId,
+        displayName: 'Aunty Nkechi', count: 3, entranceId: 'e1');
+
+    expect(rec.decision.admittedCount, 3);
+    expect(rec.clientUuid, isNotNull);
+
+    // Queued as a walk-in, so sync knows to create the household first.
+    final queued = await db.select(db.pendingScans).getSingle();
+    expect(queued.walkInName, 'Aunty Nkechi');
+    expect(queued.admittedCount, 3);
+    expect(queued.passId, isNotNull);
+
+    // And on the local list, so search finds her without the server.
+    final found = await repo.search(legId, 'nkechi');
+    expect(found.single.row.displayName, 'Aunty Nkechi');
+    expect(found.single.admitted, 3);
+  });
+
+  test('a walk-in can be scanned back in after stepping out', () async {
+    // The reason they get a local pass rather than a bare queue row.
+    final rec = await repo.addWalkIn(legId, displayName: 'Late Cousin', count: 2);
+    final passId = rec.decision.invitation!.passId;
+
+    final again = await repo.handle(legId, manualPassId: passId);
+    expect(again.decision.invitation!.displayName, 'Late Cousin');
+    expect(again.decision.invitation!.admitted, 2);
+  });
+
+  test('a walk-in is refused when the event forbids them', () async {
+    api.bootstrapPayload = bootstrapFor([adeyemi(passId)])
+      ..['event']['allow_walkins'] = false;
+    await repo.openLeg(legId);
+
+    await expectLater(
+      () => repo.addWalkIn(legId, displayName: 'Nobody', count: 1),
+      throwsA(isA<StateError>()),
+    );
+    expect(await db.select(db.pendingScans).get(), isEmpty);
+  });
+
+  test('a walk-in is refused at a cancelled event', () async {
+    api.bootstrapPayload = bootstrapFor([adeyemi(passId)])
+      ..['event']['cancelled'] = true;
+    await repo.openLeg(legId);
+
+    await expectLater(
+      () => repo.addWalkIn(legId, displayName: 'Nobody', count: 1),
+      throwsA(isA<StateError>()),
+    );
+  });
+
+  test('a nameless walk-in is refused', () async {
+    // The organiser has to be able to recognise who came in.
+    await expectLater(
+      () => repo.addWalkIn(legId, displayName: '   ', count: 1),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
+  test('sync creates the household before the check-in rows', () async {
+    await repo.addWalkIn(legId, displayName: 'Aunty Nkechi', count: 3);
+    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+
+    final accepted = await repo.sync();
+    expect(accepted, 2, reason: 'both the walk-in and the ordinary scan');
+
+    expect(api.walkIns.single['display_name'], 'Aunty Nkechi');
+    expect(api.walkIns.single['count'], 3);
+    // The walk-in went up its own route, so the batch carried only the scan.
+    expect(api.submitted.single, hasLength(1));
+
+    final left = await (db.select(db.pendingScans)
+          ..where((p) => p.synced.equals(false)))
+        .get();
+    expect(left, isEmpty);
+  });
+
+  test('a refused walk-in is settled, not retried forever', () async {
+    // The organiser turned walk-ins off after it was queued. Retrying every
+    // twelve seconds for the rest of the evening helps nobody.
+    await repo.addWalkIn(legId, displayName: 'Aunty Nkechi', count: 3);
+    api.walkInError = ApiException(403, 'forbidden', 'You cannot add walk-ins.');
+
+    await repo.sync();
+    final row = await db.select(db.pendingScans).getSingle();
+    expect(row.synced, isTrue);
+    expect(row.contested, isTrue);
+    expect(row.note, contains('You cannot add walk-ins'));
+  });
+
+  test('a walk-in that cannot be sent stays queued', () async {
+    await repo.addWalkIn(legId, displayName: 'Aunty Nkechi', count: 3);
+    api.walkInError = ApiException(0, 'unreachable', 'no signal');
+
+    await repo.sync();
+    final row = await db.select(db.pendingScans).getSingle();
+    expect(row.synced, isFalse, reason: 'no signal is not a refusal');
   });
 }

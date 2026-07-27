@@ -123,6 +123,24 @@ class ApiClient {
     return res['results'] as List<dynamic>;
   }
 
+  /// Creates the household a walk-in needs, replaying the ids this device
+  /// minted at the gate so a retry cannot invent a second one.
+  Future<Map<String, dynamic>> submitWalkIn({
+    required String legId,
+    required String clientUuid,
+    required String displayName,
+    required int count,
+    String? entranceId,
+    String? passId,
+  }) async =>
+      (await _send('POST', '/scanner/legs/$legId/walk-ins', body: {
+        'client_uuid': clientUuid,
+        'display_name': displayName,
+        'count': count,
+        'entrance_id': ?entranceId,
+        'pass_id': ?passId,
+      })) as Map<String, dynamic>;
+
   Future<void> testPing(String legId) =>
       _send('POST', '/scanner/legs/$legId/test');
 }
