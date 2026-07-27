@@ -183,9 +183,18 @@ Both the web app and the Flutter scanner talk to the **one** backend,
    on the scan screen drops the usher out of the leg entirely with no
    confirm, even mid-result; and the app installs under the label
    `scanner` (`android:label`, never set).
-4. **Deployment.** Nothing anywhere. No CI, hosting, domain, secrets
-   management, backups or migration runner. Target: Vercel (web) +
-   Railway/Fly (API), EU region.
+4. **Deployment — ready, but nowhere.** The code side is done and
+   `DEPLOY.md` is the runbook: CI runs all three suites, there is a
+   Dockerfile, and `npm run migrate --workspace api` applies migrations
+   one transaction at a time with checksums. The API boots under
+   `NODE_ENV=production`, binds `0.0.0.0`, logs JSON with phone numbers
+   redacted, and refuses to start on a missing RLS role URL or a missing
+   SMS provider.
+   - **What is missing is accounts:** a Postgres instance, Railway/Fly,
+     Vercel, Paystack test keys, a funded Termii sender ID, a domain.
+     Nothing has run against a real host.
+   - Still nothing for **backups, error monitoring, uptime checks or rate
+     limiting**, and CI deploys nothing.
 5. **Event creation is one thin form.** The setup mockup has five steps
    (details, venue, guests & entry, tables, review).
 
@@ -194,7 +203,7 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 Web scanner fallback (the handoff calls it two days that "saves an event" —
 casual staff arrive having installed nothing) · super admin's three screens ·
 guest-page accessibility and performance pass · rate limiting on public
-endpoints · error monitoring and structured logs · PDF report · email as a
+endpoints · error monitoring (logs are structured now) · PDF report · email as a
 delivery channel · Paystack **live** keys (`StubProvider` refuses to run in
 production).
 
