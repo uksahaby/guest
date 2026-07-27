@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import jsQR from "jsqr";
 import {
   searchGuests,
   submitScan,
@@ -28,7 +29,7 @@ export default function ScannerClient({ legId, entranceId, gateName }: Props) {
   const busyRef = useRef(false);
 
   const [cameraState, setCameraState] = useState<
-    "starting" | "on" | "denied" | "unsupported"
+    "starting" | "on" | "denied" | "insecure"
   >("starting");
   const [decision, setDecision] = useState<Decision | null>(null);
   const [pendingRaw, setPendingRaw] = useState<string | null>(null);
@@ -73,20 +74,55 @@ export default function ScannerClient({ legId, entranceId, gateName }: Props) {
   // ---- camera ------------------------------------------------------------
 
   useEffect(() => {
-    const Detector = (
-      globalThis as unknown as { BarcodeDetector?: new (o: object) => object }
-    ).BarcodeDetector;
-    if (!Detector) {
-      // Safari has no BarcodeDetector. Name it plainly — an usher needs to
-      // know to search by name rather than keep waving a phone at a card.
-      setCameraState("unsupported");
+    // getUserMedia only exists in a secure context. A staging box served
+    // over plain HTTP, or reached by LAN IP, has no camera API at all —
+    // and the browser gives no hint why, so say it here.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraState("insecure");
       return;
     }
 
     let stream: MediaStream | null = null;
     let stop = false;
-    const detector = new Detector({ formats: ["qr_code"] }) as {
-      detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]>;
+
+    // BarcodeDetector where it exists (Chrome on Android — the common case,
+    // and hardware-accelerated), jsQR everywhere else. Safari has no
+    // BarcodeDetector at all, and half the casual staff this page exists
+    // for are carrying iPhones, so "install Chrome" is not an answer.
+    const Detector = (
+      globalThis as unknown as { BarcodeDetector?: new (o: object) => object }
+    ).BarcodeDetector;
+
+    const native = Detector
+      ? (new Detector({ formats: ["qr_code"] }) as {
+          detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]>;
+        })
+      : null;
+
+    // jsQR reads pixels, so the frame goes through a canvas first. Sized
+    // down to 480px on its long edge: a QR that fills the reticle decodes
+    // fine at that, and full resolution costs more than it buys on a
+    // mid-range phone doing this every frame.
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+    const readFrame = async (video: HTMLVideoElement): Promise<string | null> => {
+      if (native) {
+        const found = await native.detect(video);
+        return found[0]?.rawValue ?? null;
+      }
+      if (!ctx) return null;
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (!w || !h) return null;
+      const scale = Math.min(1, 480 / Math.max(w, h));
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      return jsQR(data.data, data.width, data.height, {
+        inversionAttempts: "dontInvert",
+      })?.data ?? null;
     };
 
     (async () => {
@@ -110,8 +146,7 @@ export default function ScannerClient({ legId, entranceId, gateName }: Props) {
         const video = videoRef.current;
         if (video && video.readyState >= 2 && !busyRef.current) {
           try {
-            const found = await detector.detect(video);
-            const raw = found[0]?.rawValue;
+            const raw = await readFrame(video);
             const now = Date.now();
             const last = lastRef.current;
             if (raw && !(raw === last.raw && now - last.at < SAME_CODE_MS)) {
@@ -175,12 +210,12 @@ export default function ScannerClient({ legId, entranceId, gateName }: Props) {
             <p className="scan-nocam-t">
               {cameraState === "denied"
                 ? "No camera access"
-                : "This browser can't read QR codes"}
+                : "Camera needs a secure connection"}
             </p>
             <p className="scan-nocam-s">
               {cameraState === "denied"
-                ? "Allow the camera in your browser settings, or find guests by name below."
-                : "Chrome on Android can. On any browser, you can still find guests by name."}
+                ? "Allow the camera in your browser settings, then reload. You can still find guests by name below."
+                : "Browsers only allow the camera over https. Open this page on its https address — or find guests by name below."}
             </p>
           </div>
         )}
