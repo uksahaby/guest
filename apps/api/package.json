@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "migrate": "tsx scripts/migrate.ts",
-    "test": "tsx --test --test-concurrency=1 src/server.test.ts src/auth.test.ts src/sms.test.ts src/checkins.test.ts src/scanner.test.ts src/public.test.ts src/events.test.ts src/rls.test.ts src/billing.test.ts src/reports.test.ts src/csv.test.ts src/import.test.ts src/tables.test.ts src/live.test.ts src/settings.test.ts src/team.test.ts src/cancellation.test.ts",
+    "test": "tsx --test --test-concurrency=1 src/server.test.ts src/auth.test.ts src/sms.test.ts src/checkins.test.ts src/scanner.test.ts src/public.test.ts src/events.test.ts src/rls.test.ts src/billing.test.ts src/reports.test.ts src/csv.test.ts src/import.test.ts src/tables.test.ts src/live.test.ts src/settings.test.ts src/team.test.ts src/cancellation.test.ts src/webscan.test.ts",
     "db:pull": "drizzle-kit pull"
   },
   "dependencies": {
