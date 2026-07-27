@@ -1,0 +1,286 @@
+/* The web scanner. Dark, full-bleed, thumb-sized targets — it is used
+   one-handed, outdoors, at night, by someone who has never seen it before.
+   Tones match the app's result states so an organiser watching over a
+   shoulder sees the same colours. */
+
+.scan-root {
+  --bg: #0d0f0c;
+  --surface: #161a14;
+  --line: #262b23;
+  --text: #f2f4f0;
+  --muted: #9aa295;
+  --admit: #4ade80;
+  --hold: #fbbf24;
+  --deny: #f87171;
+
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* ---- gate picker ---- */
+
+.scan-wrap {
+  padding: 28px 20px 40px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.scan-h1 {
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0 0 20px;
+}
+.scan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.scan-card {
+  display: block;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  text-decoration: none;
+  color: inherit;
+}
+.scan-card-name {
+  display: block;
+  font-size: 16.5px;
+  font-weight: 600;
+}
+.scan-card-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.scan-empty,
+.scan-note {
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.scan-note {
+  margin-top: 28px;
+}
+
+/* ---- the gate ---- */
+
+.scan-gate {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.scan-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.scan-gate-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+.scan-back {
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.scan-view {
+  position: relative;
+  flex: 1;
+  min-height: 46dvh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #000;
+}
+.scan-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.scan-reticle {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border: 2px solid var(--admit);
+  border-radius: 18px;
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.35);
+}
+.scan-hint {
+  position: absolute;
+  bottom: 18px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.scan-nocam {
+  padding: 32px 24px;
+  text-align: center;
+}
+.scan-nocam-t {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--hold);
+}
+.scan-nocam-s {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.scan-error {
+  margin: 0;
+  padding: 12px 16px;
+  background: rgb(248 113 113 / 0.12);
+  color: var(--deny);
+  font-size: 13.5px;
+}
+
+.scan-actions {
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+}
+.scan-btn {
+  width: 100%;
+  padding: 16px;
+  font: inherit;
+  font-size: 15.5px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+/* ---- search ---- */
+
+.scan-search {
+  padding: 0 16px 20px;
+}
+.scan-input {
+  width: 100%;
+  padding: 15px;
+  font: inherit;
+  font-size: 16px; /* 16px or iOS zooms the page on focus */
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--admit);
+  border-radius: 14px;
+}
+.scan-results {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.scan-result {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 14px 2px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+.scan-result-name {
+  font-size: 16px;
+  font-weight: 500;
+}
+.scan-result-sub {
+  grid-column: 1;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.scan-result-count {
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 13px;
+  color: var(--admit);
+}
+
+/* ---- result ---- */
+
+.scan-result-panel {
+  position: fixed;
+  inset: 0;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-top: 6px solid var(--muted);
+}
+.scan-result-panel.tone-admit,
+.scan-result-panel.tone-ask {
+  border-top-color: var(--admit);
+  background: #0f1a10;
+}
+.scan-result-panel.tone-hold {
+  border-top-color: var(--hold);
+  background: #1a170c;
+}
+.scan-result-panel.tone-deny {
+  border-top-color: var(--deny);
+  background: #1a0f0f;
+}
+.scan-outcome {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.scan-who {
+  margin: 12px 0 0;
+  font-size: 18px;
+}
+.scan-detail {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.scan-ask {
+  margin: 26px 0 10px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.scan-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.scan-count {
+  min-width: 76px;
+  padding: 20px 0;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+  color: #0d0f0c;
+  background: var(--admit);
+  border: 0;
+  border-radius: 16px;
+}
+.scan-dismiss {
+  margin-top: auto;
+  padding: 16px;
+  font: inherit;
+  font-size: 15.5px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}

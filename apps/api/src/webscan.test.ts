@@ -245,3 +245,74 @@ test("the web route and the sync route agree on the same pass", async () => {
   assert.equal(out.accepted, true, "the people are already inside");
   assert.equal(out.contested, true, "but the server knows the allowance was spent");
 });
+
+// ---- find them by hand ---------------------------------------------------
+
+function guests(s: Seeded, q: string, token = s.usherToken) {
+  return app.inject({
+    method: "GET",
+    url: `/scanner/legs/${s.legId}/guests?q=${encodeURIComponent(q)}`,
+    headers: { authorization: `Bearer ${token}` },
+  });
+}
+
+test("searching by name finds a household", async () => {
+  const s = await seedEvent(app);
+  const res = await guests(s, "adeyemi");
+  assert.equal(res.statusCode, 200);
+
+  const [g] = res.json().guests;
+  assert.equal(g.display_name, "Mr & Mrs Adeyemi");
+  assert.equal(g.allowance, 4);
+  assert.equal(g.admitted, 0);
+  assert.ok(g.pass_id);
+});
+
+test("search never hands a browser a signing key or a phone number", async () => {
+  // The reason this endpoint exists instead of reusing bootstrap.
+  const s = await seedEvent(app);
+  const body = (await guests(s, "adeyemi")).body;
+  assert.ok(!body.includes("signing"), "no key material");
+  assert.ok(!body.includes("+234"), "no phone numbers");
+});
+
+test("search needs three characters", async () => {
+  const s = await seedEvent(app);
+  assert.deepEqual((await guests(s, "ad")).json().guests, []);
+});
+
+test("search is refused without an assignment on the leg", async () => {
+  const s = await seedEvent(app);
+  assert.equal((await guests(s, "adeyemi", s.outsiderToken)).statusCode, 403);
+});
+
+test("a household found by name can be checked in by hand", async () => {
+  const s = await seedEvent(app);
+  const [g] = (await guests(s, "adeyemi")).json().guests;
+
+  const res = await scan(s, { pass_id: g.pass_id, requested_count: 2 });
+  const { decision, recorded } = res.json();
+  assert.equal(decision.outcome, "manual");
+  assert.equal(decision.admittedCount, 2);
+
+  const [row] = await sql`
+    select result, admitted_count from check_in_events where id = ${recorded}`;
+  assert.equal(row!.result, "manual");
+  assert.equal(row!.admitted_count, 2);
+});
+
+test("a cancelled event refuses a manual check-in too", async () => {
+  // Search by name must not be the way around it here either.
+  const s = await seedEvent(app);
+  const [g] = (await guests(s, "adeyemi")).json().guests;
+  await sql`update events set status = 'cancelled' where id = ${s.eventId}`;
+
+  const { decision } = (await scan(s, { pass_id: g.pass_id })).json();
+  assert.equal(decision.outcome, "event_cancelled");
+});
+
+test("a pass_id must be a uuid, and one of raw or pass_id is required", async () => {
+  const s = await seedEvent(app);
+  assert.equal((await scan(s, { pass_id: "nope" })).statusCode, 400);
+  assert.equal((await scan(s, {})).statusCode, 400);
+});

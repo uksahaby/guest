@@ -29,7 +29,10 @@ const ADMITTING = new Set(["admitted", "partial", "manual", "overflow_admitted"]
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Body = {
+  /** A scanned QR. Mutually exclusive with pass_id. */
   raw?: string;
+  /** Check-in by hand, after finding someone by name. */
+  pass_id?: string;
   client_uuid?: string;
   requested_count?: number;
   entrance_id?: string | null;
@@ -59,18 +62,64 @@ function claimedPassId(raw: string): string | null {
 export async function webScanRoutes(app: FastifyInstance) {
   const uid = (req: { user: unknown }) => (req.user as { sub: string }).sub;
 
+  /**
+   * GET /scanner/legs/:legId/guests?q= — search by name, for the web
+   * scanner's "find them by hand" path.
+   *
+   * Pointedly NOT the bootstrap endpoint, which the Flutter app uses for
+   * the same job. Bootstrap ships every event signing key, and a browser
+   * has no business holding one: the server decides here, so the web
+   * surface never needs a key and therefore must never be handed one.
+   *
+   * usher_guest_list already redacts — it carries the last four digits of
+   * a phone for matching, never the number.
+   */
+  app.get<{ Params: { legId: string }; Querystring: { q?: string } }>(
+    "/scanner/legs/:legId/guests",
+    { preHandler: [app.authenticate] },
+    async (req, reply) =>
+      asUser(sqlUsher, uid(req), async (db) => {
+        const [assigned] = await db`select app_works_leg(${req.params.legId}::uuid) as ok`;
+        if (assigned?.ok !== true) {
+          return reply
+            .code(403)
+            .send({ code: "forbidden", message: "No assignment on this leg." });
+        }
+
+        const q = (req.query?.q ?? "").trim().toLowerCase();
+        // Same floor as the app: two characters match half a wedding.
+        if (q.length < 3) return { guests: [] };
+
+        const guests = await db`
+          select pass_id, display_name, category, table_name,
+                 allowance, admitted, rsvp
+          from usher_guest_list
+          where leg_id = ${req.params.legId} and search_terms like ${"%" + q + "%"}
+          order by display_name
+          limit 20`;
+        return { guests };
+      }),
+  );
+
   app.post<{ Params: { legId: string }; Body: Body }>(
     "/scanner/legs/:legId/scan",
     { preHandler: [app.authenticate] },
     async (req, reply) => {
       const { legId } = req.params;
       const raw = typeof req.body?.raw === "string" ? req.body.raw.trim() : "";
+      const manualPassId =
+        typeof req.body?.pass_id === "string" ? req.body.pass_id.trim() : "";
       const clientUuid = req.body?.client_uuid;
 
-      if (!raw) {
+      if (!raw && !manualPassId) {
         return reply
           .code(400)
-          .send({ code: "bad_request", message: "raw is required." });
+          .send({ code: "bad_request", message: "raw or pass_id is required." });
+      }
+      if (manualPassId && !UUID_RE.test(manualPassId)) {
+        return reply
+          .code(400)
+          .send({ code: "bad_request", message: "pass_id must be a uuid." });
       }
       if (typeof clientUuid !== "string" || !UUID_RE.test(clientUuid)) {
         // The browser supplies it so a double-tap or a retried request
@@ -110,9 +159,9 @@ export async function webScanRoutes(app: FastifyInstance) {
           key: Buffer.from(k.signing_key),
         }));
 
-        // Prefetch the one household the token points at, if any.
+        // Prefetch the one household this is about, if any.
         let inv: LocalInvitation | undefined;
-        const passId = claimedPassId(raw);
+        const passId = manualPassId || claimedPassId(raw);
         if (passId) {
           const [s] = await db`select * from pass_state(${passId}::uuid, ${legId}::uuid)`;
           if (s) {
@@ -145,11 +194,9 @@ export async function webScanRoutes(app: FastifyInstance) {
             find: (id) => (inv?.passId === id ? inv : undefined),
             canOverrideRsvp: staff?.can_override ?? false,
           },
-          {
-            kind: "scan",
-            raw,
-            requestedCount: req.body?.requested_count,
-          },
+          manualPassId
+            ? { kind: "manual", passId: manualPassId, requestedCount: req.body?.requested_count }
+            : { kind: "scan", raw, requestedCount: req.body?.requested_count },
         );
 
         // needs_count writes nothing — the usher is still being asked how
