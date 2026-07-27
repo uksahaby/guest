@@ -101,6 +101,145 @@ export async function webScanRoutes(app: FastifyInstance) {
       }),
   );
 
+  /**
+   * POST /scanner/legs/:legId/walk-ins — someone who is not on the list.
+   *
+   * At a Nigerian wedding this is not an edge case; it is the first hour.
+   * The schema has expected it all along (`invitations.is_walk_in`,
+   * `staff_assignments.can_walk_in`, `events.allow_walkins`, and RLS
+   * policies letting an usher insert exactly these three rows), so this
+   * builds the household the same way the organiser would have: an
+   * invitation, an entitlement at this leg, and a pass.
+   *
+   * It becomes a real household on purpose. A walk-in who steps out for a
+   * phone call has to be able to come back in, and that only works if
+   * there is a pass and an allowance to count against. It also means they
+   * land in billable_people, which is the HANDOFF §3 bargain: admit now,
+   * flag it, invoice afterwards.
+   *
+   * Three separate gates, all defaulting closed:
+   *   · the event must allow walk-ins
+   *   · this usher must hold can_walk_in
+   *   · a cancelled event admits nobody
+   */
+  app.post<{
+    Params: { legId: string };
+    Body: {
+      client_uuid?: string;
+      display_name?: string;
+      count?: number;
+      entrance_id?: string | null;
+    };
+  }>(
+    "/scanner/legs/:legId/walk-ins",
+    { preHandler: [app.authenticate] },
+    async (req, reply) => {
+      const { legId } = req.params;
+      const clientUuid = req.body?.client_uuid;
+      const displayName = (req.body?.display_name ?? "").trim();
+      const count = Number(req.body?.count ?? 1);
+
+      if (typeof clientUuid !== "string" || !UUID_RE.test(clientUuid)) {
+        return reply
+          .code(400)
+          .send({ code: "bad_request", message: "client_uuid must be a uuid." });
+      }
+      if (!displayName || displayName.length > 200) {
+        return reply.code(400).send({
+          code: "bad_request",
+          message: "A name is required — the organiser has to know who came in.",
+        });
+      }
+      if (!Number.isInteger(count) || count < 1 || count > 50) {
+        return reply
+          .code(400)
+          .send({ code: "bad_request", message: "count must be 1 to 50." });
+      }
+
+      return asUser(sqlUsher, uid(req), async (db) => {
+        const [assigned] = await db`select app_works_leg(${legId}::uuid) as ok`;
+        if (assigned?.ok !== true) {
+          return reply
+            .code(403)
+            .send({ code: "forbidden", message: "No assignment on this leg." });
+        }
+
+        const [leg] = await db`
+          select l.event_id, e.allow_walkins, e.status
+          from event_legs l join events e on e.id = l.event_id
+          where l.id = ${legId}`;
+        if (!leg) {
+          return reply.code(404).send({ code: "not_found", message: "No such leg." });
+        }
+        if (leg.status === "cancelled") {
+          return reply.code(409).send({
+            code: "event_cancelled",
+            message: "This event was called off. Nobody is being admitted.",
+          });
+        }
+        if (leg.allow_walkins !== true) {
+          return reply.code(403).send({
+            code: "walkins_not_allowed",
+            message: "This event does not admit walk-ins.",
+          });
+        }
+
+        const [staff] = await db`
+          select can_walk_in from staff_assignments
+          where leg_id = ${legId} and user_id = ${uid(req)}`;
+        if (staff?.can_walk_in !== true) {
+          return reply.code(403).send({
+            code: "forbidden",
+            message: "You cannot add walk-ins. Ask the organiser.",
+          });
+        }
+
+        // Idempotent on client_uuid: a retry must not invent a second
+        // household, so check before building anything.
+        const [existing] = await db`
+          select id, invitation_id from check_in_events
+          where client_uuid = ${clientUuid}`;
+        if (existing) {
+          return { recorded: existing.id, duplicate: true };
+        }
+
+        const [inv] = await db`
+          insert into invitations (event_id, display_name, is_walk_in)
+          values (${leg.event_id}, ${displayName}, true)
+          returning id`;
+        await db`
+          insert into invitation_legs (invitation_id, leg_id, allowance, rsvp)
+          values (${inv!.id}, ${legId}, ${count}, 'attending')`;
+        const [pass] = await db`
+          insert into passes (invitation_id, event_id)
+          values (${inv!.id}, ${leg.event_id})
+          returning id`;
+
+        const [row] = await db`
+          insert into check_in_events (
+            client_uuid, event_id, leg_id, entrance_id, pass_id, invitation_id,
+            staff_user_id, device_id, result, admitted_count, occupancy_delta,
+            scanned_at, synced_at
+          ) values (
+            ${clientUuid}, ${leg.event_id}, ${legId},
+            ${req.body?.entrance_id ?? null}, ${pass!.id}, ${inv!.id},
+            ${uid(req)}, 'web', 'manual'::checkin_result, ${count}, ${count},
+            now(), now()
+          )
+          returning id`;
+
+        return {
+          recorded: row!.id,
+          duplicate: false,
+          invitation_id: inv!.id,
+          pass_id: pass!.id,
+          display_name: displayName,
+          admitted: count,
+        };
+      });
+    },
+  );
+
   app.post<{ Params: { legId: string }; Body: Body }>(
     "/scanner/legs/:legId/scan",
     { preHandler: [app.authenticate] },

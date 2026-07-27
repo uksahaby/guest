@@ -66,3 +66,40 @@ export async function searchGuests(legId: string, q: string): Promise<Guest[]> {
   );
   return status === 200 ? data.guests : [];
 }
+
+export type WalkInResult =
+  | { ok: true; displayName: string; admitted: number }
+  | { ok: false; message: string };
+
+/**
+ * Someone not on the list. Becomes a real household, so they can step out
+ * and come back, and so the organiser is invoiced rather than the person
+ * being turned away (HANDOFF §3).
+ */
+export async function addWalkIn(
+  legId: string,
+  body: {
+    client_uuid: string;
+    display_name: string;
+    count: number;
+    entrance_id?: string | null;
+  },
+): Promise<WalkInResult> {
+  const { status, data } = await api<{
+    display_name: string;
+    admitted: number;
+    code?: string;
+    message?: string;
+  }>(`/scanner/legs/${legId}/walk-ins`, { method: "POST", body });
+
+  if (status === 200) {
+    return { ok: true, displayName: data.display_name, admitted: data.admitted };
+  }
+  // The server's own words: "you cannot add walk-ins", "this event does not
+  // admit walk-ins", "this event was called off" are all different problems
+  // and an usher needs to know which.
+  return {
+    ok: false,
+    message: data?.message ?? "Couldn't add that walk-in.",
+  };
+}

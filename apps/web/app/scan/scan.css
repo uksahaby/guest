@@ -284,3 +284,33 @@
   border: 1px solid var(--line);
   border-radius: 14px;
 }
+
+/* Walk-in. Same shape as search — one more thing an usher can do without
+   leaving the camera. */
+.scan-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.scan-count.ghost {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.scan-walkgo {
+  margin-top: 14px;
+  color: #0d0f0c;
+  background: var(--admit);
+  border-color: var(--admit);
+  font-weight: 600;
+}
+.scan-walkgo:disabled {
+  opacity: 0.4;
+}
+.scan-walkdone {
+  margin: 0;
+  padding: 12px 16px;
+  background: rgb(74 222 128 / 0.12);
+  color: var(--admit);
+  font-size: 13.5px;
+}

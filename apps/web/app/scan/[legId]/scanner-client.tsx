@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import {
+  addWalkIn,
   searchGuests,
   submitScan,
   type Decision,
@@ -38,6 +39,10 @@ export default function ScannerClient({ legId, entranceId, gateName }: Props) {
   const [query, setQuery] = useState("");
   const [guests, setGuests] = useState<Guest[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [walkOpen, setWalkOpen] = useState(false);
+  const [walkName, setWalkName] = useState("");
+  const [walkCount, setWalkCount] = useState(1);
+  const [walkDone, setWalkDone] = useState<string | null>(null);
 
   const send = useCallback(
     async (body: { raw?: string; pass_id?: string; requested_count?: number }) => {
@@ -189,6 +194,30 @@ export default function ScannerClient({ legId, entranceId, gateName }: Props) {
     setPendingPassId(null);
   };
 
+  const submitWalkIn = async () => {
+    if (busyRef.current || !walkName.trim()) return;
+    busyRef.current = true;
+    setError(null);
+    try {
+      const res = await addWalkIn(legId, {
+        client_uuid: crypto.randomUUID(),
+        display_name: walkName.trim(),
+        count: walkCount,
+        entrance_id: entranceId,
+      });
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      setWalkDone(`${res.displayName} · ${res.admitted} admitted`);
+      setWalkOpen(false);
+      setWalkName("");
+      setWalkCount(1);
+    } finally {
+      busyRef.current = false;
+    }
+  };
+
   return (
     <main className="scan-gate">
       <header className="scan-bar">
@@ -229,13 +258,61 @@ export default function ScannerClient({ legId, entranceId, gateName }: Props) {
           type="button"
           onClick={() => {
             setSearchOpen((v) => !v);
+            setWalkOpen(false);
             setGuests([]);
             setQuery("");
           }}
         >
           {searchOpen ? "Close search" : "Search by name"}
         </button>
+        <button
+          className="scan-btn"
+          type="button"
+          onClick={() => {
+            setWalkOpen((v) => !v);
+            setSearchOpen(false);
+            setWalkDone(null);
+          }}
+        >
+          {walkOpen ? "Cancel walk-in" : "Add walk-in"}
+        </button>
       </div>
+
+      {walkDone && <p className="scan-walkdone">Walked in — {walkDone}</p>}
+
+      {walkOpen && (
+        <div className="scan-search">
+          <input
+            className="scan-input"
+            placeholder="Name, as you would read it off a card"
+            value={walkName}
+            onChange={(e) => setWalkName(e.target.value)}
+            maxLength={200}
+            autoFocus
+          />
+          <p className="scan-ask">How many?</p>
+          <div className="scan-counts">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <button
+                key={n}
+                className={`scan-count${walkCount === n ? "" : " ghost"}`}
+                type="button"
+                onClick={() => setWalkCount(n)}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <button
+            className="scan-btn scan-walkgo"
+            type="button"
+            disabled={!walkName.trim()}
+            onClick={submitWalkIn}
+          >
+            Admit {walkCount}
+          </button>
+        </div>
+      )}
 
       {searchOpen && (
         <div className="scan-search">

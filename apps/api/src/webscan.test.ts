@@ -316,3 +316,139 @@ test("a pass_id must be a uuid, and one of raw or pass_id is required", async ()
   assert.equal((await scan(s, { pass_id: "nope" })).statusCode, 400);
   assert.equal((await scan(s, {})).statusCode, 400);
 });
+
+// ---- walk-ins ------------------------------------------------------------
+//
+// Not an edge case at a Nigerian wedding — the first hour. A walk-in
+// becomes a real household so they can leave and come back, and so the
+// organiser is invoiced for them afterwards rather than blocked at the
+// gate (HANDOFF §3).
+
+function walkIn(s: Seeded, body: Record<string, unknown> = {}, token = s.usherToken) {
+  return app.inject({
+    method: "POST",
+    url: `/scanner/legs/${s.legId}/walk-ins`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      client_uuid: randomUUID(),
+      display_name: "Uninvited Uncle",
+      count: 2,
+      entrance_id: s.entranceId,
+      ...body,
+    },
+  });
+}
+
+/** can_walk_in defaults closed, so grant it explicitly. */
+async function allowWalkIns(s: Seeded) {
+  await sql`update staff_assignments set can_walk_in = true
+    where leg_id = ${s.legId} and user_id = ${s.usherId}`;
+}
+
+test("a walk-in becomes a household, a pass, and an admission", async () => {
+  const s = await seedEvent(app);
+  await allowWalkIns(s);
+
+  const res = await walkIn(s);
+  assert.equal(res.statusCode, 200);
+  const out = res.json();
+  assert.equal(out.admitted, 2);
+
+  const [inv] = await sql`
+    select display_name, is_walk_in from invitations where id = ${out.invitation_id}`;
+  assert.equal(inv!.display_name, "Uninvited Uncle");
+  assert.equal(inv!.is_walk_in, true, "must be distinguishable from a real invitation");
+
+  const [row] = await sql`
+    select result, admitted_count, occupancy_delta, staff_user_id
+    from check_in_events where id = ${out.recorded}`;
+  assert.equal(row!.admitted_count, 2);
+  assert.equal(row!.occupancy_delta, 2);
+  assert.equal(row!.staff_user_id, s.usherId);
+
+  // An allowance to count against, so stepping out and back in works.
+  const [ent] = await sql`
+    select allowance from invitation_legs
+    where invitation_id = ${out.invitation_id} and leg_id = ${s.legId}`;
+  assert.equal(ent!.allowance, 2);
+});
+
+test("a walk-in can be scanned back in after stepping out", async () => {
+  // The reason they get a real pass rather than a bare log row.
+  const s = await seedEvent(app);
+  await allowWalkIns(s);
+  const out = (await walkIn(s, { count: 2 })).json();
+
+  const again = await scan(s, { pass_id: out.pass_id });
+  const { decision } = again.json();
+  assert.equal(decision.outcome, "needs_count");
+  assert.equal(decision.invitation.displayName, "Uninvited Uncle");
+});
+
+test("a walk-in counts towards the bill", async () => {
+  // HANDOFF §3: admitted now, invoiced afterwards. Blocking them is the
+  // one thing that must not happen.
+  const s = await seedEvent(app);
+  await allowWalkIns(s);
+  const [before] = await sql`select billable_people(${s.eventId}::uuid) as n`;
+  await walkIn(s, { count: 3 });
+  const [after] = await sql`select billable_people(${s.eventId}::uuid) as n`;
+  assert.equal(after!.n, before!.n + 3);
+});
+
+test("the three gates all default closed", async () => {
+  const s = await seedEvent(app);
+
+  // 1. can_walk_in is off unless the organiser grants it.
+  assert.equal((await walkIn(s)).statusCode, 403);
+  await allowWalkIns(s);
+  assert.equal((await walkIn(s)).statusCode, 200);
+
+  // 2. the event may forbid walk-ins outright.
+  await sql`update events set allow_walkins = false where id = ${s.eventId}`;
+  const forbidden = await walkIn(s);
+  assert.equal(forbidden.statusCode, 403);
+  assert.equal(forbidden.json().code, "walkins_not_allowed");
+
+  // 3. a cancelled event admits nobody, walk-in or otherwise.
+  await sql`update events set allow_walkins = true, status = 'cancelled'
+    where id = ${s.eventId}`;
+  const cancelled = await walkIn(s);
+  assert.equal(cancelled.statusCode, 409);
+  assert.equal(cancelled.json().code, "event_cancelled");
+});
+
+test("someone off the leg cannot add a walk-in", async () => {
+  const s = await seedEvent(app);
+  await allowWalkIns(s);
+  assert.equal((await walkIn(s, {}, s.outsiderToken)).statusCode, 403);
+});
+
+test("a walk-in needs a name and a sane count", async () => {
+  const s = await seedEvent(app);
+  await allowWalkIns(s);
+
+  // Nameless walk-ins make the refusal log useless to the organiser.
+  assert.equal((await walkIn(s, { display_name: "  " })).statusCode, 400);
+  assert.equal((await walkIn(s, { count: 0 })).statusCode, 400);
+  assert.equal((await walkIn(s, { count: 51 })).statusCode, 400);
+  assert.equal((await walkIn(s, { count: 2.5 })).statusCode, 400);
+});
+
+test("a retried walk-in does not invent a second household", async () => {
+  const s = await seedEvent(app);
+  await allowWalkIns(s);
+  const clientUuid = randomUUID();
+
+  const first = await walkIn(s, { client_uuid: clientUuid });
+  const second = await walkIn(s, { client_uuid: clientUuid });
+
+  assert.equal(first.json().duplicate, false);
+  assert.equal(second.json().duplicate, true);
+  assert.equal(second.json().recorded, first.json().recorded);
+
+  const [rows] = await sql`
+    select count(*)::int as n from invitations
+    where event_id = ${s.eventId} and is_walk_in = true`;
+  assert.equal(rows!.n, 1, "a retry must not double the guest list");
+});

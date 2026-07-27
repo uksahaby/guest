@@ -4,5 +4,7 @@ node_modules/
 !.env.example
 dist/
 .next/
+# A second dev server needs its own build dir (see apps/web/next.config.ts)
+.next-verify/
 *.log
 .DS_Store
