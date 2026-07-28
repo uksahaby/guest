@@ -602,4 +602,80 @@ void main() {
     final row = await db.select(db.pendingScans).getSingle();
     expect(row.synced, isFalse, reason: 'no signal is not a refusal');
   });
+
+  // ---- the recent list, and undo after the fact --------------------------
+  //
+  // The result overlay offers Undo for a second and a half. The case that
+  // matters is the usher realising thirty seconds later, and until now
+  // nothing in the system could fix that — the log is append-only and the
+  // dashboard has no editor.
+
+  test('recent shows what this phone did, newest first', () async {
+    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+    await repo.addWalkIn(legId, displayName: 'Aunty Nkechi', count: 3);
+
+    final rows = await repo.recent(legId);
+    expect(rows, hasLength(2));
+    expect(rows.first.displayName, 'Aunty Nkechi');
+    expect(rows.first.isWalkIn, isTrue);
+    expect(rows.last.displayName, 'Mr & Mrs Adeyemi');
+    expect(rows.last.admittedCount, 2);
+  });
+
+  test('an admission can be undone from the list, once', () async {
+    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+    final before = (await repo.recent(legId)).single;
+    expect(before.canUndo, isTrue);
+
+    await repo.undo(before.clientUuid);
+
+    final after = (await repo.recent(legId)).single;
+    expect(after.reversed, isTrue);
+    expect(after.canUndo, isFalse, reason: 'twice would double the reversal');
+
+    // The count really moved back.
+    final inv = await repo.find(passId, legId);
+    expect(inv!.admitted, 0);
+  });
+
+  test('the reversal is a row, not a deletion', () async {
+    // The whole log is append-only; undo must not be an exception.
+    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+    final entry = (await repo.recent(legId)).single;
+    await repo.undo(entry.clientUuid);
+
+    final queued = await db.select(db.pendingScans).get();
+    expect(queued, hasLength(2));
+    expect(queued.where((q) => q.result == 'reversal').single.admittedCount, -2);
+  });
+
+  test('a refusal offers no undo', () async {
+    // There is nothing to take back, and the organiser wants the refusal.
+    await repo.handle(legId, raw: 'not-a-token');
+    final row = (await repo.recent(legId)).single;
+    expect(row.admittedCount, 0);
+    expect(row.canUndo, isFalse);
+  });
+
+  test('reversals are shown through the row they undo, not as their own', () async {
+    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+    await repo.undo((await repo.recent(legId)).single.clientUuid);
+
+    final rows = await repo.recent(legId);
+    expect(rows, hasLength(1), reason: 'a reversal is not a second event');
+    expect(rows.single.reversed, isTrue);
+  });
+
+  test('recent carries the sync state, so an usher knows what is queued', () async {
+    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+    expect((await repo.recent(legId)).single.synced, isFalse);
+
+    await repo.sync();
+    expect((await repo.recent(legId)).single.synced, isTrue);
+  });
+
+  test('recent is scoped to this leg', () async {
+    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+    expect(await repo.recent('some-other-leg'), isEmpty);
+  });
 }

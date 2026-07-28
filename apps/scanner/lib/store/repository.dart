@@ -353,6 +353,64 @@ class Repository {
     );
   }
 
+  /// What this phone has done at this gate, newest first.
+  ///
+  /// Undo used to live for a second and a half on the result overlay and
+  /// then vanish. An usher who admits four when three came had no way back
+  /// — and neither had the organiser, because the log is append-only by
+  /// design. This is that way back.
+  ///
+  /// Only this device's own rows: the queue is what it has, and a scan
+  /// from the other gate is not something it can reverse.
+  Future<List<RecentEntry>> recent(String legId, {int limit = 50}) async {
+    final rows = await (db.select(db.pendingScans)
+          ..where((p) => p.legId.equals(legId))
+          // rowid breaks the tie: two scans can land in the same
+          // millisecond — a double-tap, or a walk-in added straight after
+          // an admission — and a list that reorders itself between reads is
+          // no use to someone trying to undo the last thing they did.
+          ..orderBy([
+            (p) => OrderingTerm.desc(p.scannedAt),
+            (p) => OrderingTerm.desc(p.rowId),
+          ])
+          ..limit(limit))
+        .get();
+
+    // Which admissions already have a reversal pointing at them.
+    final reversed = {
+      for (final r in rows)
+        if (r.reversesClientUuid != null) r.reversesClientUuid!,
+    };
+
+    final out = <RecentEntry>[];
+    for (final r in rows) {
+      // Reversals are shown through the row they undo, not on their own.
+      if (r.reversesClientUuid != null) continue;
+
+      String? name;
+      if (r.passId != null) {
+        final inv = await (db.select(db.invitations)
+              ..where((i) =>
+                  i.passId.equals(r.passId!) & i.legId.equals(legId)))
+            .getSingleOrNull();
+        name = inv?.displayName;
+      }
+
+      out.add(RecentEntry(
+        clientUuid: r.clientUuid,
+        displayName: name ?? r.walkInName ?? 'Not on the list',
+        result: r.result,
+        admittedCount: r.admittedCount,
+        scannedAt: r.scannedAt,
+        synced: r.synced,
+        contested: r.contested,
+        reversed: reversed.contains(r.clientUuid),
+        isWalkIn: r.walkInName != null,
+      ));
+    }
+    return out;
+  }
+
   /// Undo the admission written by [clientUuid]: a reversal row, never a
   /// delete. Works offline; the server validates the pairing on sync.
   Future<void> undo(String clientUuid) async {
@@ -490,4 +548,33 @@ class InvitationEntry {
   final Invitation row;
   final int admitted;
   const InvitationEntry({required this.row, required this.admitted});
+}
+
+/// One line in the recent list.
+class RecentEntry {
+  final String clientUuid;
+  final String displayName;
+  final String result;
+  final int admittedCount;
+  final DateTime scannedAt;
+  final bool synced;
+  final bool contested;
+  final bool reversed;
+  final bool isWalkIn;
+
+  const RecentEntry({
+    required this.clientUuid,
+    required this.displayName,
+    required this.result,
+    required this.admittedCount,
+    required this.scannedAt,
+    required this.synced,
+    required this.contested,
+    required this.reversed,
+    required this.isWalkIn,
+  });
+
+  /// Only an admission that moved the count can be taken back, and only
+  /// once — the server enforces both, this keeps the button honest.
+  bool get canUndo => admittedCount > 0 && !reversed;
 }

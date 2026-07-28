@@ -6,6 +6,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../core/checkin.dart';
 import '../store/repository.dart';
 import 'result_overlay.dart';
+import 'recent_sheet.dart';
 import 'search_sheet.dart';
 import 'walk_in_sheet.dart';
 import 'theme.dart';
@@ -148,6 +149,14 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
+  /// What this phone has done here, and the only way to take back an
+  /// admission once the result overlay has gone.
+  Future<void> _openRecent() async {
+    await showRecentSheet(context, widget.repo, widget.legId);
+    // An undo writes a reversal, so the queue and the counts both move.
+    await _refreshPending();
+  }
+
   /// Someone not on the list. Works with no signal: the household is
   /// created locally and the queue carries it up when the network returns,
   /// exactly like any other scan.
@@ -257,6 +266,17 @@ class _ScanScreenState extends State<ScanScreen> {
                         style:
                             const TextStyle(fontSize: 12, color: Palette.muted)),
                   ]),
+            ),
+            // Next to the sync badge rather than in the bottom bar: it is
+            // reached after something has gone wrong, not during a queue.
+            TextButton(
+              onPressed: _openRecent,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 32),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                foregroundColor: Palette.muted,
+              ),
+              child: const Text('Recent', style: TextStyle(fontSize: 12.5)),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
