@@ -11,7 +11,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { buildServer } from "./server.ts";
 import { sqlAdmin as sql, closeDb } from "./db.ts";
-import { hashPassword, verifyPassword, passwordProblem } from "./credentials.ts";
+import {
+  hashPassword,
+  verifyPassword,
+  passwordProblem,
+  normaliseRecoveryCode,
+} from "./credentials.ts";
 
 const app = buildServer();
 before(() => app.ready());
@@ -279,4 +284,252 @@ test("length is the only rule", async () => {
   assert.ok(passwordProblem(""));
   assert.ok(passwordProblem(undefined));
   assert.ok(passwordProblem("x".repeat(201)));
+});
+
+// ---- signing up without an SMS -------------------------------------------
+
+const signup = (body: Record<string, unknown>) =>
+  app.inject({ method: "POST", url: "/auth/signup", payload: body });
+
+test("an organiser creates an account with no SMS at all", async () => {
+  const p = phone();
+  const res = await signup({
+    phone: p,
+    password: "a-long-enough-one",
+    full_name: "Folake Adeyemi",
+  });
+  assert.equal(res.statusCode, 201);
+  const session = res.json();
+  assert.equal(session.user.full_name, "Folake Adeyemi");
+
+  // The session works immediately — no verification step in between.
+  const me = await app.inject({
+    method: "GET",
+    url: "/me",
+    headers: { authorization: `Bearer ${session.access_token}` },
+  });
+  assert.equal(me.statusCode, 200);
+
+  // And the password they chose signs them in again.
+  const login = await app.inject({
+    method: "POST",
+    url: "/auth/password/login",
+    payload: { phone: p, password: "a-long-enough-one" },
+  });
+  assert.equal(login.statusCode, 200);
+});
+
+test("signup never takes over an account that already exists", async () => {
+  // The attack this closes: an usher's record is created by their
+  // organiser and has no password. If signup could set one, whoever asked
+  // first would own that person's gate.
+  const s = await withUsher();
+  const [usher] = await sql`select phone from users where id = ${s.usherId}`;
+
+  const res = await signup({
+    phone: usher!.phone,
+    password: "a-long-enough-one",
+    full_name: "Not The Usher",
+  });
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.json().code, "phone_taken");
+
+  // Untouched: still no password, still their own name.
+  const [after] = await sql`
+    select full_name, password_hash from users where id = ${s.usherId}`;
+  assert.equal(after!.password_hash, null);
+  assert.equal(after!.full_name, "Usher Musa");
+});
+
+test("signup insists on a name, a real number and a long password", async () => {
+  assert.equal((await signup({ phone: "08034112098", password: "a-long-enough-one", full_name: "A" })).statusCode, 400);
+  assert.equal((await signup({ phone: phone(), password: "short", full_name: "A" })).statusCode, 400);
+  assert.equal((await signup({ phone: phone(), password: "a-long-enough-one", full_name: "  " })).statusCode, 400);
+});
+
+test("a signed-up organiser can change their own password", async () => {
+  const p = phone();
+  const { access_token } = (await signup({
+    phone: p,
+    password: "the-first-one-x",
+    full_name: "Ahmed Bello",
+  })).json();
+
+  const changed = await app.inject({
+    method: "POST",
+    url: "/auth/password",
+    headers: { authorization: `Bearer ${access_token}` },
+    payload: { password: "the-second-one-x" },
+  });
+  assert.equal(changed.statusCode, 204);
+
+  const old = await app.inject({
+    method: "POST",
+    url: "/auth/password/login",
+    payload: { phone: p, password: "the-first-one-x" },
+  });
+  assert.equal(old.statusCode, 401, "the old password must stop working");
+});
+
+// ---- forgotten passwords -------------------------------------------------
+//
+// With SMS off there is no code to text and no email channel, so the
+// recovery code IS the recovery story. It is shown once at signup and
+// spent-and-replaced on use.
+
+async function organiser() {
+  const p = phone();
+  const res = await signup({
+    phone: p,
+    password: "the-original-one",
+    full_name: "Folake Adeyemi",
+  });
+  // phone last: the spread must not overwrite the number we just used.
+  return { ...res.json(), phone: p } as {
+    phone: string;
+    access_token: string;
+    recovery_code: string;
+    user: { id: string };
+  };
+}
+
+test("signup hands back a recovery code, once", async () => {
+  const o = await organiser();
+  assert.match(o.recovery_code, /^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
+
+  // Stored only as a hash — a database read must not yield a working code.
+  const [row] = await sql`
+    select recovery_code_hash from users where id = ${o.user.id}`;
+  assert.ok(row!.recovery_code_hash);
+  assert.notEqual(row!.recovery_code_hash, o.recovery_code);
+  assert.ok(!row!.recovery_code_hash.includes(normaliseRecoveryCode(o.recovery_code)));
+});
+
+test("a forgotten password is recovered with the code, and you come back in", async () => {
+  const o = await organiser();
+
+  const res = await app.inject({
+    method: "POST",
+    url: "/auth/recovery/reset",
+    payload: {
+      phone: o.phone,
+      recovery_code: o.recovery_code,
+      password: "the-replacement-one",
+    },
+  });
+  assert.equal(res.statusCode, 200);
+  assert.ok(res.json().access_token, "signed in, not just reset");
+
+  // The new password works and the old one does not.
+  const fresh = await app.inject({
+    method: "POST",
+    url: "/auth/password/login",
+    payload: { phone: o.phone, password: "the-replacement-one" },
+  });
+  assert.equal(fresh.statusCode, 200);
+  const stale = await app.inject({
+    method: "POST",
+    url: "/auth/password/login",
+    payload: { phone: o.phone, password: "the-original-one" },
+  });
+  assert.equal(stale.statusCode, 401);
+});
+
+test("a recovery code is spent on use and replaced", async () => {
+  const o = await organiser();
+  const used = await app.inject({
+    method: "POST",
+    url: "/auth/recovery/reset",
+    payload: { phone: o.phone, recovery_code: o.recovery_code, password: "the-replacement-one" },
+  });
+  const next = used.json().recovery_code;
+  assert.notEqual(next, o.recovery_code, "a screenshot of the old one must be worthless");
+
+  // The spent code is dead.
+  const replay = await app.inject({
+    method: "POST",
+    url: "/auth/recovery/reset",
+    payload: { phone: o.phone, recovery_code: o.recovery_code, password: "another-one-here" },
+  });
+  assert.equal(replay.statusCode, 401);
+
+  // The one it handed back works.
+  const again = await app.inject({
+    method: "POST",
+    url: "/auth/recovery/reset",
+    payload: { phone: o.phone, recovery_code: next, password: "another-one-here" },
+  });
+  assert.equal(again.statusCode, 200);
+});
+
+test("the code is forgiving about how it was written down", async () => {
+  const o = await organiser();
+  const messy = ` ${o.recovery_code.toUpperCase().replace(/-/g, " ")} `;
+  const res = await app.inject({
+    method: "POST",
+    url: "/auth/recovery/reset",
+    payload: { phone: o.phone, recovery_code: messy, password: "the-replacement-one" },
+  });
+  assert.equal(res.statusCode, 200, "case, spaces and dashes are noise on paper");
+});
+
+test("a wrong code and an unknown number fail identically", async () => {
+  const o = await organiser();
+  const wrongCode = await app.inject({
+    method: "POST",
+    url: "/auth/recovery/reset",
+    payload: { phone: o.phone, recovery_code: "aaaa-bbbb-cccc-dddd", password: "the-replacement-one" },
+  });
+  const unknown = await app.inject({
+    method: "POST",
+    url: "/auth/recovery/reset",
+    payload: { phone: phone(), recovery_code: o.recovery_code, password: "the-replacement-one" },
+  });
+  assert.equal(wrongCode.statusCode, 401);
+  assert.equal(unknown.statusCode, 401);
+  assert.equal(wrongCode.json().code, unknown.json().code);
+
+  // And the real password still works — a failed attempt changes nothing.
+  const login = await app.inject({
+    method: "POST",
+    url: "/auth/password/login",
+    payload: { phone: o.phone, password: "the-original-one" },
+  });
+  assert.equal(login.statusCode, 200);
+});
+
+test("recovery still insists on a decent new password", async () => {
+  const o = await organiser();
+  const res = await app.inject({
+    method: "POST",
+    url: "/auth/recovery/reset",
+    payload: { phone: o.phone, recovery_code: o.recovery_code, password: "short" },
+  });
+  assert.equal(res.statusCode, 400);
+});
+
+test("an organiser can mint a fresh code while signed in", async () => {
+  // For someone who never wrote theirs down.
+  const o = await organiser();
+  const res = await app.inject({
+    method: "POST",
+    url: "/auth/recovery-code",
+    headers: { authorization: `Bearer ${o.access_token}` },
+  });
+  assert.equal(res.statusCode, 200);
+  const next = res.json().recovery_code;
+  assert.notEqual(next, o.recovery_code);
+
+  // Minting replaces: two live codes would be two live keys.
+  const old = await app.inject({
+    method: "POST",
+    url: "/auth/recovery/reset",
+    payload: { phone: o.phone, recovery_code: o.recovery_code, password: "the-replacement-one" },
+  });
+  assert.equal(old.statusCode, 401);
+});
+
+test("minting a recovery code needs a session", async () => {
+  const res = await app.inject({ method: "POST", url: "/auth/recovery-code" });
+  assert.equal(res.statusCode, 401);
 });

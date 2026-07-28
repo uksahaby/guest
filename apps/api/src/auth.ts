@@ -6,6 +6,9 @@ import type { SmsSender } from "./sms.ts";
 import {
   hashInviteToken,
   hashPassword,
+  hashRecoveryCode,
+  newRecoveryCode,
+  normaliseRecoveryCode,
   passwordProblem,
   verifyPassword,
 } from "./credentials.ts";
@@ -124,6 +127,81 @@ export async function authRoutes(
   });
 
   /**
+   * POST /auth/signup — create an organiser account, no SMS involved.
+   *
+   * The phone number is therefore unverified, and that is a real trade
+   * rather than an oversight. What makes it tolerable here is that a phone
+   * number on its own grants nothing: an usher reaches a gate by holding
+   * an invite link, and an organiser owns only the events they create. A
+   * squatted number is a nuisance, not a way into someone else's wedding.
+   *
+   * What it must never do is take over an account that already exists —
+   * an usher's record is created by their organiser and has no password,
+   * so letting signup set one would hand that gate to whoever asked first.
+   * An existing phone is refused outright.
+   */
+  app.post<{ Body: { phone?: string; password?: string; full_name?: string } }>(
+    "/auth/signup",
+    async (req, reply) => {
+      const phone = normalisePhone(req.body?.phone);
+      if (!phone) {
+        return reply.code(400).send({
+          code: "bad_phone",
+          message: "Phone must be E.164, like +2348034112098.",
+        });
+      }
+      const problem = passwordProblem(req.body?.password);
+      if (problem) {
+        return reply.code(400).send({ code: "bad_password", message: problem });
+      }
+      const fullName = (req.body?.full_name ?? "").trim();
+      if (!fullName || fullName.length > 120) {
+        return reply.code(400).send({
+          code: "bad_name",
+          message: "A name is required — it appears on your events.",
+        });
+      }
+
+      const hash = await hashPassword(req.body!.password!);
+      // With no SMS and no email, this is the only self-service way back
+      // in. Shown once, here, and never readable again.
+      const recoveryCode = newRecoveryCode();
+
+      const created = await asAnon(async (db) => {
+        const [row] = await db`
+          insert into users
+            (phone, full_name, password_hash, recovery_code_hash, last_seen_at)
+          values (
+            ${phone}, ${fullName}, ${hash},
+            ${hashRecoveryCode(recoveryCode)}, now()
+          )
+          on conflict (phone) do nothing
+          returning id, full_name, phone, email`;
+        return row ?? null;
+      });
+
+      if (!created) {
+        return reply.code(409).send({
+          code: "phone_taken",
+          message:
+            "That number already has an account. Sign in instead, or ask whoever added you for your link.",
+        });
+      }
+
+      return reply.code(201).send({
+        access_token: app.jwt.sign({ sub: created.id }, { expiresIn: ACCESS_TTL_S }),
+        refresh_token: app.jwt.sign(
+          { sub: created.id, typ: "refresh" },
+          { expiresIn: 90 * 24 * 3600 },
+        ),
+        expires_in: ACCESS_TTL_S,
+        user: created,
+        recovery_code: recoveryCode,
+      });
+    },
+  );
+
+  /**
    * POST /public/staff-invites/:token/accept — an usher's whole sign-in.
    *
    * No SMS, no password. The organiser sent this link over WhatsApp to one
@@ -191,12 +269,97 @@ export async function authRoutes(
       }
       const userId = (req.user as { sub: string }).sub;
       const hash = await hashPassword(req.body!.password!);
-      return asUser(sqlRw, userId, async (db) => {
+      await asUser(sqlRw, userId, async (db) => {
         await db`update users set password_hash = ${hash} where id = ${userId}`;
-        return reply.code(204).send();
+      });
+      // Send AFTER the transaction, never inside it (STATE.md §5). Replying
+      // in the callback answers before the COMMIT, and a login arriving in
+      // that window is still accepted on the old password — which a flaky
+      // test caught doing exactly that.
+      return reply.code(204).send();
+    },
+  );
+
+  /**
+   * POST /auth/recovery-code — mint a fresh one and show it once.
+   *
+   * For an organiser who never wrote theirs down, or who has just used it.
+   * Replacing the old one is the point: two live codes would be two live
+   * keys to the same account.
+   */
+  app.post(
+    "/auth/recovery-code",
+    { preHandler: [app.authenticate] },
+    async (req) => {
+      const userId = (req.user as { sub: string }).sub;
+      const code = newRecoveryCode();
+      return asUser(sqlRw, userId, async (db) => {
+        await db`
+          update users set recovery_code_hash = ${hashRecoveryCode(code)}
+          where id = ${userId}`;
+        return { recovery_code: code };
       });
     },
   );
+
+  /**
+   * POST /auth/recovery/reset — phone plus recovery code, set a new
+   * password, and come back signed in.
+   *
+   * This is the whole self-service recovery story now that SMS is off. The
+   * code is spent and replaced in the same breath, so a screenshot of the
+   * old one is worthless afterwards, and the caller is told the new one.
+   */
+  app.post<{
+    Body: { phone?: string; recovery_code?: string; password?: string };
+  }>("/auth/recovery/reset", async (req, reply) => {
+    const phone = normalisePhone(req.body?.phone);
+    const code = normaliseRecoveryCode(req.body?.recovery_code);
+    const wrong = {
+      code: "recovery_invalid",
+      message: "That number and recovery code don't match.",
+    };
+
+    const problem = passwordProblem(req.body?.password);
+    if (problem) {
+      return reply.code(400).send({ code: "bad_password", message: problem });
+    }
+    if (!phone || code.length < 8) return reply.code(401).send(wrong);
+
+    const nextCode = newRecoveryCode();
+    const hash = await hashPassword(req.body!.password!);
+
+    const user = await asAnon(async (db) => {
+      // Matching on the hash means a wrong code never even names an
+      // account, so this cannot be used to discover which numbers exist.
+      const [row] = await db`
+        select id, full_name, phone, email from users
+        where phone = ${phone} and recovery_code_hash = ${hashRecoveryCode(code)}`;
+      if (!row) return null;
+
+      await db`
+        update users set
+          password_hash = ${hash},
+          recovery_code_hash = ${hashRecoveryCode(nextCode)},
+          last_seen_at = now()
+        where id = ${row.id}`;
+      return row;
+    });
+
+    if (!user) return reply.code(401).send(wrong);
+
+    return {
+      access_token: app.jwt.sign({ sub: user.id }, { expiresIn: ACCESS_TTL_S }),
+      refresh_token: app.jwt.sign(
+        { sub: user.id, typ: "refresh" },
+        { expiresIn: 90 * 24 * 3600 },
+      ),
+      expires_in: ACCESS_TTL_S,
+      user,
+      // The old one is gone; this replaces it.
+      recovery_code: nextCode,
+    };
+  });
 
   /**
    * POST /auth/password/login — phone and password, for organisers who set

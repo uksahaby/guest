@@ -81,7 +81,7 @@ export default async function LoginPage({
             {/* Never a dead end: OTP is the way back in from a forgotten
                 password, so it stays one tap away. */}
             <p className="sub" style={{ marginTop: 16, fontSize: 13 }}>
-              <a href="/login">Forgotten it? Get a code by text instead.</a>
+              <a href="/recover">Forgotten your password?</a>
             </p>
           </>
         ) : step === "phone" ? (
@@ -103,6 +103,8 @@ export default async function LoginPage({
         {!password && step === "phone" && (
           <p className="sub" style={{ marginTop: 16, fontSize: 13 }}>
             <a href="/login?mode=password">Sign in with a password instead</a>
+            {" · "}
+            <a href="/signup">Create an account</a>
           </p>
         )}
 

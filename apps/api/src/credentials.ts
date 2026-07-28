@@ -101,3 +101,40 @@ export function hashInviteToken(token: string): string {
 
 /** Long enough to survive "I'll do it tomorrow", short enough to expire. */
 export const INVITE_TTL_DAYS = 14;
+
+// ---- recovery codes -------------------------------------------------------
+
+/**
+ * The way back in when a password is forgotten and there is no SMS or
+ * email to fall back on. Shown once at signup, stored only as a hash, and
+ * rotated the moment it is spent.
+ *
+ * Grouped and lower-case because it gets written on paper and read back
+ * over a phone; the alphabet omits look-alike characters for the same
+ * reason.
+ */
+const RECOVERY_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
+
+export function newRecoveryCode(): string {
+  const bytes = randomBytes(16);
+  const chars = Array.from(bytes, (b) => RECOVERY_ALPHABET[b % RECOVERY_ALPHABET.length]);
+  return [
+    chars.slice(0, 4).join(""),
+    chars.slice(4, 8).join(""),
+    chars.slice(8, 12).join(""),
+    chars.slice(12, 16).join(""),
+  ].join("-");
+}
+
+/** Spaces, case and dashes are noise once it has been written down. */
+export function normaliseRecoveryCode(raw: unknown): string {
+  return typeof raw === "string"
+    ? raw.toLowerCase().replace(/[^a-z0-9]/g, "")
+    : "";
+}
+
+export function hashRecoveryCode(code: string): string {
+  return createHash("sha256")
+    .update(`${normaliseRecoveryCode(code)}:recovery:${env.jwtSecret}`)
+    .digest("hex");
+}
