@@ -42,6 +42,12 @@ export default async function WelcomePage({
         {sp.error === "save" && (
           <p className="form-error">That didn&rsquo;t save. Try again.</p>
         )}
+        {sp.error === "password" && (
+          <p className="form-error">
+            Your name was saved, but the password needs at least 10
+            characters. Set one from here again, or carry on without it.
+          </p>
+        )}
 
         <form action={saveName}>
           <input
@@ -54,6 +60,19 @@ export default async function WelcomePage({
             autoFocus
             required
           />
+          <input
+            className="field"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="Password (optional, 10+ characters)"
+            minLength={10}
+            maxLength={200}
+          />
+          <p className="sub" style={{ fontSize: 12.5, marginTop: -4 }}>
+            Set one and you can sign in without waiting for a text. Skip it
+            and we&rsquo;ll text you a code each time.
+          </p>
           <button className="primary" type="submit">
             Continue
           </button>

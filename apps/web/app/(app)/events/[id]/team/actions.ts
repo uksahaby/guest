@@ -95,3 +95,28 @@ export async function removeStaff(formData: FormData): Promise<void> {
   const { status } = await api(`/staff/${assignmentId}`, { method: "DELETE" });
   back(eventId, legId, status === 204 ? undefined : "failed");
 }
+
+/**
+ * A one-time sign-in link for this usher, to send over WhatsApp.
+ *
+ * The alternative to an SMS: it costs nothing, needs no provider account,
+ * and there is no password for one-day staff to forget. The link comes
+ * back once — we only store its hash — so it is carried in the redirect
+ * for the page to show and is never readable again.
+ */
+export async function makeInviteLink(formData: FormData): Promise<void> {
+  const eventId = String(formData.get("event_id") ?? "");
+  const legId = String(formData.get("leg_id") ?? "");
+  const assignmentId = String(formData.get("assignment_id") ?? "");
+
+  const { status, data } = await api<{ url?: string }>(
+    `/staff/${assignmentId}/invite`,
+    { method: "POST" },
+  );
+  if (status !== 201 || !data.url) back(eventId, legId, "invite_failed");
+
+  revalidatePath(`/events/${eventId}/team`);
+  redirect(
+    `/events/${eventId}/team?leg=${legId}&invite=${encodeURIComponent(data.url!)}`,
+  );
+}

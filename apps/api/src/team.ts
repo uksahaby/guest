@@ -1,5 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { asUser, sqlRw, type Db } from "./db.ts";
+import { env } from "./env.ts";
+import {
+  hashInviteToken,
+  newInviteToken,
+  INVITE_TTL_DAYS,
+} from "./credentials.ts";
 
 /**
  * Gates and the people on them.
@@ -398,6 +404,62 @@ export async function teamRoutes(app: FastifyInstance) {
       return out.code === 204
         ? reply.code(204).send()
         : reply.code(out.code).send(out.body);
+    },
+  );
+
+  /**
+   * POST /staff/:staffId/invite — a one-time sign-in link for this usher.
+   *
+   * The alternative to an SMS. The organiser shares it over WhatsApp, which
+   * is already how this product delivers everything and costs nothing, and
+   * the usher taps it. No password to forget, no reset flow, and nothing
+   * for casual staff to manage.
+   *
+   * Same trust model as a guest pass: the link IS the credential. It is
+   * single-use, expires, and issuing a new one kills any outstanding link
+   * for that assignment — which is also how an organiser revokes one sent
+   * to the wrong number.
+   */
+  app.post<{ Params: { staffId: string } }>(
+    "/staff/:staffId/invite",
+    { preHandler: [app.authenticate] },
+    async (req, reply) => {
+      const out = await asUser(sqlRw, uid(req), async (db): Promise<Sendable> => {
+        const [staff] = await db`
+          select id, user_id, leg_id from staff_assignments
+          where id = ${req.params.staffId}`;
+        if (!staff || !(await managesLeg(db, staff.leg_id))) return FORBIDDEN;
+
+        const token = newInviteToken();
+        const expiresAt = new Date(
+          Date.now() + INVITE_TTL_DAYS * 24 * 3600 * 1000,
+        );
+
+        // asUser already runs inside a transaction, so these two land
+        // together. One live link per assignment: re-issuing is how you
+        // take back a link that went to the wrong number.
+        await db`
+          update staff_invites set expires_at = now()
+          where user_id = ${staff.user_id} and leg_id = ${staff.leg_id}
+            and accepted_at is null and expires_at > now()`;
+        await db`
+          insert into staff_invites
+            (user_id, leg_id, token_hash, created_by, expires_at)
+          values (
+            ${staff.user_id}, ${staff.leg_id}, ${hashInviteToken(token)},
+            ${uid(req)}, ${expiresAt}
+          )`;
+
+        return {
+          code: 201,
+          body: {
+            // Shown once. We store only the hash, so it cannot be re-read.
+            url: `${env.webUrl}/join/${token}`,
+            expires_at: expiresAt.toISOString(),
+          },
+        };
+      });
+      return reply.code(out.code).send(out.body);
     },
   );
 }

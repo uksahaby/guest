@@ -8,6 +8,7 @@ import {
   removeStaff,
   updateGate,
   updateStaff,
+  makeInviteLink,
 } from "./actions";
 
 /**
@@ -62,7 +63,12 @@ export default async function TeamPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ leg?: string; error?: string; saved?: string }>;
+  searchParams: Promise<{
+    leg?: string;
+    error?: string;
+    saved?: string;
+    invite?: string;
+  }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -108,6 +114,7 @@ export default async function TeamPage({
 
       {sp.error && <p className="form-error">{ERRORS[sp.error] ?? ERRORS.failed}</p>}
       {sp.saved && !sp.error && <div className="plan-line">Saved.</div>}
+      {sp.invite && <InviteLink url={sp.invite} />}
 
       {staff.length > 0 && untested > 0 && (
         <div className="unassigned">
@@ -321,6 +328,14 @@ export default async function TeamPage({
                           </label>
                         </div>
                       </form>
+                      <form action={makeInviteLink} style={{ marginTop: 8 }}>
+                        <input type="hidden" name="event_id" value={id} />
+                        <input type="hidden" name="leg_id" value={leg.id} />
+                        <input type="hidden" name="assignment_id" value={s.id} />
+                        <button className="ghost" type="submit">
+                          Get sign-in link
+                        </button>
+                      </form>
                       <form action={removeStaff} style={{ marginTop: 8 }}>
                         <input type="hidden" name="event_id" value={id} />
                         <input type="hidden" name="leg_id" value={leg.id} />
@@ -425,5 +440,37 @@ export default async function TeamPage({
         </p>
       </div>
     </>
+  );
+}
+
+/**
+ * Shown once, straight after issuing. Only the hash is stored, so if the
+ * organiser navigates away without sending it they must issue another —
+ * which is the same thing as revoking the one they lost.
+ */
+function InviteLink({ url }: { url: string }) {
+  const message = `You're on the gate for this event. Tap to start checking guests in: ${url}`;
+  return (
+    <div className="unassigned">
+      <div>
+        <div className="t">Sign-in link ready — send it now</div>
+        <div className="s">
+          It works once, expires in 14 days, and is the only copy. Sending it
+          on WhatsApp costs nothing.
+        </div>
+        <div className="s" style={{ marginTop: 10, wordBreak: "break-all" }}>
+          <code>{url}</code>
+        </div>
+        <a
+          className="ghost"
+          style={{ display: "inline-block", marginTop: 12 }}
+          href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Send on WhatsApp
+        </a>
+      </div>
+    </div>
   );
 }

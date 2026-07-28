@@ -74,3 +74,31 @@ export async function signOut(): Promise<void> {
   (await cookies()).delete("jwt");
   redirect("/login");
 }
+
+/**
+ * Phone and password, for organisers who set one. OTP stays available and
+ * is the way back in when a password is forgotten — which is why the login
+ * page offers both rather than replacing one with the other.
+ */
+export async function signInWithPassword(formData: FormData): Promise<void> {
+  const phone = String(formData.get("phone") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  const res = await fetch(`${API_URL}/auth/password/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ phone, password }),
+  });
+  if (!res.ok) redirect("/login?mode=password&error=password");
+
+  const session = await res.json();
+  const jar = await cookies();
+  jar.set("jwt", session.access_token, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 30 * 24 * 3600,
+    path: "/",
+  });
+  if (!String(session.user?.full_name ?? "").trim()) redirect("/welcome");
+  redirect("/events");
+}

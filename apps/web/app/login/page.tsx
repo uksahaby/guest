@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { requestCode, verifyCode } from "./actions";
+import { requestCode, signInWithPassword, verifyCode } from "./actions";
 import "../(app)/org.css";
 
 /**
@@ -9,12 +9,13 @@ import "../(app)/org.css";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ step?: string; error?: string }>;
+  searchParams: Promise<{ step?: string; error?: string; mode?: string }>;
 }) {
   const sp = await searchParams;
   const jar = await cookies();
   if (jar.get("jwt")) redirect("/events");
 
+  const password = sp.mode === "password";
   const step = sp.step === "code" && jar.get("login_phone") ? "code" : "phone";
   const hint = jar.get("login_hint")?.value;
 
@@ -26,9 +27,11 @@ export default async function LoginPage({
         </div>
         <h1>{step === "phone" ? "Welcome back" : "Enter your code"}</h1>
         <p className="sub">
-          {step === "phone"
-            ? "Your phone number is your login. We'll text you a code."
-            : "We sent a six-digit code to your phone."}
+          {password
+            ? "Your phone number and password."
+            : step === "phone"
+              ? "Your phone number is your login. We'll text you a code."
+              : "We sent a six-digit code to your phone."}
         </p>
 
         {sp.error === "phone" && (
@@ -36,6 +39,11 @@ export default async function LoginPage({
         )}
         {sp.error === "code" && (
           <p className="form-error">That code didn&rsquo;t work. Try again.</p>
+        )}
+        {sp.error === "password" && (
+          <p className="form-error">
+            That phone number and password don&rsquo;t match.
+          </p>
         )}
         {sp.error === "sms" && (
           <p className="form-error">
@@ -46,7 +54,37 @@ export default async function LoginPage({
           <p className="form-error">Something went wrong. Try again.</p>
         )}
 
-        {step === "phone" ? (
+        {password ? (
+          <>
+            <form action={signInWithPassword}>
+              <input
+                className="field"
+                name="phone"
+                type="tel"
+                placeholder="+234 803 411 2098"
+                autoComplete="username"
+                autoFocus
+                required
+              />
+              <input
+                className="field"
+                name="password"
+                type="password"
+                placeholder="Password"
+                autoComplete="current-password"
+                required
+              />
+              <button className="primary" type="submit">
+                Sign in
+              </button>
+            </form>
+            {/* Never a dead end: OTP is the way back in from a forgotten
+                password, so it stays one tap away. */}
+            <p className="sub" style={{ marginTop: 16, fontSize: 13 }}>
+              <a href="/login">Forgotten it? Get a code by text instead.</a>
+            </p>
+          </>
+        ) : step === "phone" ? (
           <form action={requestCode}>
             <input
               className="field"
@@ -60,7 +98,15 @@ export default async function LoginPage({
               Send code
             </button>
           </form>
-        ) : (
+        ) : null}
+
+        {!password && step === "phone" && (
+          <p className="sub" style={{ marginTop: 16, fontSize: 13 }}>
+            <a href="/login?mode=password">Sign in with a password instead</a>
+          </p>
+        )}
+
+        {!password && step === "code" ? (
           <form action={verifyCode}>
             <input
               className="field code-field"
@@ -76,7 +122,7 @@ export default async function LoginPage({
               Sign in
             </button>
           </form>
-        )}
+        ) : null}
       </div>
     </div>
   );

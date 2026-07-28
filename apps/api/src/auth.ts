@@ -3,11 +3,26 @@ import type { FastifyInstance } from "fastify";
 import { asAnon, asUser, sqlRw } from "./db.ts";
 import { env } from "./env.ts";
 import type { SmsSender } from "./sms.ts";
+import {
+  hashInviteToken,
+  hashPassword,
+  passwordProblem,
+  verifyPassword,
+} from "./credentials.ts";
 
 /**
- * Phone-first OTP auth (architecture decision #7: phone is the primary
- * identifier, email optional everywhere; ushers are OTP-only and never
- * have a password).
+ * Three ways in, all keyed on the phone number (architecture decision #7:
+ * phone is the primary identifier, email optional everywhere).
+ *
+ *   OTP        — anyone. Needs a funded SMS account to work in production.
+ *   Invite link — ushers. The organiser shares it over WhatsApp; tapping it
+ *                is the whole sign-in. No SMS, no password, nothing for
+ *                one-day staff to manage or forget.
+ *   Password   — organisers who set one. Optional, never issued by anyone
+ *                else, and OTP stays the way back in when it is forgotten.
+ *
+ * Ushers still have no password, which is the part of decision #7 that
+ * mattered. What changed is that they no longer need an SMS either.
  *
  * These routes run through asAnon: the login path has no user context yet,
  * so users and auth_otp_codes are the two tables deliberately left out of
@@ -107,6 +122,130 @@ export async function authRoutes(
       ...(env.isDev && sms.echoesCodes ? { dev_code: outcome.code } : {}),
     });
   });
+
+  /**
+   * POST /public/staff-invites/:token/accept — an usher's whole sign-in.
+   *
+   * No SMS, no password. The organiser sent this link over WhatsApp to one
+   * phone number; tapping it is the proof, exactly as a guest pass link is
+   * proof for a guest. Single use, so a forwarded link is spent.
+   */
+  app.post<{ Params: { token: string } }>(
+    "/public/staff-invites/:token/accept",
+    async (req, reply) => {
+      const raw = req.params.token ?? "";
+      const dead = {
+        code: "invite_invalid",
+        message: "This link has expired or has already been used. Ask the organiser for a new one.",
+      };
+      // Garbage, expired, spent and forged all read the same, so the link
+      // cannot be probed for which staff exist.
+      if (raw.length < 20) return reply.code(404).send(dead);
+
+      const session = await asAnon(async (db) => {
+        const [invite] = await db`
+          select id, user_id, leg_id from staff_invites
+          where token_hash = ${hashInviteToken(raw)}
+            and accepted_at is null and expires_at > now()`;
+        if (!invite) return null;
+
+        // Spend it, and only then hand out a session.
+        await db`update staff_invites set accepted_at = now() where id = ${invite.id}`;
+        await db`update users set last_seen_at = now() where id = ${invite.user_id}`;
+
+        const [user] = await db`
+          select id, full_name, phone, email from users where id = ${invite.user_id}`;
+        return user ? { user, legId: invite.leg_id } : null;
+      });
+
+      if (!session) return reply.code(404).send(dead);
+
+      return {
+        access_token: app.jwt.sign({ sub: session.user.id }, { expiresIn: ACCESS_TTL_S }),
+        refresh_token: app.jwt.sign(
+          { sub: session.user.id, typ: "refresh" },
+          { expiresIn: 90 * 24 * 3600 },
+        ),
+        expires_in: ACCESS_TTL_S,
+        user: session.user,
+        // So the web can drop them straight on the gate they were invited to.
+        leg_id: session.legId,
+      };
+    },
+  );
+
+  /**
+   * POST /auth/password — set or change your own password.
+   *
+   * Only ever your own: an organiser choosing a password for someone else
+   * means the organiser knows their credential, which is the thing the
+   * invite links exist to avoid.
+   */
+  app.post<{ Body: { password?: string } }>(
+    "/auth/password",
+    { preHandler: [app.authenticate] },
+    async (req, reply) => {
+      const problem = passwordProblem(req.body?.password);
+      if (problem) {
+        return reply.code(400).send({ code: "bad_password", message: problem });
+      }
+      const userId = (req.user as { sub: string }).sub;
+      const hash = await hashPassword(req.body!.password!);
+      return asUser(sqlRw, userId, async (db) => {
+        await db`update users set password_hash = ${hash} where id = ${userId}`;
+        return reply.code(204).send();
+      });
+    },
+  );
+
+  /**
+   * POST /auth/password/login — phone and password, for organisers who set
+   * one. OTP still works and is the way back in when a password is
+   * forgotten, which is why this never became the only door.
+   */
+  app.post<{ Body: { phone?: string; password?: string } }>(
+    "/auth/password/login",
+    async (req, reply) => {
+      const phone = normalisePhone(req.body?.phone);
+      const password = req.body?.password;
+      const wrong = {
+        code: "invalid_login",
+        message: "That phone number and password don't match.",
+      };
+      if (!phone || typeof password !== "string" || password.length === 0) {
+        return reply.code(401).send(wrong);
+      }
+
+      const user = await asAnon(async (db) => {
+        const [row] = await db`
+          select id, full_name, phone, email, password_hash
+          from users where phone = ${phone}`;
+        // Hash even when there is no such user, so the response time does
+        // not say which numbers have accounts.
+        const ok = await verifyPassword(password, row?.password_hash ?? null);
+        if (!ok || !row) return null;
+        await db`update users set last_seen_at = now() where id = ${row.id}`;
+        return row;
+      });
+
+      if (!user) return reply.code(401).send(wrong);
+
+      return {
+        access_token: app.jwt.sign({ sub: user.id }, { expiresIn: ACCESS_TTL_S }),
+        refresh_token: app.jwt.sign(
+          { sub: user.id, typ: "refresh" },
+          { expiresIn: 90 * 24 * 3600 },
+        ),
+        expires_in: ACCESS_TTL_S,
+        user: {
+          id: user.id,
+          full_name: user.full_name,
+          phone: user.phone,
+          email: user.email,
+        },
+      };
+    },
+  );
 
   app.post<{ Body: { phone?: string; code?: string } }>("/auth/otp/verify", async (req, reply) => {
     const phone = normalisePhone(req.body?.phone);
