@@ -4,7 +4,7 @@ Companion to `HANDOFF.md`, which remains the source of truth for *why*
 anything is the way it is. This file records *what exists*, what doesn't,
 and what will bite whoever picks it up next — including me, later.
 
-Written 26 July 2026 · branch `main` · 29 commits · **nothing deployed**.
+Written 26–28 July 2026 · branch `main` · 43 commits · **nothing deployed**.
 
 ---
 
@@ -14,21 +14,29 @@ Written 26 July 2026 · branch `main` · 29 commits · **nothing deployed**.
 # Postgres 17 running locally, trust auth for the postgres user.
 psql -U postgres -h localhost -c "create database guest_dev"
 psql -U postgres -h localhost -d guest_dev -f spec/schema-v1.sql
-for f in db/migrations/*.sql; do psql -U postgres -h localhost -d guest_dev -f "$f"; done
 
 npm install                                   # workspace root
 cp apps/api/.env.example apps/api/.env
+npm run migrate --workspace api               # applies db/migrations, tracked
 npx tsx apps/api/scripts/seed-demo.ts         # prints working guest URLs
 
 npm run start --workspace api                 # :3001
 npm run dev   --workspace web                 # :3000
 ```
 
-Sign in at `http://localhost:3000/login` as `+2348030000001` (organiser) or
-`+2348030000002` (usher). **The OTP is printed on the login page in dev** —
-with `TERMII_API_KEY` unset the API falls back to a `LogSender` and returns
-the code as `dev_code`. Set the key and both the log line and `dev_code`
-stop; see §5 *SMS*.
+**No SMS provider is needed, for anything.** Three ways in:
+
+- **Organisers** create an account at `/signup` with a phone number and a
+  password, and get a recovery code shown once. Forgotten password →
+  `/recover`. Lost both → `npx tsx scripts/reset-password.ts +234…`, which
+  is deliberately not an API endpoint.
+- **Ushers** never type anything: the organiser hits *Get sign-in link* on
+  the Team page and sends it over WhatsApp. One tap lands them on the gate.
+- **OTP** still works and is now just a third door. With `TERMII_API_KEY`
+  unset the code is printed on the login page in dev.
+
+The seeded accounts are `+2348030000001` (organiser) and `+2348030000002`
+(usher).
 
 `.claude/launch.json` defines both servers for the Browser pane.
 
@@ -51,9 +59,10 @@ re-triggers the "Allow USB debugging?" prompt on the handset.
 ### Tests
 
 ```bash
-npm test --workspace api            # 220
+npm test --workspace api            # 285
 npm test --workspace checkin-core   # 40
-cd apps/scanner && flutter test     # 74
+npm test --workspace web            # 3  (the QR decoder, pinned)
+cd apps/scanner && flutter test     # 89
 ```
 
 Tests rebuild a disposable `guest_test` from `spec/schema-v1.sql` plus every
@@ -66,11 +75,11 @@ could never be cleaned out.
 ## 2. Shape
 
 ```
-apps/api        Fastify 5 + postgres.js (raw SQL, no ORM)   ~9,900 lines · 220 tests
-apps/web        Next.js 16 App Router                        ~6,500 lines · 15 pages
-apps/scanner    Flutter 3.44 + drift + mobile_scanner         ~6,400 lines ·  74 tests
+apps/api        Fastify 5 + postgres.js (raw SQL, no ORM)  ~11,900 lines · 285 tests
+apps/web        Next.js 16 App Router                        ~8,300 lines · 20 pages
+apps/scanner    Flutter 3.44 + drift + mobile_scanner         ~7,500 lines ·  89 tests
 packages/checkin-core   the handoff's own state machine                    ·  40 tests
-db/migrations   8 migrations layered on spec/schema-v1.sql
+db/migrations   10 migrations layered on spec/schema-v1.sql
 spec/           untouched handoff artefacts — schema, OpenAPI, architecture
 design/mockups/ untouched; the dashboard copies their tokens by hand
 ```
@@ -82,13 +91,15 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /auth/otp/request` · `POST /auth/otp/verify` · `GET/PATCH /me` |
+| Auth | `POST /auth/signup` · `POST /auth/password/login` · `POST /auth/password` · `POST /auth/recovery-code` · `POST /auth/recovery/reset` · `POST /auth/otp/request` · `POST /auth/otp/verify` · `GET/PATCH /me` |
+| Usher access | `POST /staff/:id/invite` (organiser) · `POST /public/staff-invites/:token/accept` |
 | Events | `GET/POST /events` · `GET/PATCH/DELETE /events/:id` · `GET /events/:id/settings` · `POST /events/:id/reissue-passes` · `PATCH /legs/:id` |
 | Guest list | `GET/POST /events/:id/invitations` · `POST /events/:id/invitations/import` · `PUT/DELETE /invitations/:id/legs/:legId` |
 | Sending | `POST /events/:id/delivery-links` (wa.me — **the billing gate**) |
 | Gates & team | `GET/POST /legs/:id/entrances` · `PATCH/DELETE /entrances/:id` · `GET/POST /legs/:id/staff` · `PATCH/DELETE /staff/:id` |
 | Seating | `GET/POST /legs/:id/tables` · `PATCH/DELETE /tables/:id` · `GET /legs/:id/unseated` |
 | Gate | `GET /scanner/assignments` · `GET /scanner/legs/:id/bootstrap` · `POST /scanner/legs/:id/test` · `POST /scanner/check-ins` |
+| Web scanner | `POST /scanner/legs/:id/scan` (server decides) · `GET /scanner/legs/:id/guests` · `POST /scanner/legs/:id/walk-ins` |
 | Live | `GET /legs/:id/attendance` · `GET /legs/:id/live` · `GET /legs/:id/stream` (SSE) |
 | Reports | `GET /events/:id/report` (+ `?format=csv`) |
 | Money | `GET /events/:id/billing` · `POST /events/:id/checkout` · `POST /webhooks/paystack` |
@@ -96,11 +107,16 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 
 ### Web pages
 
-`/` marketing · `/login` · `/welcome` name yourself ·
-`/i/[token]` guest invitation · `/events` ·
-`/events/[id]` countdown home · `…/guests` · `…/guests/import` ·
+**Organiser** `/` marketing · `/signup` · `/login` · `/recover` ·
+`/welcome` name yourself · `/welcome/recovery` the code, shown once ·
+`/events` · `/events/[id]` countdown home · `…/guests` · `…/guests/import` ·
 `…/guests/[invId]/link` · `…/tables` · `…/team` · `…/live` · `…/report`
 (+ `/export`) · `…/billing` · `…/settings`
+
+**Usher** `/join/[token]` the invite link · `/scan` gates · `/scan/[legId]`
+the web scanner
+
+**Guest** `/i/[token]` invitation and pass
 
 ---
 
@@ -123,11 +139,31 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 - **`decide()` is never reimplemented.** TS in `packages/checkin-core`,
   ported once to Dart, with a pinned cross-language token vector
   (`apps/scanner/test/token_interop_test.dart`). If those two disagree,
-  both are wrong.
+  both are wrong. This is why the **web scanner is a dumb terminal**: it
+  posts the raw QR string to `POST /scanner/legs/:id/scan` and renders what
+  comes back, rather than becoming a third implementation. The cost is that
+  it only works online, which is the honest trade for a fallback aimed at
+  staff who turned up having installed nothing.
 - **Prices live only in `apps/api/src/plans.ts`.** Checkout names a *plan*,
   never an amount.
 - **Only a signed webhook upgrades a plan**, and it re-checks the amount
   against our own quoted row.
+- **No feature depends on SMS.** Organisers use a password and a recovery
+  code; ushers use a one-time invite link the organiser sends over
+  WhatsApp; guest invitations were always WhatsApp deep links. OTP is one
+  door among three. The phone number is consequently *unverified* — the
+  trade that makes it safe is that a number alone grants nothing: gate
+  access needs the link, and an organiser owns only what they create.
+  Signup refuses a number that already has an account, so it can never take
+  over an usher's password-less record.
+- **Nobody sets anybody else's password.** An organiser knowing an usher's
+  credential is exactly what the invite links exist to avoid, so there is
+  no route that does it. Support recovery is a script with database access,
+  never an endpoint.
+- **A walk-in becomes a real household**, not a bare log row: an invitation
+  flagged `is_walk_in`, an entitlement at that leg, and a pass. That is
+  what lets someone who steps out be scanned back in, and what puts them in
+  `billable_people` — admit now, flag it, invoice after.
 - **`dev_code` is gated on the sender, not on `NODE_ENV`.** `SmsSender`
   carries `echoesCodes`, and only a sender that genuinely delivers nothing
   sets it. A staging box with `NODE_ENV` unset and a real Termii key must
@@ -147,65 +183,63 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 
 ### Blocks a real wedding
 
-1. **SMS is built, but has never sent a real message.** The code is done
-   (`apps/api/src/sms.ts`, 13 tests in `sms.test.ts`) and the whole design
-   below is implemented; what is missing is a Termii account. Nobody has
-   watched a code land on a handset, and the sender ID has not been
-   registered. Until someone does, treat delivery as unproven — the
-   provider contract is pinned by tests against a stubbed `fetch`, which
-   proves the payload shape and nothing about Termii's behaviour.
-   - **Still to do by hand:** open a Termii account, fund it, register a
-     sender ID (or use their pre-approved `N-Alert`), set `TERMII_API_KEY`,
-     then send one real code to a real Nigerian number — ideally one on the
-     DND list.
-2. **The scanner has run on a phone — but has never read a real QR code.**
-   Verified 26 July 2026 on a Xiaomi 23106RN0DA, Android 14, arm64, against
-   the API over `adb reverse`. What is now proven on hardware: build and
-   install, OTP login, camera preview and the runtime permission prompt,
-   bootstrap into drift, offline search, manual check-in reaching Postgres
-   with a real `device_id`, the offline queue, and reconnect sync. Release
-   APK builds and its merged manifest carries `CAMERA` and `INTERNET` (both
-   arrive from plugins; the app's own manifest declares neither).
-   - **Still unproven: the decode path.** Every check-in in that session
-     went through *Search by name*. No QR has been put in front of the lens,
-     so `mobile_scanner` reading a real pass — focus, low light, a phone
-     screen behind glass, a printed card at a Lagos reception — is still
-     untested. That is now the highest-risk unknown.
-   - **No error path for a denied camera.** `MobileScanner` is constructed
-     with no `errorBuilder` (`scan_screen.dart` ~line 260), so an usher who
-     taps Deny gets the plugin's own bare error box and no route to
-     settings.
-3. **Scanner gaps.** "Add walk-in" and "Call manager" dismiss without doing
-   anything (`apps/scanner/lib/ui/scan_screen.dart` ~line 193); the "Recent"
-   button does nothing; no audio tones (phase-4c §5 specifies sound, we ship
-   haptics only); no undo from a recent list. **A walk-in also needs an API
-   endpoint — it doesn't exist.** Two more found on the device: a back-press
-   on the scan screen drops the usher out of the leg entirely with no
-   confirm, even mid-result; and the app installs under the label
-   `scanner` (`android:label`, never set).
-4. **Deployment — ready, but nowhere.** The code side is done and
-   `DEPLOY.md` is the runbook: CI runs all three suites, there is a
-   Dockerfile, and `npm run migrate --workspace api` applies migrations
-   one transaction at a time with checksums. The API boots under
+1. **Nothing is deployed.** The code side is done and `DEPLOY.md` is the
+   runbook: CI runs every suite, there is a Dockerfile, and
+   `npm run migrate --workspace api` applies migrations one transaction at
+   a time with checksums and refuses an edited one. The API boots under
    `NODE_ENV=production`, binds `0.0.0.0`, logs JSON with phone numbers
-   redacted, and refuses to start on a missing RLS role URL or a missing
-   SMS provider.
-   - **What is missing is accounts:** a Postgres instance, Railway/Fly,
-     Vercel, Paystack test keys, a funded Termii sender ID, a domain.
-     Nothing has run against a real host.
+   redacted, and refuses to start on a missing RLS role URL.
+   - **What is missing is accounts**, which is a different kind of blocked:
+     a Postgres instance, Railway/Fly, Vercel, Paystack test keys, a
+     domain. No SMS provider is needed for any of it.
    - Still nothing for **backups, error monitoring, uptime checks or rate
      limiting**, and CI deploys nothing.
-5. **Event creation is one thin form.** The setup mockup has five steps
+2. **Payments have never met real Paystack.** Everything so far is the
+   offline `StubProvider`; the signed-webhook path is tested against our
+   own signature, never theirs.
+3. **No audio at the gate.** phase-4c §5 specifies sound and we ship
+   haptics only — which a phone can have switched off system-wide, so a
+   refusal can be both silent and, in a pocket, invisible. The last item on
+   the scanner's own list.
+4. **Event creation is one thin form.** The setup mockup has five steps
    (details, venue, guests & entry, tables, review).
+5. **Small scanner gaps found on the device.** A back-press on the scan
+   screen drops the usher out of the leg with no confirm, even mid-result;
+   the app installs under the label `scanner` (`android:label`, never set);
+   and `MobileScanner` has no `errorBuilder`, so an usher who denies the
+   camera gets the plugin's bare error box and no route to settings.
+
+### Proven on hardware
+
+A Xiaomi 23106RN0DA, Android 14, arm64, over `adb reverse` — 26–28 July.
+Everything below was watched happening, not inferred:
+
+- A **real QR read off a monitor**, with the phone **unplugged**: decoded
+  and its HMAC verified against signing keys read from disk, six admitted
+  into the offline queue, synced on reconnect. This was the project's
+  longest-standing unknown.
+- **Offline from a cold start** — app killed, no network: gate list from
+  cache, leg opened from cache, guest admitted, queue drained later with
+  the gate's own `scanned_at` times preserved.
+- **Overflow, undo and reversal pairing**, including two admissions undone
+  and netting back to the invited count. Nothing deleted.
+- **Walk-ins**, **Recent with undo after the fact**, and **Call manager**
+  firing a `tel:` intent that Android offered to Phone/Truecaller/Zoom.
+- The **web scanner** end to end in a browser: gate list, search, count
+  prompt, manual admission landing as `device_id = 'web'`.
+- **Sign-up, password login and recovery-code reset**, with the old
+  password dead and the spent code refused.
 
 ### Wanted before charging strangers
 
-Web scanner fallback (the handoff calls it two days that "saves an event" —
-casual staff arrive having installed nothing) · super admin's three screens ·
-guest-page accessibility and performance pass · rate limiting on public
-endpoints · error monitoring (logs are structured now) · PDF report · email as a
-delivery channel · Paystack **live** keys (`StubProvider` refuses to run in
-production).
+~~Web scanner fallback~~ (built — `/scan`, online-only by design) · super
+admin's three screens · guest-page accessibility and performance pass ·
+**rate limiting on public endpoints** (nothing throttles signup, password
+login or recovery — the most obviously missing thing now that those exist)
+· error monitoring (logs are structured now) · PDF report · email as a
+delivery channel and as a second recovery path · undo and a recent list in
+the *web* scanner (the app has both; the web one has neither) · Paystack
+**live** keys (`StubProvider` refuses to run in production).
 
 ### Deferred by the handoff itself — not oversights
 
@@ -234,7 +268,13 @@ tests written the way a bug would write them — keep them passing.
 **Never `reply.send()` inside `asUser`/`asPass` on a write path.** The
 response goes out before COMMIT, so a client can be told "created" and then
 read back nothing. Return a value (or `{code, body}`) and send after.
-Documented on `asUser` in `db.ts`; it already caused one real bug.
+Documented on `asUser` in `db.ts`.
+
+It has now caused two real bugs. The second, on 28 July, was
+`POST /auth/password` answering 204 before the COMMIT — a login arriving in
+that window was still accepted on the *old* password. It surfaced as a
+**flaky** test, which is the only reason it was caught; a test that fails
+one run in six is a finding, not noise.
 
 **Two Postgres policy traps, both already hit:**
 - Policies on two tables referencing each other is mutual recursion
@@ -257,6 +297,9 @@ the dependable signal — `req.raw`'s doesn't reliably fire, and a leaked
 subscription grows all through event day. Enrichment must be serialised per
 connection or rapid scans render out of order. Both fixed in `live.ts`.
 
+The next two only matter **if** someone turns SMS on; nothing requires it
+now. They are kept because both fail silently.
+
 **Termii's `channel` is not cosmetic.** A large share of Nigerian numbers
 sit on the Do-Not-Disturb list. On the `generic` route Termii accepts the
 message, answers `code: "ok"`, and never delivers it — there is no error to
@@ -269,6 +312,19 @@ rate-limit reads the newest row for the phone *regardless of `consumed_at`*,
 so a consumed row would lock the user out for 30 seconds over our outage.
 That delete needed a new grant (`db/migrations/007_otp_delete.sql`) —
 `app_rw` had select/insert/update on `auth_otp_codes` and nothing more.
+
+**A paused Flutter app returns stale screenshots.** `adb exec-out screencap`
+on a backgrounded or idle app gives the last frame it drew while the
+status-bar clock keeps advancing — so it reads exactly like a hang. Minutes
+went into a "frozen" leg-open that was nothing of the sort; on a clean start
+it opened in under four seconds. Wake the device before believing a
+screenshot.
+
+**Restart the API after adding a route OR changing a payload.** The note
+below covers new routes; the subtler version is a *field* added to an
+existing response. "Call manager" did nothing on the phone because the
+running server predated the change and simply omitted `manager_phone`. Curl
+the endpoint before debugging the client.
 
 **Grants on `events` are per-column, so a new column is invisible until
 granted.** Reading `events.status` from the guest page and the scanner
@@ -315,20 +371,36 @@ hot-reload new registrations, and the symptom is a confusing 404.
 
 ## 6. Suggested order
 
-1. ~~SMS~~ — built. Left to do: a Termii account and one real delivery (§4.1).
-2. ~~Scanner on a real device~~ — done, and it paid for itself (§4.2).
-   What remains is **putting a real QR in front of the lens**; do that
-   before building walk-in, Recent and audio on top of it.
-3. ~~Cancellation + onboarding~~ — done; the UI no longer promises more
-   than it does.
-4. **Deploy to staging** with Paystack test keys.
-5. Web scanner fallback → setup wizard → super admin.
+1. ~~SMS~~ · ~~scanner on a real device~~ · ~~the QR read~~ ·
+   ~~cancellation + onboarding~~ · ~~web scanner fallback~~ · ~~walk-ins~~ ·
+   ~~Recent and undo~~ · ~~Call manager~~ — all done, and where it matters
+   watched working on a handset.
+2. **Deploy to staging.** Needs accounts and nothing else; no messaging
+   provider is involved. `DEPLOY.md` is the runbook.
+3. **A real run-through** on that box with a real guest list and a real
+   WhatsApp send — the first time any of this meets a real person.
+4. **Rate limiting** before strangers can reach it: signup, password login
+   and recovery are all unthrottled.
+5. Audio at the gate → setup wizard → super admin.
 
 ---
 
 ## 7. Commit history
 
 ```
+b3e5612  "Call manager" has somebody to call
+558a8a1  recent list, and undo after the fact
+95579f8  SMS recorded as optional
+166cbac  sign up and recover with no SMS
+88a2e6c  usher invite links, organiser passwords
+00a4ac6  walk-ins in the scanner, with no signal
+1879684  walk-ins: endpoint and web scanner
+2326e34  name the server the scanner could not reach
+807da54  QR decoding without BarcodeDetector
+14311ff  the web scanner fallback
+8ca27ae  a scan decided on the server
+1f7d7ba  STATE.md on deployment
+5531643  STATE.md: cancellation and onboarding
 b2b6605  ask an organiser their name
 d0c7b01  cancelling an event actually cancels it
 2c84380  STATE.md after the first hardware run
