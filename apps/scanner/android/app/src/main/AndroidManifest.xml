@@ -41,5 +41,12 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Android 11+ hides other apps unless they are declared here.
+             Without this, "Call manager" silently resolves to nothing and
+             the dialler never opens. -->
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
     </queries>
 </manifest>

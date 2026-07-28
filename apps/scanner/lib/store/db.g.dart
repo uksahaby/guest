@@ -1620,6 +1620,17 @@ class $LegMetaTable extends LegMeta with TableInfo<$LegMetaTable, LegMetaData> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _managerPhoneMeta = const VerificationMeta(
+    'managerPhone',
+  );
+  @override
+  late final GeneratedColumn<String> managerPhone = GeneratedColumn<String>(
+    'manager_phone',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _syncedAtMeta = const VerificationMeta(
     'syncedAt',
   );
@@ -1640,6 +1651,7 @@ class $LegMetaTable extends LegMeta with TableInfo<$LegMetaTable, LegMetaData> {
     requireRsvp,
     allowWalkins,
     cancelled,
+    managerPhone,
     syncedAt,
   ];
   @override
@@ -1717,6 +1729,15 @@ class $LegMetaTable extends LegMeta with TableInfo<$LegMetaTable, LegMetaData> {
         cancelled.isAcceptableOrUnknown(data['cancelled']!, _cancelledMeta),
       );
     }
+    if (data.containsKey('manager_phone')) {
+      context.handle(
+        _managerPhoneMeta,
+        managerPhone.isAcceptableOrUnknown(
+          data['manager_phone']!,
+          _managerPhoneMeta,
+        ),
+      );
+    }
     if (data.containsKey('synced_at')) {
       context.handle(
         _syncedAtMeta,
@@ -1762,6 +1783,10 @@ class $LegMetaTable extends LegMeta with TableInfo<$LegMetaTable, LegMetaData> {
         DriftSqlType.bool,
         data['${effectivePrefix}cancelled'],
       )!,
+      managerPhone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}manager_phone'],
+      ),
       syncedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}synced_at'],
@@ -1788,6 +1813,11 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
   /// page promises the guest that passes stop working, not that they stop
   /// working when the scanner happens to have signal.
   final bool cancelled;
+
+  /// Who "Call manager" dials. Carried offline for the same reason as
+  /// everything else here: the moment an usher needs it is the moment the
+  /// signal has gone.
+  final String? managerPhone;
   final DateTime syncedAt;
   const LegMetaData({
     required this.legId,
@@ -1797,6 +1827,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     required this.requireRsvp,
     required this.allowWalkins,
     required this.cancelled,
+    this.managerPhone,
     required this.syncedAt,
   });
   @override
@@ -1809,6 +1840,9 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     map['require_rsvp'] = Variable<bool>(requireRsvp);
     map['allow_walkins'] = Variable<bool>(allowWalkins);
     map['cancelled'] = Variable<bool>(cancelled);
+    if (!nullToAbsent || managerPhone != null) {
+      map['manager_phone'] = Variable<String>(managerPhone);
+    }
     map['synced_at'] = Variable<DateTime>(syncedAt);
     return map;
   }
@@ -1822,6 +1856,9 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
       requireRsvp: Value(requireRsvp),
       allowWalkins: Value(allowWalkins),
       cancelled: Value(cancelled),
+      managerPhone: managerPhone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(managerPhone),
       syncedAt: Value(syncedAt),
     );
   }
@@ -1839,6 +1876,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
       requireRsvp: serializer.fromJson<bool>(json['requireRsvp']),
       allowWalkins: serializer.fromJson<bool>(json['allowWalkins']),
       cancelled: serializer.fromJson<bool>(json['cancelled']),
+      managerPhone: serializer.fromJson<String?>(json['managerPhone']),
       syncedAt: serializer.fromJson<DateTime>(json['syncedAt']),
     );
   }
@@ -1853,6 +1891,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
       'requireRsvp': serializer.toJson<bool>(requireRsvp),
       'allowWalkins': serializer.toJson<bool>(allowWalkins),
       'cancelled': serializer.toJson<bool>(cancelled),
+      'managerPhone': serializer.toJson<String?>(managerPhone),
       'syncedAt': serializer.toJson<DateTime>(syncedAt),
     };
   }
@@ -1865,6 +1904,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     bool? requireRsvp,
     bool? allowWalkins,
     bool? cancelled,
+    Value<String?> managerPhone = const Value.absent(),
     DateTime? syncedAt,
   }) => LegMetaData(
     legId: legId ?? this.legId,
@@ -1874,6 +1914,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     requireRsvp: requireRsvp ?? this.requireRsvp,
     allowWalkins: allowWalkins ?? this.allowWalkins,
     cancelled: cancelled ?? this.cancelled,
+    managerPhone: managerPhone.present ? managerPhone.value : this.managerPhone,
     syncedAt: syncedAt ?? this.syncedAt,
   );
   LegMetaData copyWithCompanion(LegMetaCompanion data) {
@@ -1891,6 +1932,9 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
           ? data.allowWalkins.value
           : this.allowWalkins,
       cancelled: data.cancelled.present ? data.cancelled.value : this.cancelled,
+      managerPhone: data.managerPhone.present
+          ? data.managerPhone.value
+          : this.managerPhone,
       syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
     );
   }
@@ -1905,6 +1949,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
           ..write('requireRsvp: $requireRsvp, ')
           ..write('allowWalkins: $allowWalkins, ')
           ..write('cancelled: $cancelled, ')
+          ..write('managerPhone: $managerPhone, ')
           ..write('syncedAt: $syncedAt')
           ..write(')'))
         .toString();
@@ -1919,6 +1964,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
     requireRsvp,
     allowWalkins,
     cancelled,
+    managerPhone,
     syncedAt,
   );
   @override
@@ -1932,6 +1978,7 @@ class LegMetaData extends DataClass implements Insertable<LegMetaData> {
           other.requireRsvp == this.requireRsvp &&
           other.allowWalkins == this.allowWalkins &&
           other.cancelled == this.cancelled &&
+          other.managerPhone == this.managerPhone &&
           other.syncedAt == this.syncedAt);
 }
 
@@ -1943,6 +1990,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
   final Value<bool> requireRsvp;
   final Value<bool> allowWalkins;
   final Value<bool> cancelled;
+  final Value<String?> managerPhone;
   final Value<DateTime> syncedAt;
   final Value<int> rowid;
   const LegMetaCompanion({
@@ -1953,6 +2001,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     this.requireRsvp = const Value.absent(),
     this.allowWalkins = const Value.absent(),
     this.cancelled = const Value.absent(),
+    this.managerPhone = const Value.absent(),
     this.syncedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1964,6 +2013,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     required bool requireRsvp,
     required bool allowWalkins,
     this.cancelled = const Value.absent(),
+    this.managerPhone = const Value.absent(),
     required DateTime syncedAt,
     this.rowid = const Value.absent(),
   }) : legId = Value(legId),
@@ -1981,6 +2031,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     Expression<bool>? requireRsvp,
     Expression<bool>? allowWalkins,
     Expression<bool>? cancelled,
+    Expression<String>? managerPhone,
     Expression<DateTime>? syncedAt,
     Expression<int>? rowid,
   }) {
@@ -1992,6 +2043,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
       if (requireRsvp != null) 'require_rsvp': requireRsvp,
       if (allowWalkins != null) 'allow_walkins': allowWalkins,
       if (cancelled != null) 'cancelled': cancelled,
+      if (managerPhone != null) 'manager_phone': managerPhone,
       if (syncedAt != null) 'synced_at': syncedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2005,6 +2057,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     Value<bool>? requireRsvp,
     Value<bool>? allowWalkins,
     Value<bool>? cancelled,
+    Value<String?>? managerPhone,
     Value<DateTime>? syncedAt,
     Value<int>? rowid,
   }) {
@@ -2016,6 +2069,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
       requireRsvp: requireRsvp ?? this.requireRsvp,
       allowWalkins: allowWalkins ?? this.allowWalkins,
       cancelled: cancelled ?? this.cancelled,
+      managerPhone: managerPhone ?? this.managerPhone,
       syncedAt: syncedAt ?? this.syncedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -2045,6 +2099,9 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
     if (cancelled.present) {
       map['cancelled'] = Variable<bool>(cancelled.value);
     }
+    if (managerPhone.present) {
+      map['manager_phone'] = Variable<String>(managerPhone.value);
+    }
     if (syncedAt.present) {
       map['synced_at'] = Variable<DateTime>(syncedAt.value);
     }
@@ -2064,6 +2121,7 @@ class LegMetaCompanion extends UpdateCompanion<LegMetaData> {
           ..write('requireRsvp: $requireRsvp, ')
           ..write('allowWalkins: $allowWalkins, ')
           ..write('cancelled: $cancelled, ')
+          ..write('managerPhone: $managerPhone, ')
           ..write('syncedAt: $syncedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3559,6 +3617,7 @@ typedef $$LegMetaTableCreateCompanionBuilder =
       required bool requireRsvp,
       required bool allowWalkins,
       Value<bool> cancelled,
+      Value<String?> managerPhone,
       required DateTime syncedAt,
       Value<int> rowid,
     });
@@ -3571,6 +3630,7 @@ typedef $$LegMetaTableUpdateCompanionBuilder =
       Value<bool> requireRsvp,
       Value<bool> allowWalkins,
       Value<bool> cancelled,
+      Value<String?> managerPhone,
       Value<DateTime> syncedAt,
       Value<int> rowid,
     });
@@ -3616,6 +3676,11 @@ class $$LegMetaTableFilterComposer
 
   ColumnFilters<bool> get cancelled => $composableBuilder(
     column: $table.cancelled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get managerPhone => $composableBuilder(
+    column: $table.managerPhone,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3669,6 +3734,11 @@ class $$LegMetaTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get managerPhone => $composableBuilder(
+    column: $table.managerPhone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get syncedAt => $composableBuilder(
     column: $table.syncedAt,
     builder: (column) => ColumnOrderings(column),
@@ -3710,6 +3780,11 @@ class $$LegMetaTableAnnotationComposer
 
   GeneratedColumn<bool> get cancelled =>
       $composableBuilder(column: $table.cancelled, builder: (column) => column);
+
+  GeneratedColumn<String> get managerPhone => $composableBuilder(
+    column: $table.managerPhone,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get syncedAt =>
       $composableBuilder(column: $table.syncedAt, builder: (column) => column);
@@ -3753,6 +3828,7 @@ class $$LegMetaTableTableManager
                 Value<bool> requireRsvp = const Value.absent(),
                 Value<bool> allowWalkins = const Value.absent(),
                 Value<bool> cancelled = const Value.absent(),
+                Value<String?> managerPhone = const Value.absent(),
                 Value<DateTime> syncedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LegMetaCompanion(
@@ -3763,6 +3839,7 @@ class $$LegMetaTableTableManager
                 requireRsvp: requireRsvp,
                 allowWalkins: allowWalkins,
                 cancelled: cancelled,
+                managerPhone: managerPhone,
                 syncedAt: syncedAt,
                 rowid: rowid,
               ),
@@ -3775,6 +3852,7 @@ class $$LegMetaTableTableManager
                 required bool requireRsvp,
                 required bool allowWalkins,
                 Value<bool> cancelled = const Value.absent(),
+                Value<String?> managerPhone = const Value.absent(),
                 required DateTime syncedAt,
                 Value<int> rowid = const Value.absent(),
               }) => LegMetaCompanion.insert(
@@ -3785,6 +3863,7 @@ class $$LegMetaTableTableManager
                 requireRsvp: requireRsvp,
                 allowWalkins: allowWalkins,
                 cancelled: cancelled,
+                managerPhone: managerPhone,
                 syncedAt: syncedAt,
                 rowid: rowid,
               ),

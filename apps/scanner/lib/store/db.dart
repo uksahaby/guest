@@ -112,6 +112,11 @@ class LegMeta extends Table {
   /// working when the scanner happens to have signal.
   BoolColumn get cancelled =>
       boolean().withDefault(const Constant(false))();
+
+  /// Who "Call manager" dials. Carried offline for the same reason as
+  /// everything else here: the moment an usher needs it is the moment the
+  /// signal has gone.
+  TextColumn get managerPhone => text().nullable()();
   DateTimeColumn get syncedAt => dateTime()();
 
   @override
@@ -133,7 +138,7 @@ class ScannerDb extends _$ScannerDb {
   ScannerDb.forTesting(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -152,6 +157,8 @@ class ScannerDb extends _$ScannerDb {
           if (from < 5) {
             await m.addColumn(pendingScans, pendingScans.walkInName);
           }
+          // v6 carries the number an usher escalates to.
+          if (from < 6) await m.addColumn(legMeta, legMeta.managerPhone);
         },
       );
 

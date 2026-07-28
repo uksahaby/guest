@@ -146,6 +146,7 @@ class Repository {
         allowWalkins: event['allow_walkins'] as bool,
         // Older API builds omit it; absent means not cancelled.
         cancelled: Value(event['cancelled'] as bool? ?? false),
+        managerPhone: Value(event['manager_phone'] as String?),
         syncedAt: DateTime.now(),
       ));
 

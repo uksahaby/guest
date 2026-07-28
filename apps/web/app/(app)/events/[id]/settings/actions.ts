@@ -28,11 +28,13 @@ export async function updateEvent(formData: FormData): Promise<void> {
   const body: Record<string, unknown> =
     field === "rsvp_deadline"
       ? { rsvp_deadline: String(raw ?? "") || null }
-      : field === "name"
-        ? { name: String(raw ?? "") }
-        : field === "status"
-          ? { status: String(raw ?? "") }
-          : { [field]: formData.get("on") === "on" };
+      : field === "manager_phone"
+        ? { manager_phone: String(raw ?? "").trim() || null }
+        : field === "name"
+          ? { name: String(raw ?? "") }
+          : field === "status"
+            ? { status: String(raw ?? "") }
+            : { [field]: formData.get("on") === "on" };
 
   const { status } = await api(`/events/${eventId}`, { method: "PATCH", body });
   back(eventId, status === 200, field);

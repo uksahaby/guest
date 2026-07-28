@@ -61,7 +61,7 @@ export async function scannerRoutes(app: FastifyInstance) {
 
         const [leg] = await db`
           select l.event_id, e.name, e.allow_overflow, e.require_rsvp,
-                 e.allow_walkins, e.status
+                 e.allow_walkins, e.status, e.manager_phone
           from event_legs l join events e on e.id = l.event_id
           where l.id = ${legId}`;
         if (!leg) {
@@ -94,6 +94,10 @@ export async function scannerRoutes(app: FastifyInstance) {
             // included — which is why it rides in the payload rather than
             // being checked only on the server.
             cancelled: leg.status === "cancelled",
+            // Who "Call manager" dials. Carried offline like everything
+            // else the gate needs — the moment you need it is the moment
+            // the signal is gone.
+            manager_phone: leg.manager_phone,
           },
           keys: keys.map((k) => ({
             event_id: k.event_id,

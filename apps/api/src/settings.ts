@@ -95,7 +95,7 @@ export async function settingsRoutes(app: FastifyInstance) {
 
         const [event] = await db`
           select id, name, event_type, status, allow_overflow, require_rsvp,
-                 allow_walkins, allow_usher_undo, rsvp_deadline, plan,
+                 allow_walkins, allow_usher_undo, rsvp_deadline, manager_phone, plan,
                  people_limit, token_version
           from events where id = ${eventId}`;
         const legs = await db`
@@ -122,6 +122,7 @@ export async function settingsRoutes(app: FastifyInstance) {
       allow_walkins?: boolean;
       allow_usher_undo?: boolean;
       rsvp_deadline?: string | null;
+      manager_phone?: string | null;
     };
   }>(
     "/events/:eventId",
@@ -139,6 +140,16 @@ export async function settingsRoutes(app: FastifyInstance) {
         return reply.code(400).send({
           code: "bad_name",
           message: "An event needs a name.",
+        });
+      }
+      // Empty clears it; anything else has to be dialable, because the
+      // scanner turns it into a tel: link an usher taps one-handed.
+      const managerPhone =
+        typeof b.manager_phone === "string" ? b.manager_phone.replace(/[\s\-().]/g, "") : b.manager_phone;
+      if (managerPhone && !/^\+\d{8,15}$/.test(managerPhone)) {
+        return reply.code(400).send({
+          code: "bad_manager_phone",
+          message: "A number like +2348034112098, so an usher can dial it.",
         });
       }
 
@@ -161,10 +172,16 @@ export async function settingsRoutes(app: FastifyInstance) {
                 ? (b.rsvp_deadline || null)
                 : db`rsvp_deadline`
             },
+            manager_phone    = ${
+              Object.hasOwn(b, "manager_phone")
+                ? (managerPhone || null)
+                : db`manager_phone`
+            },
             updated_at = now()
           where id = ${eventId}
           returning id, name, status, allow_overflow, require_rsvp,
-                    allow_walkins, allow_usher_undo, rsvp_deadline`;
+                    allow_walkins, allow_usher_undo, rsvp_deadline,
+                    manager_phone`;
         return { code: 200, body: event };
       });
       return reply.code(out.code).send(out.body);

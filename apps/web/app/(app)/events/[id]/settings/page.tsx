@@ -27,6 +27,7 @@ type Settings = {
   allow_walkins: boolean;
   allow_usher_undo: boolean;
   rsvp_deadline: string | null;
+  manager_phone: string | null;
   token_version: number;
   legs: {
     id: string;
@@ -156,6 +157,25 @@ export default async function SettingsPage({
             <input className="field" name="value" defaultValue={s.name} required />
             <button className="ghost" type="submit">
               Save name
+            </button>
+          </div>
+        </form>
+        {/* The number an usher taps when they cannot admit someone. Not
+            the account owner's by default: on the day it is usually the
+            planner or the chief usher who should pick up. */}
+        <form action={updateEvent} style={{ marginTop: 12 }}>
+          <input type="hidden" name="event_id" value={id} />
+          <input type="hidden" name="field" value="manager_phone" />
+          <div className="form-row">
+            <input
+              className="field"
+              name="value"
+              type="tel"
+              placeholder="Who ushers call, e.g. +2348034112098"
+              defaultValue={s.manager_phone ?? ""}
+            />
+            <button className="ghost" type="submit">
+              Save number
             </button>
           </div>
         </form>

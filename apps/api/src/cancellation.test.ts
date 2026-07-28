@@ -188,3 +188,102 @@ test("cancelling erases nothing", async () => {
     select count(*)::int as n from invitations where event_id = ${s.eventId}`;
   assert.ok(invs!.n >= 1);
 });
+
+// ---- somebody for an usher to call ---------------------------------------
+//
+// "Call manager" has been on every hold and refusal decide() returns since
+// the scanner was built, and it dismissed without doing anything. An usher
+// facing a guest they cannot admit had no way to escalate except finding
+// the couple, at their own wedding.
+
+test("the gate is told who to call, offline", async () => {
+  const s = await seedEvent(app);
+  await sql`update events set manager_phone = '+2348034112098'
+    where id = ${s.eventId}`;
+
+  const boot = await app.inject({
+    method: "GET",
+    url: `/scanner/legs/${s.legId}/bootstrap`,
+    headers: { authorization: `Bearer ${s.usherToken}` },
+  });
+  // In the payload, not fetched on demand: the moment an usher needs this
+  // is the moment the signal has gone.
+  assert.equal(boot.json().event.manager_phone, "+2348034112098");
+});
+
+test("no number set means no number carried", async () => {
+  const s = await seedEvent(app);
+  const boot = await app.inject({
+    method: "GET",
+    url: `/scanner/legs/${s.legId}/bootstrap`,
+    headers: { authorization: `Bearer ${s.usherToken}` },
+  });
+  assert.equal(boot.json().event.manager_phone, null);
+});
+
+test("the organiser sets and clears it from settings", async () => {
+  const s = await seedEvent(app);
+  const owner = await sql`
+    select owner_user_id from workspaces w
+    join events e on e.workspace_id = w.id where e.id = ${s.eventId}`;
+  const token = app.jwt.sign({ sub: owner[0]!.owner_user_id });
+
+  const set = await app.inject({
+    method: "PATCH",
+    url: `/events/${s.eventId}`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: { manager_phone: "+234 803 411 2098" },
+  });
+  assert.equal(set.statusCode, 200);
+  // Spaces and dashes are how people type a number, not how it dials.
+  assert.equal(set.json().manager_phone, "+2348034112098");
+
+  const cleared = await app.inject({
+    method: "PATCH",
+    url: `/events/${s.eventId}`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: { manager_phone: "" },
+  });
+  assert.equal(cleared.json().manager_phone, null);
+});
+
+test("a number that cannot be dialled is refused", async () => {
+  const s = await seedEvent(app);
+  const owner = await sql`
+    select owner_user_id from workspaces w
+    join events e on e.workspace_id = w.id where e.id = ${s.eventId}`;
+  const token = app.jwt.sign({ sub: owner[0]!.owner_user_id });
+
+  const res = await app.inject({
+    method: "PATCH",
+    url: `/events/${s.eventId}`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: { manager_phone: "call the planner" },
+  });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.json().code, "bad_manager_phone");
+});
+
+test("editing other settings leaves the number alone", async () => {
+  // The coalesce rule: a form that posts three fields must not blank the
+  // other five.
+  const s = await seedEvent(app);
+  const owner = await sql`
+    select owner_user_id from workspaces w
+    join events e on e.workspace_id = w.id where e.id = ${s.eventId}`;
+  const token = app.jwt.sign({ sub: owner[0]!.owner_user_id });
+
+  await app.inject({
+    method: "PATCH",
+    url: `/events/${s.eventId}`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: { manager_phone: "+2348034112098" },
+  });
+  const other = await app.inject({
+    method: "PATCH",
+    url: `/events/${s.eventId}`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: { allow_walkins: false },
+  });
+  assert.equal(other.json().manager_phone, "+2348034112098");
+});

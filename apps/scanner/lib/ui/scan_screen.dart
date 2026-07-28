@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/checkin.dart';
 import '../store/repository.dart';
@@ -149,6 +150,36 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
+  /// Dial whoever the organiser nominated for this event.
+  ///
+  /// The number rides in the offline payload, so this works at a gate with
+  /// no signal — which is exactly where an usher is standing when a guest
+  /// they cannot admit starts arguing.
+  Future<void> _callManager() async {
+    final m = await widget.repo.meta(widget.legId);
+    if (!mounted) return;
+
+    final number = m?.managerPhone;
+    if (number == null || number.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+          'No number set for this event. The organiser adds one in Settings.',
+        ),
+      ));
+      return;
+    }
+
+    // DIAL rather than CALL: it opens the dialler with the number filled
+    // in and lets the usher press the button. Placing a call outright
+    // needs a permission, and a mis-tap at a gate should not ring someone.
+    final uri = Uri(scheme: 'tel', path: number);
+    if (!await launchUrl(uri) && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open the dialler. Call $number.')),
+      );
+    }
+  }
+
   /// What this phone has done here, and the only way to take back an
   /// admission once the result overlay has gone.
   Future<void> _openRecent() async {
@@ -238,8 +269,10 @@ class _ScanScreenState extends State<ScanScreen> {
                   } else if (a == 'Add walk-in') {
                     _close();
                     _openWalkIn();
+                  } else if (a == 'Call manager') {
+                    _close();
+                    _callManager();
                   } else {
-                    // 'Call manager' still arrives with its feature.
                     _close();
                   }
                 },
