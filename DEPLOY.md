@@ -8,6 +8,10 @@ is that the API boots under `NODE_ENV=production` with the full env below,
 binds every interface, answers `/health`, logs JSON with phone numbers
 redacted, and hides the dev-only routes.
 
+**No messaging provider is required.** Organisers sign up with a phone
+number and a password; ushers arrive by an invite link sent over WhatsApp.
+Guest invitations were always WhatsApp deep links. SMS is optional.
+
 ---
 
 ## 1. What only a human can do
@@ -20,10 +24,11 @@ card, or a decision:
   the web app.
 - **Paystack test keys** — a Paystack business account. Test keys are
   enough for staging; `sk_test_…` never moves real money.
-- **A Termii account, funded, with a sender ID.** Needed before anyone
-  outside the team can sign in. To stand the infrastructure up first, set
-  `ALLOW_SMS_LOG_SENDER=true` and read login codes out of the API log —
-  then remove it once the Termii key is in place.
+- ~~A Termii account~~ — **no longer needed to deploy or to use the
+  system.** Organisers sign up and sign in with a phone number and a
+  password, and recover with a code; ushers arrive by an invite link the
+  organiser shares over WhatsApp. Set `ALLOW_SMS_LOG_SENDER=true` and leave
+  `TERMII_API_KEY` unset to run with no messaging provider at all.
 - **A domain**, if staging should have a real name. `WEB_URL` is used to
   build the invitation links guests receive, so it wants to be the URL
   people will actually open.
@@ -79,14 +84,14 @@ DATABASE_URL="$SUPERUSER_URL" npm run migrate --workspace api
 | `DATABASE_URL_APP_VERIFY` | yes | Signing keys, nothing else. |
 | `DATABASE_URL_APP_BILLING` | yes | Webhook path. |
 | `JWT_SECRET` | yes | Strong and unique. Rotating it signs everyone out. |
-| `TERMII_API_KEY` | yes* | Without it the API **refuses to boot**: a deploy that forgot it would look healthy while nobody could sign in. See `ALLOW_SMS_LOG_SENDER` to stand a box up before the Termii account exists. |
+| `TERMII_API_KEY` | no | Only for OTP login, which is now one option among three. Without it the API refuses to boot *unless* `ALLOW_SMS_LOG_SENDER=true` — that guard predates password sign-in and still catches a deploy that meant to have SMS. |
 | `PAYSTACK_SECRET_KEY` | yes | `sk_test_…` for staging. Without it checkout tries the offline stub, which refuses to exist in production. |
 | `WEB_URL` | yes | Public URL of the web app; builds guest invitation links. |
 | `SMS_SENDER_ID` | no | Default `N-Alert` (Termii's pre-approved, DND-capable). |
 | `SMS_CHANNEL` | no | Leave as `dnd`. |
 | `PORT` / `HOST` | no | Platform sets `PORT`; `HOST` defaults to `0.0.0.0` in production. |
 | `LOG_LEVEL` | no | Default `info`. |
-| `ALLOW_SMS_LOG_SENDER` | no | `true` lets the box boot with no SMS provider. Login codes go to the **log** instead of a phone, in clear text, and it warns loudly at startup. Staging only — and it does *not* put codes back in HTTP responses. |
+| `ALLOW_SMS_LOG_SENDER` | no | `true` lets the box boot with no SMS provider — now the ordinary case. Any OTP codes go to the **log** rather than a phone; nothing else depends on it. It does *not* put codes back in HTTP responses. |
 
 ### Web
 
@@ -96,11 +101,10 @@ DATABASE_URL="$SUPERUSER_URL" npm run migrate --workspace api
 
 ## 5. Order
 
-If you are bringing infrastructure up before the Termii account exists,
-set `ALLOW_SMS_LOG_SENDER=true` for steps 3–6 and sign in by reading the
-API log. Codes never appear in a response either way. Remove it as soon as
-`TERMII_API_KEY` is set — a staging box anyone can reach whose logs contain
-live login codes is a real account takeover, not a theoretical one.
+Set `ALLOW_SMS_LOG_SENDER=true` and skip Termii entirely unless you
+actually want OTP login. If you add a key later, drop the flag — a box
+anyone can reach whose logs contain live login codes is a real account
+takeover, not a theoretical one.
 
 1. Create the database, load `spec/schema-v1.sql`, run the migrations.
 2. Change the five role passwords, build the role URLs.
@@ -108,8 +112,14 @@ live login codes is a real account takeover, not a theoretical one.
 4. Deploy the web app with `API_URL` pointing at it.
 5. Set `WEB_URL` on the API to the web app's public URL and redeploy.
 6. Point the Paystack **test** webhook at `POST /webhooks/paystack`.
-7. Sign in with a real Nigerian number and watch the code arrive. That is
-   the first real proof SMS works — see STATE.md §4.1.
+7. Create the first organiser account at `/signup` — phone and password,
+   no SMS. **Write down the recovery code it shows you**; it is displayed
+   once and cannot be looked up. Then add an usher on the event's Team page
+   and send them their sign-in link over WhatsApp.
+
+If someone loses both password and recovery code, the way back in is
+`npx tsx scripts/reset-password.ts +234…` from a machine with the
+superuser `DATABASE_URL`. It is not an API endpoint on purpose.
 
 ## 6. Not done
 
