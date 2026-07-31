@@ -76,6 +76,20 @@ function checkDrift(files: Migration[], done: Map<string, string>): void {
 async function main(): Promise<void> {
   const mode = process.argv[2];
   const files = load();
+
+  const [{ exists }] = await sql<{ exists: boolean }[]>`
+    select exists (
+      select 1 from information_schema.tables 
+      where table_schema = 'public' and table_name = 'events'
+    )`;
+
+  if (!exists) {
+    console.log("Fresh database detected. Applying base schema (spec/schema-v1.sql)...");
+    const schemaSql = readFileSync(join(root, "spec", "schema-v1.sql"), "utf8");
+    await sql.unsafe(schemaSql);
+    console.log("Base schema applied successfully.");
+  }
+
   await ensureTable();
   const done = await applied();
   checkDrift(files, done);

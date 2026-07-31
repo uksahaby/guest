@@ -18,6 +18,17 @@ const TEST_DB = "guest_test";
 process.env.DATABASE_URL = `postgres://postgres@localhost:5432/${TEST_DB}`;
 process.env.JWT_SECRET ??= "test-secret";
 
+// Pin every RLS role at the throwaway database too, and do it by SETTING
+// rather than deleting: env.ts fills anything still undefined from .env, so
+// a developer whose .env holds production role URLs would otherwise have
+// the app connections in a test run pointing at a real database while the
+// admin connection stayed local. That is a very quiet way to write test
+// rows into production.
+for (const role of ["app_rw", "app_usher", "app_public", "app_verify", "app_billing"]) {
+  process.env[`DATABASE_URL_${role.toUpperCase()}`] =
+    `postgres://${role}:${role}_dev_only@localhost:5432/${TEST_DB}`;
+}
+
 function psql(args: string): void {
   execSync(`psql -U postgres -h localhost ${args}`, { stdio: "pipe" });
 }
