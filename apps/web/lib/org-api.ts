@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 /**
@@ -8,6 +8,25 @@ import { redirect } from "next/navigation";
  */
 
 export const API_URL = process.env.API_URL ?? "http://localhost:3001";
+
+/**
+ * Pass the caller's address through to the API.
+ *
+ * Nothing here runs in the browser — every call to the API is made by this
+ * server. So as far as the API is concerned all of our traffic, from every
+ * guest and every organiser, comes from one address. Its per-IP rate
+ * limits would be one shared bucket, and the first person to trip it would
+ * lock out everyone else.
+ *
+ * Forwarding the chain our own host set restores the real caller. The API
+ * only believes it when TRUST_PROXY is set there (apps/api/src/env.ts), so
+ * a local run with neither configured behaves exactly as before.
+ */
+export async function callerHeaders(): Promise<Record<string, string>> {
+  const h = await headers();
+  const chain = h.get("x-forwarded-for");
+  return chain ? { "x-forwarded-for": chain } : {};
+}
 
 export async function getToken(): Promise<string | null> {
   return (await cookies()).get("jwt")?.value ?? null;
@@ -28,6 +47,7 @@ export async function api<T = unknown>(
     method: init?.method ?? "GET",
     headers: {
       "content-type": "application/json",
+      ...(await callerHeaders()),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),

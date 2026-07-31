@@ -3,6 +3,8 @@
  * talks to the API from the browser — everything renders on the server.
  */
 
+import { callerHeaders } from "@/lib/org-api";
+
 const API_URL = process.env.API_URL ?? "http://localhost:3001";
 
 export type PublicLeg = {
@@ -33,7 +35,7 @@ export async function getInvitation(
 ): Promise<PublicInvitation | null> {
   const res = await fetch(
     `${API_URL}/public/invitations/${encodeURIComponent(token)}`,
-    { cache: "no-store" },
+    { cache: "no-store", headers: await callerHeaders() },
   );
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`API ${res.status}`);
@@ -50,7 +52,7 @@ export async function postRsvp(
     `${API_URL}/public/invitations/${encodeURIComponent(token)}/rsvp`,
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(await callerHeaders()) },
       body: JSON.stringify({
         leg_id: legId,
         attending,

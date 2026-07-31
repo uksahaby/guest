@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { API_URL } from "@/lib/org-api";
+import { API_URL, callerHeaders } from "@/lib/org-api";
 
 /**
  * Create an organiser account. No code to wait for and nothing to pay a
@@ -16,7 +16,7 @@ export async function createAccount(formData: FormData): Promise<void> {
 
   const res = await fetch(`${API_URL}/auth/signup`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await callerHeaders()) },
     body: JSON.stringify({ phone, password, full_name: fullName }),
   });
 

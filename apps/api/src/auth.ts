@@ -12,6 +12,7 @@ import {
   passwordProblem,
   verifyPassword,
 } from "./credentials.ts";
+import { tooMany } from "./ratelimit.ts";
 
 /**
  * Three ways in, all keyed on the phone number (architecture decision #7:
@@ -35,6 +36,11 @@ import {
  * LogSender in dev. dev_code comes back in the response only while the
  * sender is one that does not really deliver; the moment a real provider
  * is configured a code can never leave the server over HTTP.
+ *
+ * Every door here is open to the internet, so every door here is throttled.
+ * The policy and the reasoning behind the numbers live in ratelimit.ts;
+ * what matters at the call sites is which key each route counts against
+ * and whether it counts requests or only failures.
  */
 
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -70,6 +76,14 @@ export async function authRoutes(
     const phone = normalisePhone(req.body?.phone);
     if (!phone) {
       return reply.code(400).send({ code: "bad_phone", message: "Phone must be E.164, like +2348034112098." });
+    }
+
+    // Per phone this is already 30 seconds apart. That does nothing about
+    // one caller walking a list of numbers, and with Termii configured
+    // every one of those is money out of the organiser's account.
+    const burst = app.limits.otpRequestPerIp.hit(req.ip);
+    if (!burst.ok) {
+      return tooMany(reply, burst, "Too many codes requested. Try again later.");
     }
 
     const outcome = await asAnon(async (db) => {
@@ -154,6 +168,14 @@ export async function authRoutes(
       if (problem) {
         return reply.code(400).send({ code: "bad_password", message: problem });
       }
+      // Ahead of the password hash: hashing is deliberately slow, which
+      // makes an unthrottled signup endpoint a way to spend the server's
+      // CPU as well as a way to fill the users table.
+      const burst = app.limits.signupPerIp.hit(req.ip);
+      if (!burst.ok) {
+        return tooMany(reply, burst, "Too many accounts created from here. Try again later.");
+      }
+
       const fullName = (req.body?.full_name ?? "").trim();
       if (!fullName || fullName.length > 120) {
         return reply.code(400).send({
@@ -219,6 +241,11 @@ export async function authRoutes(
       // Garbage, expired, spent and forged all read the same, so the link
       // cannot be probed for which staff exist.
       if (raw.length < 20) return reply.code(404).send(dead);
+
+      const burst = app.limits.inviteAcceptPerIp.hit(req.ip);
+      if (!burst.ok) {
+        return tooMany(reply, burst, "Too many attempts. Try again later.");
+      }
 
       const session = await asAnon(async (db) => {
         const [invite] = await db`
@@ -326,6 +353,26 @@ export async function authRoutes(
     }
     if (!phone || code.length < 8) return reply.code(401).send(wrong);
 
+    // The tightest limit in the file. A recovery code is the entire
+    // account with nothing behind it, and unlike a password there is no
+    // second door to fall back to.
+    //
+    // 429 rather than 401 tells an attacker their guessing is being
+    // counted, which is the honest trade: the alternative is letting a
+    // legitimate organiser burn their five attempts in silence and reach
+    // the reset-password script wondering why the code they wrote down
+    // "stopped working".
+    const ipBurst = app.limits.recoveryPerIp.peek(req.ip);
+    if (!ipBurst.ok) return tooMany(reply, ipBurst, "Too many attempts. Try again later.");
+    const phoneBurst = app.limits.recoveryFailPerPhone.peek(phone);
+    if (!phoneBurst.ok) {
+      return tooMany(
+        reply,
+        phoneBurst,
+        "Too many recovery attempts for this number. Try again later.",
+      );
+    }
+
     const nextCode = newRecoveryCode();
     const hash = await hashPassword(req.body!.password!);
 
@@ -346,7 +393,14 @@ export async function authRoutes(
       return row;
     });
 
-    if (!user) return reply.code(401).send(wrong);
+    if (!user) {
+      app.limits.recoveryPerIp.bump(req.ip);
+      app.limits.recoveryFailPerPhone.bump(phone);
+      return reply.code(401).send(wrong);
+    }
+    // Spent successfully: the code is already replaced, so whatever was
+    // being guessed at is gone anyway.
+    app.limits.recoveryFailPerPhone.forget(phone);
 
     return {
       access_token: app.jwt.sign({ sub: user.id }, { expiresIn: ACCESS_TTL_S }),
@@ -379,6 +433,20 @@ export async function authRoutes(
         return reply.code(401).send(wrong);
       }
 
+      // Checked before the hash below, which is slow by design: without a
+      // limit here, a login endpoint is both a password oracle and a way
+      // to pin the CPU with a few concurrent requests.
+      const ipBurst = app.limits.loginPerIp.peek(req.ip);
+      if (!ipBurst.ok) return tooMany(reply, ipBurst, "Too many attempts. Try again later.");
+      const phoneBurst = app.limits.loginFailPerPhone.peek(phone);
+      if (!phoneBurst.ok) {
+        return tooMany(
+          reply,
+          phoneBurst,
+          "Too many failed sign-ins for this number. Try again later, or sign in with a code.",
+        );
+      }
+
       const user = await asAnon(async (db) => {
         const [row] = await db`
           select id, full_name, phone, email, password_hash
@@ -391,7 +459,15 @@ export async function authRoutes(
         return row;
       });
 
-      if (!user) return reply.code(401).send(wrong);
+      if (!user) {
+        app.limits.loginPerIp.bump(req.ip);
+        app.limits.loginFailPerPhone.bump(phone);
+        return reply.code(401).send(wrong);
+      }
+      // Signing in successfully is the proof that this was never an
+      // attack. An organiser who fumbles their password four times on
+      // event morning and then gets it right starts clean.
+      app.limits.loginFailPerPhone.forget(phone);
 
       return {
         access_token: app.jwt.sign({ sub: user.id }, { expiresIn: ACCESS_TTL_S }),
@@ -415,6 +491,14 @@ export async function authRoutes(
     const code = req.body?.code;
     if (!phone || typeof code !== "string" || !/^\d{6}$/.test(code)) {
       return reply.code(401).send({ code: "invalid_code", message: "That code didn't work." });
+    }
+
+    // A single code dies after 5 wrong attempts (MAX_ATTEMPTS), but the
+    // caller can keep requesting fresh ones. This caps the whole game
+    // rather than each round of it.
+    const burst = app.limits.otpVerifyPerIp.hit(req.ip);
+    if (!burst.ok) {
+      return tooMany(reply, burst, "Too many attempts. Try again later.");
     }
 
     const user = await asAnon(async (db) => {

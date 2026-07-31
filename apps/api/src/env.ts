@@ -57,4 +57,34 @@ export const env = {
   smsSenderId: process.env.SMS_SENDER_ID ?? "N-Alert",
   /** See TermiiSender — "dnd" or the message may never arrive. */
   smsChannel: process.env.SMS_CHANNEL ?? "dnd",
+  /**
+   * Who is allowed to tell us the caller's real address.
+   *
+   * Rate limiting is worthless without this. In production nothing reaches
+   * the API directly: the platform's router sits in front of it, and the
+   * web app makes every guest-facing call server-side (apps/web never
+   * fetches the API from a browser). Left unset, req.ip is therefore the
+   * router or the web app for EVERY request — one key, one bucket, and the
+   * first burst locks out the entire internet including the couple.
+   *
+   * Set it and X-Forwarded-For is believed. That header is trivially
+   * forged by anything that can reach the API directly, which is the other
+   * half of why the per-phone limits in ratelimit.ts carry the real weight
+   * and the per-IP ones are only a ceiling.
+   *
+   *   TRUST_PROXY=true          believe the whole chain (single platform
+   *                             router in front, API not otherwise exposed)
+   *   TRUST_PROXY=2             believe the last 2 hops
+   *   TRUST_PROXY=10.0.0.0/8    believe only these addresses — best, when
+   *                             the platform documents its router's range
+   */
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
 };
+
+export function parseTrustProxy(raw: string | undefined): boolean | number | string[] {
+  if (!raw || raw === "false") return false;
+  if (raw === "true") return true;
+  const hops = Number(raw);
+  if (Number.isInteger(hops) && hops > 0) return hops;
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}

@@ -59,7 +59,7 @@ re-triggers the "Allow USB debugging?" prompt on the handset.
 ### Tests
 
 ```bash
-npm test --workspace api            # 285
+npm test --workspace api            # 301
 npm test --workspace checkin-core   # 40
 npm test --workspace web            # 3  (the QR decoder, pinned)
 cd apps/scanner && flutter test     # 89
@@ -192,8 +192,10 @@ the web scanner
    - **What is missing is accounts**, which is a different kind of blocked:
      a Postgres instance, Railway/Fly, Vercel, Paystack test keys, a
      domain. No SMS provider is needed for any of it.
-   - Still nothing for **backups, error monitoring, uptime checks or rate
-     limiting**, and CI deploys nothing.
+   - Rate limiting is now **done** (see §5 and `DEPLOY.md` §6) — but it
+     needs `TRUST_PROXY` set on the box or it collapses into one shared
+     bucket for the whole internet. Still nothing for **backups, error
+     monitoring or uptime checks**, and CI deploys nothing.
 2. **Payments have never met real Paystack.** Everything so far is the
    offline `StubProvider`; the signed-webhook path is tested against our
    own signature, never theirs.
@@ -234,9 +236,7 @@ Everything below was watched happening, not inferred:
 
 ~~Web scanner fallback~~ (built — `/scan`, online-only by design) · super
 admin's three screens · guest-page accessibility and performance pass ·
-**rate limiting on public endpoints** (nothing throttles signup, password
-login or recovery — the most obviously missing thing now that those exist)
-· error monitoring (logs are structured now) · PDF report · email as a
+~~rate limiting on public endpoints~~ (built) · error monitoring (logs are structured now) · PDF report · email as a
 delivery channel and as a second recovery path · undo and a recent list in
 the *web* scanner (the app has both; the web one has neither) · Paystack
 **live** keys (`StubProvider` refuses to run in production).
@@ -257,6 +257,21 @@ business account · the first real couple.
 ---
 
 ## 5. Things that will bite you
+
+**`req.ip` is a lie until `TRUST_PROXY` is set.** Every guest-facing call
+is made *by the web server*, not by a browser — so without it the API sees
+one address for the entire internet, and per-IP rate limiting becomes a
+kill switch anybody can pull for everybody. `apps/web/lib/org-api.ts`
+forwards `X-Forwarded-For`; the API believes it only when `TRUST_PROXY`
+says so. Both halves are needed and neither is visible when it is wrong:
+limiting still *works*, it just fires on the wrong person.
+
+**Per-IP limits cannot be tight here.** Nigerian carriers NAT whole cities
+behind a few addresses, so an IP is not a person. The tight limits are per
+phone number (10 failed sign-ins / 15 min, 5 recovery attempts / hour) and
+they count failures only — a success clears the count, or the limiter's
+first victim is the organiser who fumbles their password on event morning.
+Numbers and reasoning are in `apps/api/src/ratelimit.ts`.
 
 **RLS is real, and load-bearing.** The API connects as `app_rw` /
 `app_usher` / `app_public` / `app_verify` / `app_billing` — never
@@ -379,8 +394,8 @@ hot-reload new registrations, and the symptom is a confusing 404.
    provider is involved. `DEPLOY.md` is the runbook.
 3. **A real run-through** on that box with a real guest list and a real
    WhatsApp send — the first time any of this meets a real person.
-4. **Rate limiting** before strangers can reach it: signup, password login
-   and recovery are all unthrottled.
+4. ~~Rate limiting~~ — done ahead of the deploy rather than after it,
+   since the gap opens the moment staging has a URL. Remember `TRUST_PROXY`.
 5. Audio at the gate → setup wizard → super admin.
 
 ---

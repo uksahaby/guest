@@ -19,10 +19,12 @@ import { webScanRoutes } from "./webscan.ts";
 import multipart from "@fastify/multipart";
 import { makeProvider, type PaymentProvider } from "./paystack.ts";
 import { makeSender, type SmsSender } from "./sms.ts";
+import { createLimits, type Limits } from "./ratelimit.ts";
 
 declare module "fastify" {
   interface FastifyInstance {
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    limits: Limits;
   }
 }
 
@@ -32,6 +34,10 @@ export function buildServer(
   // Logging is off only under test. Production is where logs matter most —
   // there is no other way to find out what happened at someone's wedding.
   const app = Fastify({
+    // Without this req.ip is whatever spoke to us last — the platform's
+    // router, or apps/web, which makes every guest call server-side. Every
+    // per-IP limit would then share one bucket. See env.trustProxy.
+    trustProxy: env.trustProxy,
     logger: process.env.NODE_TEST_CONTEXT === undefined && {
       level: process.env.LOG_LEVEL ?? "info",
       // Never let a phone number or a login code reach the log sink.
@@ -67,6 +73,11 @@ export function buildServer(
 
   app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
   app.register(jwt, { secret: env.jwtSecret });
+
+  // Per instance, not module state: each test file builds its own server
+  // and every injected request arrives from 127.0.0.1, so a shared counter
+  // would make one test's traffic another test's lockout.
+  app.decorate("limits", createLimits());
 
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
     try {

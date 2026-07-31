@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { API_URL } from "@/lib/org-api";
+import { API_URL, callerHeaders } from "@/lib/org-api";
 
 /**
  * Phone plus recovery code, set a new password, come back signed in.
@@ -17,7 +17,7 @@ export async function recoverAccount(formData: FormData): Promise<void> {
 
   const res = await fetch(`${API_URL}/auth/recovery/reset`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await callerHeaders()) },
     body: JSON.stringify({
       phone,
       recovery_code: recoveryCode,

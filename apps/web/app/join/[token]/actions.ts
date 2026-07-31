@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { API_URL } from "@/lib/org-api";
+import { API_URL, callerHeaders } from "@/lib/org-api";
 
 /**
  * Spends the invite and signs the usher in.
@@ -18,7 +18,7 @@ export async function acceptInvite(formData: FormData): Promise<void> {
 
   const res = await fetch(
     `${API_URL}/public/staff-invites/${encodeURIComponent(token)}/accept`,
-    { method: "POST", cache: "no-store" },
+    { method: "POST", cache: "no-store", headers: await callerHeaders() },
   );
 
   if (!res.ok) redirect(`/join/${encodeURIComponent(token)}?error=1`);

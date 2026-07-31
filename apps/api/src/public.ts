@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { asPass, sqlVerify, type Db } from "./db.ts";
 import { verifyToken } from "checkin-core/token";
+import { tooMany } from "./ratelimit.ts";
 
 /**
  * Guest-facing routes. Unauthenticated by design.
@@ -132,6 +133,24 @@ async function publicInvitation(db: Db, raw: string, h: Household) {
 }
 
 export async function publicRoutes(app: FastifyInstance) {
+  /**
+   * One ceiling over everything in this plugin. A token is unguessable, so
+   * this is not really about guessing — it is about the cost of the two
+   * database round trips each read makes, and about a token that leaks
+   * into a WhatsApp group being refreshed by a thousand phones.
+   *
+   * Encapsulated: this hook applies to the routes registered below and to
+   * nothing else in the API. Nothing at the gate is throttled — an usher
+   * scanning fast is the system working, and the gate never refuses over
+   * anything but a cancelled event.
+   */
+  app.addHook("onRequest", async (req, reply) => {
+    const burst = app.limits.publicPerIp.hit(req.ip);
+    if (!burst.ok) {
+      return tooMany(reply, burst, "Too many requests. Try again in a moment.");
+    }
+  });
+
   app.get<{ Params: { token: string } }>(
     "/public/invitations/:token",
     async (req, reply) => {

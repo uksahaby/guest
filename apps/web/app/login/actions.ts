@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { API_URL } from "@/lib/org-api";
+import { API_URL, callerHeaders } from "@/lib/org-api";
 
 /**
  * Two-step OTP sign-in. The phone number travels in an httpOnly cookie
@@ -13,7 +13,7 @@ export async function requestCode(formData: FormData): Promise<void> {
   const phone = String(formData.get("phone") ?? "").trim();
   const res = await fetch(`${API_URL}/auth/otp/request`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await callerHeaders()) },
     body: JSON.stringify({ phone }),
   });
   const data = await res.json();
@@ -48,7 +48,7 @@ export async function verifyCode(formData: FormData): Promise<void> {
 
   const res = await fetch(`${API_URL}/auth/otp/verify`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await callerHeaders()) },
     body: JSON.stringify({ phone, code }),
   });
   if (!res.ok) redirect("/login?step=code&error=code");
@@ -86,7 +86,7 @@ export async function signInWithPassword(formData: FormData): Promise<void> {
 
   const res = await fetch(`${API_URL}/auth/password/login`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await callerHeaders()) },
     body: JSON.stringify({ phone, password }),
   });
   if (!res.ok) redirect("/login?mode=password&error=password");

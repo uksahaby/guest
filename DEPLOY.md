@@ -92,6 +92,7 @@ DATABASE_URL="$SUPERUSER_URL" npm run migrate --workspace api
 | `PORT` / `HOST` | no | Platform sets `PORT`; `HOST` defaults to `0.0.0.0` in production. |
 | `LOG_LEVEL` | no | Default `info`. |
 | `ALLOW_SMS_LOG_SENDER` | no | `true` lets the box boot with no SMS provider — now the ordinary case. Any OTP codes go to the **log** rather than a phone; nothing else depends on it. It does *not* put codes back in HTTP responses. |
+| `TRUST_PROXY` | **yes, in practice** | Who may tell the API the caller's real address. Read §6 before choosing a value — left unset, every per-IP rate limit collapses into one shared bucket. |
 
 ### Web
 
@@ -121,9 +122,44 @@ If someone loses both password and recovery code, the way back in is
 `npx tsx scripts/reset-password.ts +234…` from a machine with the
 superuser `DATABASE_URL`. It is not an API endpoint on purpose.
 
-## 6. Not done
+## 6. Rate limiting and `TRUST_PROXY`
+
+The unauthenticated endpoints — signup, password login, recovery, OTP, the
+staff-invite link and the guest invitation pages — are throttled. The
+policy and the reasoning behind every number live in
+`apps/api/src/ratelimit.ts`; three things matter at deploy time.
+
+**Set `TRUST_PROXY`, or the limits are worse than none.** Nothing reaches
+the API directly: the platform's router is in front of it, and the web app
+makes every guest-facing call server-side. Unset, `req.ip` is that router
+or that web app for *every* request, so all traffic shares one bucket and
+the first burst locks out the whole internet — including the couple.
+
+| Value | Use when |
+|---|---|
+| `10.0.0.0/8` (or whatever the platform documents) | Best. Only these addresses may set `X-Forwarded-For`. |
+| `2` | Believe the last two hops — router, then the web app. |
+| `true` | Believe the whole chain. Fine when the API is reachable only through the router; anything that can reach it directly can then forge its own address. |
+
+**The counting is deliberately lopsided.** Per-phone limits are tight
+(10 failed sign-ins per 15 minutes, 5 recovery attempts per hour) and
+per-IP limits are generous. That is not a compromise, it is the local
+reality: Nigerian carriers put whole cities behind a handful of NAT
+addresses, so an IP is not a person and a limit tight enough to stop an
+attacker would lock out a neighbourhood on event morning. Login and
+recovery count *failures* only, and a success clears the count.
+
+**Limits live in memory, so they are per process.** At one API instance
+they are exact. Behind a load balancer each instance allows the full
+budget — the per-phone limits degrade to N× attempts, not to none. Revisit
+if the API is ever scaled out; a Postgres counter was rejected because it
+puts a transatlantic write in front of every request.
+
+Nothing at the gate is throttled. An usher scanning fast is the system
+working, and the check-in path never refuses over volume.
+
+## 7. Not done
 
 Named so nobody assumes otherwise: **no backups, no error monitoring, no
-uptime checks, no rate limiting on the public endpoints, no staging seed
-data.** CI (`.github/workflows/ci.yml`) runs the three test suites but does
-not deploy anything.
+uptime checks, no staging seed data.** CI (`.github/workflows/ci.yml`) runs
+the three test suites but does not deploy anything.
