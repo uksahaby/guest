@@ -187,8 +187,78 @@ puts a transatlantic write in front of every request.
 Nothing at the gate is throttled. An usher scanning fast is the system
 working, and the check-in path never refuses over volume.
 
-## 7. Not done
+## 7. Backups
 
-Named so nobody assumes otherwise: **no backups, no error monitoring, no
-uptime checks, no staging seed data.** CI (`.github/workflows/ci.yml`) runs
-the three test suites but does not deploy anything.
+```bash
+npm run backup --workspace api                  # write and verify a dump
+npm run backup --workspace api -- --list FILE   # what is inside one
+npm run backup --workspace api -- --prune 30    # delete dumps over 30 days
+```
+
+Reads `SUPERUSER_URL`, falling back to `DATABASE_URL`, from `apps/api/.env`.
+Writes to `backups/`, which is gitignored — a dump is every guest's name and
+phone number in one file and must never reach a repository. Set `BACKUP_DIR`
+to put it somewhere else.
+
+**This does not replace Neon's point-in-time restore, and PITR does not
+replace this.** PITR covers the likely accident — a bad migration, a DELETE
+without a WHERE — and covers none of the unlikely ones: a suspended account,
+a deleted project, a lapsed card. A dump on a disk you control covers those
+and nothing else does. Check the history retention window in the Neon
+console; on the free plan it is short.
+
+The irreplaceable table is `check_in_events`. A guest list can be rebuilt
+from the organiser's own spreadsheet. Who actually walked through the gate
+exists here and nowhere else.
+
+### Restoring
+
+**Create the five roles before restoring, or the restore looks fine and
+leaves the API unable to read anything.** The dump carries 64 ACL entries
+naming `app_rw`, `app_usher`, `app_public`, `app_verify` and `app_billing`.
+Restored into a fresh Neon project, where those roles do not exist, every
+one of those grants fails — `pg_restore` keeps going and reports a count at
+the end that is easy to skim past. The tables come back, the policies come
+back, and the application roles have no permissions.
+
+```bash
+# 1. Roles first. Lines 33-46 and 501-510 of db/migrations/003_rls.sql,
+#    or by hand — they only need to exist, passwords are set in step 3.
+psql "$SUPERUSER_URL" -c "create role app_rw login password '...'"      # ×5
+
+# 2. Then the data.
+pg_restore --dbname "$SUPERUSER_URL" --no-owner backups/guest-....dump
+
+# 3. Set the real passwords and rebuild the DATABASE_URL_APP_* values.
+```
+
+`--no-owner` is deliberate: the dump is taken with it, so the file does not
+insist on a `postgres` role that Neon does not have.
+
+### What a restore was verified to bring back
+
+Dump → drop the database → restore → check, against a database built the
+normal way (schema + all 10 migrations):
+
+| | |
+|---|---|
+| Row data | ✓ |
+| `schema_migrations` | 10 rows — the next deploy does not re-run everything |
+| RLS policies | 49 |
+| Tables with RLS enabled | 15 |
+| Append-only triggers on `check_in_events` | 2 |
+
+The policy count is the one that matters. A restore that returns data
+without its policies looks healthy and is wide open.
+
+**Not yet done: nobody has restored the real Neon database.** The drill ran
+against local Postgres. Run it once against a scratch Neon branch before
+trusting any of this with a wedding.
+
+## 8. Not done
+
+Named so nobody assumes otherwise: **no error monitoring, no uptime checks,
+no staging seed data, and the backup above is manual** — nothing runs it on
+a schedule, so it protects you exactly as often as someone remembers.
+CI (`.github/workflows/ci.yml`) runs the three test suites but does not
+deploy anything.

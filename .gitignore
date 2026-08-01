@@ -8,3 +8,7 @@ dist/
 .next-verify/
 *.log
 .DS_Store
+# Database dumps: every guest's name and phone number, in one file. These
+# belong on a disk you control, never in a repository.
+backups/
+*.dump

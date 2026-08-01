@@ -212,15 +212,24 @@ the web scanner
    - No SMS provider is needed for any of it.
    - Rate limiting is now **done** (see §5 and `DEPLOY.md` §6) — but it
      needs `TRUST_PROXY` set on the box or it collapses into one shared
-     bucket for the whole internet. Still nothing for **backups, error
-     monitoring or uptime checks**, and CI deploys nothing.
+     bucket for the whole internet.
+   - **Backups** exist: `npm run backup --workspace api`, verified by a
+     dump → drop → restore drill that also checks 49 RLS policies and the
+     append-only triggers come back (`DEPLOY.md` §7). Two caveats, both
+     load-bearing: nothing runs it on a schedule, and the drill was against
+     local Postgres — **nobody has restored the real Neon database yet.**
+   - Still nothing for **error monitoring or uptime checks**, and CI
+     deploys nothing.
 2. **Payments have never met real Paystack.** Everything so far is the
    offline `StubProvider`; the signed-webhook path is tested against our
    own signature, never theirs.
-3. **No audio at the gate.** phase-4c §5 specifies sound and we ship
-   haptics only — which a phone can have switched off system-wide, so a
-   refusal can be both silent and, in a pocket, invisible. The last item on
-   the scanner's own list.
+3. ~~No audio at the gate.~~ **Done.** Four generated cues, one per tone,
+   told apart by contour rather than pitch — rising for admitted, two flat
+   repeats for wait, low and falling for refused. `tool/make_sounds.py`
+   regenerates them; the WAVs are committed so a build never needs Python.
+   A persisted mute exists for a ceremony, and haptics continue when muted.
+   **Nobody has judged them by ear yet** — the tests prove the right cue
+   fires for the right verdict, not that a refusal cuts through a crowd.
 4. **Event creation is one thin form.** The setup mockup has five steps
    (details, venue, guests & entry, tables, review).
 5. **Small scanner gaps found on the device.** A back-press on the scan
