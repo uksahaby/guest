@@ -183,15 +183,21 @@ the web scanner
 
 ### Blocks a real wedding
 
-1. **Nothing is deployed.** The code side is done and `DEPLOY.md` is the
-   runbook: CI runs every suite, there is a Dockerfile, and
-   `npm run migrate --workspace api` applies migrations one transaction at
-   a time with checksums and refuses an edited one. The API boots under
+1. **Half deployed.** `DEPLOY.md` is the runbook. `npm run migrate
+   --workspace api` applies migrations one transaction at a time with
+   checksums and refuses an edited one. The API boots under
    `NODE_ENV=production`, binds `0.0.0.0`, logs JSON with phone numbers
    redacted, and refuses to start on a missing RLS role URL.
-   - **What is missing is accounts**, which is a different kind of blocked:
-     a Postgres instance, Railway/Fly, Vercel, Paystack test keys, a
-     domain. No SMS provider is needed for any of it.
+   - **Done:** the repo is on GitHub (`uksahaby/guest`). Neon holds the
+     schema, ten migrations and five roles with rotated passwords. The web
+     app builds and serves on Vercel, root directory `apps/web`. A
+     Paystack `sk_test_` key is in hand.
+   - **Outstanding:** the API on Render — a plain Node service, no
+     container, root directory the repo root so the `checkin-core`
+     workspace resolves. Then `API_URL` and `WEB_URL` point the two hosts
+     at each other, the Paystack test webhook gets its URL, and the first
+     organiser account gets created at `/signup`.
+   - No SMS provider is needed for any of it.
    - Rate limiting is now **done** (see §5 and `DEPLOY.md` §6) — but it
      needs `TRUST_PROXY` set on the box or it collapses into one shared
      bucket for the whole internet. Still nothing for **backups, error

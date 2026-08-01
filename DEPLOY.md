@@ -5,9 +5,11 @@ Postgres 17.
 
 Deployed as a plain Node service, not a container. `apps/api` runs
 TypeScript directly under `tsx` — there is no build step, no native module
-and nothing to compile, so the container bought nothing that two settings
-do not. `apps/api/Dockerfile` is kept because it still documents the build
-for anyone who wants it; nothing in the deploy path reads it.
+and nothing to compile, so a container bought nothing that the settings
+below do not. There was a `Dockerfile`; it was deleted rather than left to
+rot, since a build recipe nobody runs is a build recipe nobody keeps
+correct. `git log -- apps/api/Dockerfile` has it if a container is ever
+wanted again.
 
 Two things the host has to get right, and they pull in opposite
 directions from the web app's settings:
@@ -21,11 +23,12 @@ directions from the web app's settings:
 
 **`tsx` is a runtime dependency, not a dev one** — production runs
 TypeScript directly, so `npm ci` under `NODE_ENV=production` must still
-install it. It sits in `dependencies` for exactly that reason. The
-Dockerfile only ever survived this by accident of ordering: it installed
-before it set `NODE_ENV`. Moving `tsx` back to `devDependencies` breaks
-the deploy at startup with `tsx: not found`, and nothing catches it before
-the box is live.
+install it. It sits in `dependencies` for exactly that reason. The old
+Dockerfile only ever survived this by accident of ordering — it installed
+before it set `NODE_ENV` — which is why the problem stayed hidden until
+the first deploy that was not a container. Moving `tsx` back to
+`devDependencies` breaks startup with `tsx: not found`, and no test
+catches it, because every test runs somewhere dev dependencies exist.
 
 Nothing here has been run against a real host yet. What *has* been checked
 is that the API boots under `NODE_ENV=production` with the full env below,
