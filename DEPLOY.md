@@ -1,7 +1,31 @@
 # Deploying
 
-Target from HANDOFF §3: **Vercel** for `apps/web`, **Railway or Fly** for
-`apps/api`, EU region, managed Postgres 17.
+Target: **Vercel** for `apps/web`, **Render** for `apps/api`, **Neon** for
+Postgres 17.
+
+Deployed as a plain Node service, not a container. `apps/api` runs
+TypeScript directly under `tsx` — there is no build step, no native module
+and nothing to compile, so the container bought nothing that two settings
+do not. `apps/api/Dockerfile` is kept because it still documents the build
+for anyone who wants it; nothing in the deploy path reads it.
+
+Two things the host has to get right, and they pull in opposite
+directions from the web app's settings:
+
+| Setting | Value | Why |
+|---|---|---|
+| Root Directory | repo root — **not** `apps/api` | `apps/api` imports `checkin-core` through the npm workspace. Rooted at `apps/api`, the install cannot see it. |
+| Build Command | `npm ci --workspace api --include-workspace-root` | Installs the API and the workspace root together. |
+| Start Command | `npm run start --workspace api` | |
+| `NODE_VERSION` | `22` | |
+
+**`tsx` is a runtime dependency, not a dev one** — production runs
+TypeScript directly, so `npm ci` under `NODE_ENV=production` must still
+install it. It sits in `dependencies` for exactly that reason. The
+Dockerfile only ever survived this by accident of ordering: it installed
+before it set `NODE_ENV`. Moving `tsx` back to `devDependencies` breaks
+the deploy at startup with `tsx: not found`, and nothing catches it before
+the box is live.
 
 Nothing here has been run against a real host yet. What *has* been checked
 is that the API boots under `NODE_ENV=production` with the full env below,
@@ -19,9 +43,11 @@ Guest invitations were always WhatsApp deep links. SMS is optional.
 None of this can be done from a terminal here — each needs an account, a
 card, or a decision:
 
-- **A Postgres 17 instance** (Railway, Fly, Neon, Supabase). EU region.
-- **A Railway or Fly account** for the API, and a **Vercel account** for
-  the web app.
+- **A Postgres 17 instance** — Neon, done. Note it sits in `us-east-1`,
+  not the EU region originally planned; cheap to move while it is empty
+  and expensive afterwards.
+- **A Render account** for the API, and a **Vercel account** for the web
+  app. Both done.
 - **Paystack test keys** — a Paystack business account. Test keys are
   enough for staging; `sk_test_…` never moves real money.
 - ~~A Termii account~~ — **no longer needed to deploy or to use the
