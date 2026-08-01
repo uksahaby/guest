@@ -224,9 +224,16 @@ the web scanner
      optional `ERROR_WEBHOOK_URL` tells someone. Alerts are rate-limited
      three per fault per 15 min and scrubbed of anything phone-shaped.
      No vendor, no SDK — if it ever needs traces, that is Sentry's job.
-   - Still nothing for **uptime checks**: error monitoring only speaks
-     while the API is alive enough to notice, and a sleeping free-tier box
-     looks exactly like a dead one from outside. CI deploys nothing.
+   - **Uptime checks** exist (`.github/workflows/uptime.yml`, `DEPLOY.md`
+     §9): GitHub asks `/health` every ten minutes from outside Render, and
+     requires `"ok":true` rather than a bare 200 — a process answering
+     without its database is a site that looks up and admits nobody. The
+     poll also keeps Render's free instance from sleeping, which removes
+     the 30-60s cold start on event morning. Needs the repository variable
+     `API_HEALTH_URL` set or it does nothing. GitHub's schedules are
+     best-effort and stop after 60 days of no commits, so for a real
+     wedding add an external monitor too.
+   - CI deploys nothing.
 2. **Payments have never met real Paystack.** Everything so far is the
    offline `StubProvider`; the signed-webhook path is tested against our
    own signature, never theirs.

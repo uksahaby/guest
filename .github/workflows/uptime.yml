@@ -1,0 +1,114 @@
+name: Uptime
+
+# Error monitoring only speaks while the API is alive enough to notice. A
+# dead box is silent, and that silence is indistinguishable from a quiet
+# Saturday. Something outside Render has to ask.
+#
+# GitHub Actions is that something because it needs no new account and it
+# is genuinely elsewhere — a Render outage does not take the watcher with
+# it. Read the honest limits in DEPLOY.md §9 before trusting it on the day:
+# scheduled runs are best-effort and routinely late, and GitHub disables
+# schedules on a repository with 60 days of no commits.
+#
+# Set the repository variable API_HEALTH_URL (Settings → Secrets and
+# variables → Actions → Variables) to
+# https://your-api.onrender.com/health. Without it this exits quietly
+# rather than failing every ten minutes and training everyone to ignore it.
+#
+# Optional: secret UPTIME_WEBHOOK_URL, the same Slack/Discord/ntfy webhook
+# the API uses for errors. Without it a failure still reaches you — GitHub
+# emails the repository owner when a scheduled workflow fails.
+
+on:
+  schedule:
+    # Every ten minutes. Also keeps Render's free instance from sleeping,
+    # which is worth as much as the monitoring: a cold start is 30-60
+    # seconds, and event morning is exactly when nobody has warmed it up.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  # A slow check must not stack up behind itself.
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: /health answers
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check
+        id: check
+        env:
+          URL: ${{ vars.API_HEALTH_URL }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "API_HEALTH_URL is not set — nothing to watch." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Three attempts before calling it down. A single failure is
+          # usually a deploy rolling or a cold start, and an alert that
+          # cries wolf on every deploy is one nobody reads by the wedding.
+          # The first timeout is generous for exactly that reason.
+          for attempt in 1 2 3; do
+            # Delete it first: curl leaves the previous attempt's file in
+            # place when it cannot connect, which put a cheerful {"ok":true}
+            # from the last success into the alert for an unreachable host.
+            rm -f body.txt
+
+            # curl prints 000 itself on a connection failure — the obvious
+            # `|| echo 000` appends a second one and reports HTTP 000000.
+            code=$(curl -sS -o body.txt -w "%{http_code}" --max-time 90 "$URL" || true)
+            code=${code:-000}
+            body=$(tr -d '\r\n' < body.txt 2>/dev/null || true)
+
+            if [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"ok":true'; then
+              echo "attempt $attempt: ok"
+              exit 0
+            fi
+
+            echo "attempt $attempt: HTTP $code ${body:-no body}"
+            # Newlines stripped above: GITHUB_ENV is line-based and a
+            # multi-line value silently corrupts everything after it.
+            echo "last_code=$code" >> "$GITHUB_ENV"
+            echo "last_body=$(printf '%.200s' "${body:-no body}")" >> "$GITHUB_ENV"
+
+            # Written as an if, not `[ ] && sleep`: the runner uses bash -e,
+            # where a false test on the last line of the loop ends the whole
+            # script early.
+            if [ "$attempt" -lt 3 ]; then
+              sleep 30
+            fi
+          done
+
+          exit 1
+
+      # A 200 is not enough on its own: the endpoint runs `select 1` as
+      # app_rw, so a body without "ok":true means the process is answering
+      # while the database is not reachable through a real role. That is a
+      # site which looks up and cannot check anybody in.
+      - name: Say so
+        if: failure()
+        env:
+          HOOK: ${{ secrets.UPTIME_WEBHOOK_URL }}
+          URL: ${{ vars.API_HEALTH_URL }}
+        run: |
+          echo "### API health check failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: $URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Last status: ${last_code:-unknown}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Last body: ${last_body:-none}" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$HOOK" ]; then
+            text="API health check failed after 3 attempts. $URL returned ${last_code:-no response}."
+            # Same two keys the API's own alerter sends, so one webhook
+            # serves both: Slack reads text, Discord reads content.
+            curl -sS --max-time 10 -X POST "$HOOK" \
+              -H 'content-type: application/json' \
+              -d "$(printf '{"text":%s,"content":%s}' \
+                    "$(printf '%s' "$text" | jq -Rs .)" \
+                    "$(printf '%s' "$text" | jq -Rs .)")" || true
+          fi

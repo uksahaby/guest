@@ -293,13 +293,52 @@ value that collided, and here that value is often somebody's phone number.
 
 Only 5xx alerts. A 400 is not an incident.
 
-## 9. Not done
+## 9. Uptime
 
-Named so nobody assumes otherwise: **no uptime checks, no staging seed
-data, and the backup is manual** — nothing runs it on a schedule, so it
-protects you exactly as often as someone remembers. Nothing watches whether
-the API is *up*; error monitoring only speaks when the API is alive enough
-to notice. A dead box is silent, and Render's free tier sleeps on purpose,
-which makes "no traffic" and "no server" look identical from outside.
-CI (`.github/workflows/ci.yml`) runs the three test suites but does not
-deploy anything.
+`.github/workflows/uptime.yml` asks `/health` every ten minutes from
+GitHub's runners — deliberately somewhere else, because a Render outage
+would take any watcher hosted on Render down with it.
+
+**To switch it on:** repository **Settings → Secrets and variables →
+Actions → Variables**, add `API_HEALTH_URL` =
+`https://your-api.onrender.com/health`. Unset, the workflow exits quietly
+rather than failing every ten minutes and teaching everyone to ignore it.
+
+Optionally add the secret `UPTIME_WEBHOOK_URL` — the same webhook the API
+uses for errors. Without it a failure still reaches you: GitHub emails the
+repository owner when a scheduled workflow fails.
+
+**A 200 is not enough.** The check requires `"ok":true` in the body, because
+`/health` runs `select 1` as `app_rw`. A process answering with anything
+else is a site that looks up and can check nobody in. Verified against a
+live API (passes), an unreachable host (fails), and a 200 with the wrong
+body (fails).
+
+Three attempts thirty seconds apart before it calls anything down. A single
+failure is usually a deploy rolling or a cold start, and an alert that
+cries wolf on every deploy is one nobody reads by the wedding.
+
+**The ping also keeps the box awake.** Render's free instance sleeps after
+15 minutes idle and takes 30-60 seconds to come back; a ten-minute poll
+means that never happens. Worth as much as the monitoring — event morning
+is exactly when nobody has warmed it up. It does mean the service runs
+around the clock, so watch the free tier's monthly instance hours if you
+ever add a second service.
+
+**Two limits worth knowing before the day:**
+
+- GitHub's scheduled workflows are best-effort. Ten minutes is a target,
+  not a promise; late runs are normal and busy periods are worse.
+- GitHub disables schedules on a repository with 60 days of no commits.
+
+For a real wedding, add an external monitor as well — UptimeRobot's free
+tier polls far more often and its whole business is being reliable at it.
+This workflow is the version that needs no account and is genuinely better
+than nothing, which is what was here before.
+
+## 10. Not done
+
+Named so nobody assumes otherwise: **no staging seed data, and the backup
+is manual** — nothing runs it on a schedule, so it protects you exactly as
+often as someone remembers. CI (`.github/workflows/ci.yml`) runs the three
+test suites but does not deploy anything.
