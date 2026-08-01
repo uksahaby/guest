@@ -437,6 +437,34 @@ class Repository {
     ));
   }
 
+  // ---- sign out -----------------------------------------------------------
+
+  /// Erases every trace of this usher from the phone.
+  ///
+  /// Signing out has to take the guest list with it. A gate's bootstrap is
+  /// the whole household list plus the event's signing keys, and leaving
+  /// that on a shared handset for the next person is the same leak as
+  /// handing over the printed list — worse, because the keys let the phone
+  /// verify passes for an event it no longer works.
+  ///
+  /// The caller is responsible for checking [pendingCount] first. This
+  /// deletes unsynced scans along with everything else, because a queue
+  /// belonging to a signed-out usher has no owner and no way to replay:
+  /// the token that could have sent it is gone. Losing a check-in silently
+  /// is the one outcome the gate cannot afford, so the decision to discard
+  /// belongs to a human looking at the number.
+  Future<void> wipe() async {
+    await db.transaction(() async {
+      await db.delete(db.pendingScans).go();
+      await db.delete(db.invitations).go();
+      await db.delete(db.revokedPasses).go();
+      await db.delete(db.signingKeys).go();
+      await db.delete(db.cachedAssignments).go();
+      await db.delete(db.legMeta).go();
+    });
+    keys = [];
+  }
+
   // ---- sync ---------------------------------------------------------------
 
   Future<int> pendingCount() async {

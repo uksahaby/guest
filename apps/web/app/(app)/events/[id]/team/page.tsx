@@ -394,9 +394,11 @@ export default async function TeamPage({
           </div>
         </form>
         <p className="sub">
-          They sign in with that number — we text them a code, no password and
-          no app store account. Nothing is sent automatically yet, so tell them
-          to open the scanner and sign in.
+          Adding them here does not tell them anything. Once they appear in
+          the list, use <strong>Get sign-in link</strong> on their row and
+          send it over WhatsApp — that link is how they sign in, on the
+          scanner app or straight in their browser. No password, no code to
+          wait for.
         </p>
       </div>
 
@@ -456,7 +458,9 @@ function InviteLink({ url }: { url: string }) {
         <div className="t">Sign-in link ready — send it now</div>
         <div className="s">
           It works once, expires in 14 days, and is the only copy. Sending it
-          on WhatsApp costs nothing.
+          on WhatsApp costs nothing. They can tap it to scan in their browser,
+          or paste the whole message into the scanner app — whichever they
+          open first spends it.
         </div>
         <div className="s" style={{ marginTop: 10, wordBreak: "break-all" }}>
           <code>{url}</code>

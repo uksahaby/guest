@@ -678,4 +678,43 @@ void main() {
     await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
     expect(await repo.recent('some-other-leg'), isEmpty);
   });
+
+  // ---- signing out --------------------------------------------------------
+  //
+  // Ushers are casual staff and phones get shared between them. Signing out
+  // has to take the downloaded event with it, or the next person holds a
+  // guest list and a set of signing keys for an event they do not work.
+
+  test('signing out leaves no guest list, no keys and no queue', () async {
+    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+    expect(await repo.pendingCount(), greaterThan(0));
+
+    await repo.wipe();
+
+    expect(repo.keys, isEmpty);
+    expect(await repo.pendingCount(), 0);
+    expect(await repo.recent(legId), isEmpty);
+    expect(await repo.find(passId, legId), isNull,
+        reason: 'the household list must not outlive the session');
+    expect(await repo.meta(legId), isNull);
+
+    // And the cached assignment list, which is what would otherwise show
+    // the next usher which event this phone last worked. With it gone and
+    // no network, asking throws rather than answering "no events" — an
+    // empty list would be a claim, and the app has nothing to base one on.
+    api.assignmentsError = ApiException(0, 'unreachable', 'no route to host');
+    await expectLater(repo.assignments(), throwsA(isA<ApiException>()));
+  });
+
+  test('a wiped phone can verify nothing until it downloads again', () async {
+    await repo.wipe();
+
+    // A fresh Repository is the app restarting after sign-out. The pass is
+    // genuine and correctly signed; there is simply nothing to check it
+    // against, and the gate must not guess.
+    final restarted = Repository(db: db, api: api, deviceId: 'test-device');
+    api.bootstrapError = ApiException(0, 'unreachable', 'no route to host');
+
+    await expectLater(restarted.openLeg(legId), throwsA(isA<ApiException>()));
+  });
 }

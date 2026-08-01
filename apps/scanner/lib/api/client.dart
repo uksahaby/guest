@@ -107,6 +107,21 @@ class ApiClient {
     return session;
   }
 
+  /// Spends a one-time staff invite and remembers the session.
+  ///
+  /// The same endpoint the web `/join/<token>` page posts to. An usher gets
+  /// one link over WhatsApp and it works in either place, which is the
+  /// point: no SMS provider, no password, nothing to forget. Single use, so
+  /// signing in here spends the link the browser would have used.
+  Future<Map<String, dynamic>> acceptInvite(String inviteToken) async {
+    final session = (await _send(
+      'POST',
+      '/public/staff-invites/${Uri.encodeComponent(inviteToken)}/accept',
+    )) as Map<String, dynamic>;
+    token = session['access_token'] as String;
+    return session;
+  }
+
   // ---- scanner ------------------------------------------------------------
 
   Future<List<dynamic>> assignments() async =>

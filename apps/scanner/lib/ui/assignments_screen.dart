@@ -10,12 +10,14 @@ class AssignmentsScreen extends StatefulWidget {
   final Repository repo;
   final void Function(String legId, String? entranceId, String eventName,
       String gateName) onOpenLeg;
+  final Future<void> Function() onSignOut;
 
   const AssignmentsScreen({
     super.key,
     required this.api,
     required this.repo,
     required this.onOpenLeg,
+    required this.onSignOut,
   });
 
   @override
@@ -79,10 +81,72 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
     }
   }
 
+  /// Sign out, but never quietly: an unsynced scan is a guest who was let
+  /// in and whose check-in exists nowhere else. Signing out drops the token
+  /// that queue would have replayed with, so discarding it is permanent.
+  Future<void> _signOut() async {
+    var pending = await widget.repo.pendingCount();
+
+    // Try to make the problem go away before asking about it. Usually the
+    // phone has signal by the time anyone signs out and this leaves zero.
+    if (pending > 0) {
+      try {
+        await widget.repo.sync();
+        pending = await widget.repo.pendingCount();
+      } catch (_) {
+        // Still offline. The dialog below says so plainly.
+      }
+    }
+
+    if (!mounted) return;
+
+    if (pending > 0) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: Palette.surface,
+          title: Text('$pending check-in${pending == 1 ? '' : 's'} not sent'),
+          content: Text(
+            "They're saved on this phone but haven't reached the server, and "
+            'signing out deletes them. Get online and open the gate again to '
+            'send them first.',
+            style: const TextStyle(color: Palette.muted, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Stay signed in'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete and sign out',
+                  style: TextStyle(color: Palette.deny)),
+            ),
+          ],
+        ),
+      );
+      if (discard != true) return;
+    }
+
+    await widget.onSignOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Which event?')),
+      appBar: AppBar(
+        title: const Text('Which event?'),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'signout') _signOut();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'signout', child: Text('Sign out')),
+            ],
+          ),
+        ],
+      ),
       body: _error != null
           ? Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [

@@ -31,9 +31,21 @@ npm run dev   --workspace web                 # :3000
   `/recover`. Lost both → `npx tsx scripts/reset-password.ts +234…`, which
   is deliberately not an API endpoint.
 - **Ushers** never type anything: the organiser hits *Get sign-in link* on
-  the Team page and sends it over WhatsApp. One tap lands them on the gate.
+  the Team page and sends it over WhatsApp. One tap lands them on the gate
+  in a browser — or they paste the same message into the **scanner app**,
+  which pulls the token out of it and spends it the same way. One invite,
+  either surface, whichever they open first. The app is the better of the
+  two at a real gate: the browser scanner asks the server about every scan,
+  while the app verifies offline.
 - **OTP** still works and is now just a third door. With `TERMII_API_KEY`
-  unset the code is printed on the login page in dev.
+  unset the code is printed on the login page in dev. It is no longer the
+  scanner app's primary sign-in — it sits behind *"I have no link"*, since
+  SMS costs money per usher and needs a provider the deploy does not have.
+- **Signing out** of the app wipes the session *and* the downloaded event:
+  guest list, signing keys, cached assignments. Ushers are casual staff and
+  phones get shared, so leaving a household list on the handset is the same
+  leak as leaving the printed one. It refuses to discard unsynced check-ins
+  without an explicit confirmation naming the count.
 
 The seeded accounts are `+2348030000001` (organiser) and `+2348030000002`
 (usher).

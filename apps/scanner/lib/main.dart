@@ -51,6 +51,19 @@ class _ScannerAppState extends State<ScannerApp> {
     });
   }
 
+  /// Drops the session and everything downloaded under it.
+  ///
+  /// The device id deliberately survives. It identifies the handset, not
+  /// the person, and the server uses it to recognise a replayed queue —
+  /// rotating it on every sign-out would turn one phone into many and
+  /// break that idempotency for no gain.
+  Future<void> _signOut() async {
+    await _repo?.wipe();
+    await _storage.delete(key: 'jwt');
+    _api.token = null;
+    if (mounted) setState(() => _signedIn = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -64,7 +77,7 @@ class _ScannerAppState extends State<ScannerApp> {
                   api: _api,
                   onSignedIn: () => setState(() => _signedIn = true),
                 )
-              : _Home(api: _api, repo: _repo!),
+              : _Home(api: _api, repo: _repo!, onSignOut: _signOut),
     );
   }
 }
@@ -72,13 +85,19 @@ class _ScannerAppState extends State<ScannerApp> {
 class _Home extends StatelessWidget {
   final ApiClient api;
   final Repository repo;
-  const _Home({required this.api, required this.repo});
+  final Future<void> Function() onSignOut;
+  const _Home({
+    required this.api,
+    required this.repo,
+    required this.onSignOut,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AssignmentsScreen(
       api: api,
       repo: repo,
+      onSignOut: onSignOut,
       onOpenLeg: (legId, entranceId, eventName, gateName) {
         Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => ScanScreen(
