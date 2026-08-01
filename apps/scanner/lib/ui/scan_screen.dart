@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/checkin.dart';
 import '../store/repository.dart';
 import 'result_overlay.dart';
+import 'sounds.dart';
 import 'recent_sheet.dart';
 import 'search_sheet.dart';
 import 'walk_in_sheet.dart';
@@ -55,6 +56,13 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   void initState() {
     super.initState();
+    // Decode the cues now. Left to the first scan, the codec spins up while
+    // a guest is standing there and the sound lands after the screen has
+    // already changed — which reads as the sound belonging to the next
+    // person in the queue.
+    GateSounds.instance.warmUp().then((_) {
+      if (mounted) setState(() {});
+    });
     _refreshPending();
     // The queue replays whenever signal allows; a failure just waits for
     // the next tick. Check-in never stops.
@@ -180,6 +188,18 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
+  Future<void> _toggleMute() async {
+    await GateSounds.instance.setMuted(!GateSounds.instance.muted);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(seconds: 2),
+      content: Text(GateSounds.instance.muted
+          ? 'Sound off — the phone still buzzes.'
+          : 'Sound on.'),
+    ));
+  }
+
   /// What this phone has done here, and the only way to take back an
   /// admission once the result overlay has gone.
   Future<void> _openRecent() async {
@@ -299,6 +319,21 @@ class _ScanScreenState extends State<ScanScreen> {
                         style:
                             const TextStyle(fontSize: 12, color: Palette.muted)),
                   ]),
+            ),
+            // A ceremony is the case this exists for: a chime during vows
+            // is worse than an usher glancing at the screen. Icon only, and
+            // deliberately not next to anything destructive.
+            IconButton(
+              onPressed: _toggleMute,
+              visualDensity: VisualDensity.compact,
+              tooltip: GateSounds.instance.muted ? 'Sound off' : 'Sound on',
+              icon: Icon(
+                GateSounds.instance.muted
+                    ? Icons.volume_off_outlined
+                    : Icons.volume_up_outlined,
+                size: 19,
+                color: GateSounds.instance.muted ? Palette.hold : Palette.muted,
+              ),
             ),
             // Next to the sync badge rather than in the bottom bar: it is
             // reached after something has gone wrong, not during a queue.

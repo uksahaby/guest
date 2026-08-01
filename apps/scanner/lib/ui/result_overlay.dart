@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../core/checkin.dart';
+import 'sounds.dart';
 import 'theme.dart';
 
 /// The result screen for every scan outcome, per design/mockups/scanner.html
@@ -92,21 +92,14 @@ class _ResultOverlayState extends State<ResultOverlay> {
     super.dispose();
   }
 
-  /// Phase-4c §5: distinguishable without looking. (Tones are v2 — haptics
-  /// carry the split for now.)
+  /// Phase-4c §5: distinguishable without looking — now actually audible.
+  ///
+  /// Sound leads and haptics stay. An usher working a queue is looking at
+  /// the guest, not the phone, and a buzz reaches nobody holding a handset
+  /// at arm's length.
   void _feedback() {
-    switch (d.tone) {
-      case Tone.admit:
-        HapticFeedback.lightImpact();
-      case Tone.ask:
-        HapticFeedback.lightImpact();
-      case Tone.hold:
-        HapticFeedback.mediumImpact();
-        Future.delayed(const Duration(milliseconds: 120),
-            HapticFeedback.mediumImpact);
-      case Tone.deny:
-        HapticFeedback.vibrate();
-    }
+    GateSounds.instance.play(d.tone);
+    gateHaptic(d.tone);
   }
 
   Color get _accent => switch (d.tone) {
