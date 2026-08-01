@@ -52,12 +52,38 @@ class _ResultOverlayState extends State<ResultOverlay> {
   @override
   void initState() {
     super.initState();
+    _arrive();
+  }
+
+  /// Found at a real gate: admitting from the count picker left the overlay
+  /// up forever, saying "Returning to camera" with nothing to return it.
+  ///
+  /// A needs_count result is replaced in place by the admitted one — same
+  /// widget, same position — so Flutter keeps this State and initState does
+  /// not run a second time. The timer, the haptic and the picker default
+  /// all lived there, so none of them happened for the outcome the usher
+  /// actually ends on. Every scan after it was ignored, because the screen
+  /// behind is guarded on a result being present.
+  ///
+  /// A plain admit never showed it: that overlay is built fresh.
+  @override
+  void didUpdateWidget(covariant ResultOverlay old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.decision, widget.decision)) {
+      _autoReturn?.cancel();
+      _arrive();
+    }
+  }
+
+  /// Everything a newly shown result does, whether it is the first or the
+  /// third in one visit.
+  void _arrive() {
     _picked = d.remaining != null && d.remaining! > 0 ? d.remaining! : 1;
     _feedback();
     final ms = d.autoReturnMs;
-    if (ms != null) {
-      _autoReturn = Timer(Duration(milliseconds: ms), widget.onClose);
-    }
+    _autoReturn = ms == null
+        ? null
+        : Timer(Duration(milliseconds: ms), widget.onClose);
   }
 
   @override
