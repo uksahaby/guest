@@ -218,8 +218,15 @@ the web scanner
      append-only triggers come back (`DEPLOY.md` §7). Two caveats, both
      load-bearing: nothing runs it on a schedule, and the drill was against
      local Postgres — **nobody has restored the real Neon database yet.**
-   - Still nothing for **error monitoring or uptime checks**, and CI
-     deploys nothing.
+   - **Error monitoring** exists (`src/errors.ts`, `DEPLOY.md` §8): every
+     500 carries a request id the caller can quote, the cause never leaves
+     the server, a crash kills the process so Render restarts it, and an
+     optional `ERROR_WEBHOOK_URL` tells someone. Alerts are rate-limited
+     three per fault per 15 min and scrubbed of anything phone-shaped.
+     No vendor, no SDK — if it ever needs traces, that is Sentry's job.
+   - Still nothing for **uptime checks**: error monitoring only speaks
+     while the API is alive enough to notice, and a sleeping free-tier box
+     looks exactly like a dead one from outside. CI deploys nothing.
 2. **Payments have never met real Paystack.** Everything so far is the
    offline `StubProvider`; the signed-webhook path is tested against our
    own signature, never theirs.

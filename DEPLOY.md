@@ -121,6 +121,7 @@ DATABASE_URL="$SUPERUSER_URL" npm run migrate --workspace api
 | `PORT` / `HOST` | no | Platform sets `PORT`; `HOST` defaults to `0.0.0.0` in production. |
 | `LOG_LEVEL` | no | Default `info`. |
 | `ALLOW_SMS_LOG_SENDER` | no | `true` lets the box boot with no SMS provider — now the ordinary case. Any OTP codes go to the **log** rather than a phone; nothing else depends on it. It does *not* put codes back in HTTP responses. |
+| `ERROR_WEBHOOK_URL` | no | Where to shout when something breaks. Any URL that accepts a POST. Unset, the only record is the log. See §8. |
 | `TRUST_PROXY` | **yes, in practice** | Who may tell the API the caller's real address. Read §6 before choosing a value — left unset, every per-IP rate limit collapses into one shared bucket. |
 
 ### Web
@@ -255,10 +256,50 @@ without its policies looks healthy and is wide open.
 against local Postgres. Run it once against a scratch Neon branch before
 trusting any of this with a wedding.
 
-## 8. Not done
+## 8. Error monitoring
 
-Named so nobody assumes otherwise: **no error monitoring, no uptime checks,
-no staging seed data, and the backup above is manual** — nothing runs it on
-a schedule, so it protects you exactly as often as someone remembers.
+Set `ERROR_WEBHOOK_URL` to any URL that accepts a POST — a Slack or Discord
+incoming webhook, an ntfy topic, your own endpoint. Unset, everything still
+works and the only record is the log, which on a Saturday morning is nobody.
+
+Deliberately not a service: no account, no SDK, no vendor. If this ever
+needs traces, breadcrumbs or release tracking, the answer is Sentry, not a
+bigger `errors.ts`.
+
+**Three things it does.**
+
+*Every 500 carries a request id, and the caller sees it.* "Something went
+wrong (a3f9c2)" turns an unreproducible complaint into one log search. The
+cause never leaves the server, in any environment — no message, no stack.
+
+*A crash takes the process down.* After an unhandled rejection the process
+is in a state nobody reasoned about. Render restarts in seconds and the
+scanner queues through a restart; nothing recovers from a server quietly
+answering wrongly.
+
+*Someone gets told,* if the webhook is set.
+
+**Alerts are rate-limited**: three per distinct fault per 15 minutes, and
+20 in total. A crash loop must not bury the alert that mattered, and every
+alert is an outbound request — unbounded, our incident becomes theirs.
+Faults are told apart by route, error name and the first stack frame in
+`src/`, so `/events/abc/guests` and `/events/def/guests` failing the same
+way is one fault, not two hundred.
+
+**Alerts are scrubbed** of anything phone-shaped and any connection string
+before they leave. The logger redacts by field name, which cannot help when
+a number sits inside a message — a Postgres unique violation quotes the
+value that collided, and here that value is often somebody's phone number.
+
+Only 5xx alerts. A 400 is not an incident.
+
+## 9. Not done
+
+Named so nobody assumes otherwise: **no uptime checks, no staging seed
+data, and the backup is manual** — nothing runs it on a schedule, so it
+protects you exactly as often as someone remembers. Nothing watches whether
+the API is *up*; error monitoring only speaks when the API is alive enough
+to notice. A dead box is silent, and Render's free tier sleeps on purpose,
+which makes "no traffic" and "no server" look identical from outside.
 CI (`.github/workflows/ci.yml`) runs the three test suites but does not
 deploy anything.

@@ -41,6 +41,15 @@ export const env = {
   /** Unset locally: OTP codes go to the log instead of a phone. */
   termiiApiKey: process.env.TERMII_API_KEY ?? "",
   /**
+   * Where to shout when something breaks. Any URL that accepts a POST —
+   * a Slack or Discord incoming webhook, ntfy, your own endpoint.
+   *
+   * Unset means the only record is the log, which is nobody watching on a
+   * Saturday morning. Alerts are rate-limited and scrubbed of anything
+   * phone-shaped before they leave; see errors.ts.
+   */
+  errorWebhookUrl: process.env.ERROR_WEBHOOK_URL ?? "",
+  /**
    * Escape hatch for standing infrastructure up before the Termii account
    * exists. Lets the log-only sender run in production, so a staging box
    * can boot and be signed into by reading its log.

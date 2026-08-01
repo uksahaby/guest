@@ -20,16 +20,29 @@ import multipart from "@fastify/multipart";
 import { makeProvider, type PaymentProvider } from "./paystack.ts";
 import { makeSender, type SmsSender } from "./sms.ts";
 import { createLimits, type Limits } from "./ratelimit.ts";
+import {
+  Alerts,
+  installErrorHandling,
+  installProcessHandlers,
+  makeAlerter,
+  type Alerter,
+} from "./errors.ts";
 
 declare module "fastify" {
   interface FastifyInstance {
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
     limits: Limits;
+    alerts: Alerts;
   }
 }
 
 export function buildServer(
-  opts: { provider?: PaymentProvider; sms?: SmsSender } = {},
+  opts: {
+    provider?: PaymentProvider;
+    sms?: SmsSender;
+    /** Tests pass a fake; production reads ERROR_WEBHOOK_URL. */
+    alerter?: Alerter | null;
+  } = {},
 ) {
   // Logging is off only under test. Production is where logs matter most —
   // there is no other way to find out what happened at someone's wedding.
@@ -87,6 +100,11 @@ export function buildServer(
     }
   });
 
+  // Before the routes, so anything they throw lands here rather than in
+  // Fastify's default handler.
+  app.decorate("alerts", new Alerts(opts.alerter ?? makeAlerter()));
+  installErrorHandling(app, app.alerts);
+
   app.get("/health", async () => {
     await assertDbUp();
     return { ok: true };
@@ -133,6 +151,9 @@ export function buildServer(
 const { pathToFileURL } = await import("node:url");
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const app = buildServer();
+  // Only here: a test suite that builds twenty servers must not install
+  // twenty sets of process handlers.
+  installProcessHandlers(app, app.alerts);
   app.listen({ port: env.port, host: env.host }).catch((err) => {
     app.log.error(err);
     process.exit(1);
