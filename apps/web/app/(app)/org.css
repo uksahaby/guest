@@ -1152,3 +1152,219 @@ table.list tr:last-child td {
   .side { display: none; }
   .main { padding: 16px; }
 }
+
+/* =====================================================================
+   Event overview.
+   ===================================================================== */
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.crumbs a {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.crumbs a:hover { text-decoration: underline; }
+.crumbs b {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.grid-hero {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+.card.hero { padding: 20px; }
+.hero-top {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+.hero-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 27px;
+  margin-bottom: 10px;
+}
+.facts.plain {
+  color: var(--ink-2);
+  margin-bottom: 14px;
+}
+.hero-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The countdown: four cells, tabular so the digits do not jitter as the
+   seconds tick. */
+.countdown {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.countdown > div {
+  background: var(--p50);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 4px;
+  text-align: center;
+}
+.countdown strong {
+  display: block;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.countdown small {
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.ready-block {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.ready-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.sub.sm { font-size: 12.5px; }
+
+.stats.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+
+.muted-count {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-3);
+}
+
+/* The RSVP ring's other two arcs. */
+.ring-warn,
+.ring-err {
+  fill: none;
+  stroke-width: 13;
+  stroke-linecap: butt;
+}
+.ring-warn { stroke: var(--warn); }
+.ring-err { stroke: var(--err); }
+
+.legend.spread li { justify-content: flex-start; }
+.legend.spread b {
+  margin-left: auto;
+  font-weight: 500;
+  color: var(--ink);
+}
+.ghost.wide {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+/* ---------- checklist ---------- */
+.checks { list-style: none; }
+.checks li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.checks li:first-child { border-top: none; }
+.checks li i {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+}
+.checks li.done i {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+.checks li.urgent i { border-color: var(--err); }
+.checks li a {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.checks li a:hover { text-decoration: underline; }
+.checks li.done a { color: var(--ink-2); }
+.checks li > span {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.checks li.urgent > span {
+  color: var(--err);
+  font-weight: 600;
+}
+
+/* ---------- activity, laid out in a row ---------- */
+.feed.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 4px 18px;
+}
+.feed.row li {
+  border-top: none;
+  align-items: flex-start;
+}
+.feed.row li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.feed.row span {
+  font-size: 13px;
+  line-height: 1.35;
+}
+.feed.row time { font-size: 11.5px; }
+
+@media (max-width: 1180px) {
+  .stats.five { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-hero { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .stats.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero-top { flex-direction: column; align-items: flex-start; }
+}
+
+/* Timing badge on the event hero — neutral, so it does not compete with
+   the readiness word beside it. */
+.state.when {
+  background: var(--p100);
+  color: var(--p600);
+}

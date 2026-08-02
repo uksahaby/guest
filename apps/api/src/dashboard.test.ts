@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { buildServer } from "./server.ts";
 import { sqlAdmin as sql, closeDb } from "./db.ts";
-import { readiness } from "./dashboard.ts";
+import { readiness } from "./readiness.ts";
 
 const app = buildServer();
 before(() => app.ready());
