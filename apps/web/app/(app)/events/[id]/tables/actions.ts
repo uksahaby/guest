@@ -68,3 +68,28 @@ export async function removeTable(formData: FormData): Promise<void> {
   const { status } = await api(`/tables/${tableId}`, { method: "DELETE" });
   back(eventId, status === 204 ? undefined : "failed");
 }
+
+/**
+ * Seat everyone who has replied yes and has nowhere to sit.
+ *
+ * This is what "seating rules" means here: keep a household together, put
+ * it at the tightest table that still fits, largest parties first. It never
+ * moves anyone already seated — an organiser who hand-placed the parents
+ * will not forgive a button that reshuffles them.
+ */
+export async function autoSeat(formData: FormData): Promise<void> {
+  const eventId = String(formData.get("event_id") ?? "");
+  if (!eventId) redirect("/events");
+
+  const { status, data } = await api<{ seated: number; still_waiting: number }>(
+    `/events/${eventId}/seating/auto`,
+    { method: "POST" },
+  );
+
+  revalidatePath(`/events/${eventId}/tables`);
+  redirect(
+    status < 400
+      ? `/events/${eventId}/tables?seated=${data.seated}&waiting=${data.still_waiting}`
+      : `/events/${eventId}/tables?error=auto`,
+  );
+}

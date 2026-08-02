@@ -1,59 +1,59 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api, type EventShape } from "@/lib/org-api";
-import { addTables, removeTable, renameTable, seatHousehold } from "./actions";
+import { addTables, seatHousehold, autoSeat } from "./actions";
+import { FloorPlan, type PlanTable } from "./FloorPlan";
 
 /**
- * Seating, per the Tables view in mockups/event-workspace.html: a card per
- * table with "8 of 10 seats", an occupancy bar, and who is on it — plus an
- * amber strip for the households still without a seat.
+ * Tables and seating: the list, the floor plan, and who is still standing.
  *
- * A seat is a person, so a household of four takes four of them.
+ * Seats are counted from invitation_legs.table_id and nowhere else. A
+ * stored "seats assigned" is a number that has to be kept in step with the
+ * thing it counts, and eventually is not.
  */
 
 type Seating = {
   leg_id: string;
-  tables: {
+  tables: (PlanTable & { households: number })[];
+  unassigned: {
     id: string;
-    name: string;
-    capacity: number;
-    seats_used: number;
-    households: number;
-    who: string[];
-    over_capacity: boolean;
-  }[];
-  total_tables: number;
-  total_capacity: number;
-  seated_people: number;
-  unseated_households: number;
-  unseated_people: number;
-};
-
-type Unseated = {
-  data: {
-    invitation_id: string;
     display_name: string;
     allowance: number;
-    category: string | null;
     rsvp: string;
+    category: string | null;
   }[];
+  totals: {
+    tables: number;
+    active: number;
+    inactive: number;
+    seats: number;
+    assigned: number;
+    empty: number;
+    unseated_people: number;
+    unseated_households: number;
+  };
 };
 
-const ERRORS: Record<string, string> = {
-  bad_capacity: "Seats per table must be between 1 and 100.",
-  bad_count: "Create between 1 and 500 tables at a time.",
-  too_many_tables: "That would be more than 500 tables at this part of the event.",
-  wrong_leg_table: "That table belongs to a different part of the event.",
-  not_invited: "That household isn't invited to this part of the event.",
-  failed: "That didn't save — try again.",
-};
+const PER_PAGE = 8;
+
+function pct(n: number, of: number): string {
+  return of > 0 ? `${((n / of) * 100).toFixed(1)}%` : "0.0%";
+}
 
 export default async function TablesPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; leg?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    q?: string;
+    page?: string;
+    seated?: string;
+    waiting?: string;
+    error?: string;
+    added?: string;
+  }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -61,241 +61,370 @@ export default async function TablesPage({
   const { status, data: event } = await api<EventShape>(`/events/${id}`);
   if (status !== 200) notFound();
 
-  // Seating is per leg. Single-leg events — the common case — never see a
-  // switcher, per the handoff's rule that the UI mustn't say "leg".
-  const leg = event.legs.find((l) => l.id === sp.leg) ?? event.legs[0];
-  if (!leg) notFound();
+  const { status: st, data } = await api<Seating>(`/events/${id}/seating`);
+  if (st !== 200) notFound();
 
-  const [{ data: plan }, { data: unseated }] = await Promise.all([
-    api<Seating>(`/legs/${leg.id}/tables`),
-    api<Unseated>(`/legs/${leg.id}/unseated`),
-  ]);
+  const t = data.totals;
+  const here = `/events/${id}/tables`;
+  const tab = sp.tab === "unassigned" ? "unassigned" : "list";
+  const q = (sp.q ?? "").trim().toLowerCase();
+  const page = Math.max(1, Number(sp.page ?? 1) || 1);
+
+  const filtered = q
+    ? data.tables.filter(
+        (x) =>
+          x.name.toLowerCase().includes(q) ||
+          (x.kind ?? "").toLowerCase().includes(q),
+      )
+    : data.tables;
+  const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const shown = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const from = filtered.length === 0 ? 0 : (page - 1) * PER_PAGE + 1;
+  const to = Math.min(page * PER_PAGE, filtered.length);
+
+  const occupied = t.seats > 0 ? Math.round((t.assigned / t.seats) * 100) : 0;
+  const fullest = [...data.tables]
+    .filter((x) => x.is_active)
+    .sort((a, b) => b.assigned - a.assigned)[0];
+
+  const ring = 2 * Math.PI * 26;
+  const qs = q ? `q=${encodeURIComponent(q)}&` : "";
+
+  const cards = [
+    { label: "Total Tables", n: t.tables,
+      foot: `${t.active} Active · ${t.inactive} Inactive`, tone: "",
+      d: "M4 20V8l8-4 8 4v12M9 20v-6h6v6" },
+    { label: "Total Seats", n: t.seats,
+      foot: `${t.unseated_households} Unassigned`, tone: "mute",
+      d: "M16 20v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6" },
+    { label: "Seats Assigned", n: t.assigned,
+      foot: `${pct(t.assigned, t.seats)} of total`, tone: "ok",
+      d: "M20 6 9 17l-5-5" },
+    { label: "Empty Seats", n: t.empty,
+      foot: `${pct(t.empty, t.seats)} of total`, tone: "warn",
+      d: "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18" },
+  ];
 
   return (
     <>
-      <p className="eyebrow">
-        <Link href={`/events/${id}`} style={{ color: "inherit" }}>
-          {event.name}
-        </Link>
-      </p>
-      <h1 className="page">Tables</h1>
-      <p className="sub">
-        {plan.total_tables === 0
-          ? "No tables yet. Add a run of them and seat households by party — a family of four takes four seats."
-          : `${plan.total_tables} tables · ${plan.total_capacity} seats · ${plan.seated_people} seated.`}
-      </p>
+      <nav className="crumbs">
+        <Link href="/events">My Events</Link>
+        <span aria-hidden="true">›</span>
+        <Link href={`/events/${id}`}>{event.name}</Link>
+        <span aria-hidden="true">›</span>
+        <b>Tables &amp; Seating</b>
+      </nav>
 
-      {event.legs.length > 1 && (
-        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-          {event.legs.map((l) => (
-            <Link
-              key={l.id}
-              className={l.id === leg.id ? "primary" : "ghost"}
-              href={`/events/${id}/tables?leg=${l.id}`}
-            >
-              {l.name}
-            </Link>
-          ))}
+      <div className="page-head">
+        <div>
+          <h1 className="page">Tables &amp; Seating</h1>
+          <p className="sub">
+            Organise your tables, manage seating arrangements and assign guests.
+          </p>
         </div>
-      )}
-
-      {sp.error && <p className="form-error">{ERRORS[sp.error] ?? ERRORS.failed}</p>}
-
-      {plan.unseated_households > 0 && (
-        <div className="unassigned">
-          <div>
-            <div className="t">
-              {plan.unseated_households}{" "}
-              {plan.unseated_households === 1 ? "household has" : "households have"} no
-              table
-            </div>
-            <div className="s">
-              {plan.unseated_people}{" "}
-              {plan.unseated_people === 1 ? "person" : "people"} to seat. Nobody is
-              turned away over a table — this only affects place cards.
-            </div>
-          </div>
+        <div className="head-actions">
+          <a className="ghost" href="#floor-plan">Floor Plan View</a>
+          <form action={autoSeat}>
+            <input type="hidden" name="event_id" value={id} />
+            <button className="ghost" type="submit">Seating Rules</button>
+          </form>
+          <a className="primary" href="#add-table">+ Add Table</a>
         </div>
-      )}
-
-      <div className="card">
-        <h2>Add tables</h2>
-        <form action={addTables}>
-          <input type="hidden" name="event_id" value={id} />
-          <input type="hidden" name="leg_id" value={leg.id} />
-          <div className="form-row">
-            <input
-              className="field narrow"
-              name="count"
-              type="number"
-              min={1}
-              max={500}
-              defaultValue={10}
-              aria-label="How many tables"
-            />
-            <input
-              className="field narrow"
-              name="capacity"
-              type="number"
-              min={1}
-              max={100}
-              defaultValue={10}
-              aria-label="Seats per table"
-            />
-            <button className="primary" type="submit">
-              Add numbered tables
-            </button>
-          </div>
-        </form>
-        <form action={addTables} style={{ marginTop: 10 }}>
-          <input type="hidden" name="event_id" value={id} />
-          <input type="hidden" name="leg_id" value={leg.id} />
-          <div className="form-row">
-            <input className="field" name="name" placeholder="VIP Table" required />
-            <input
-              className="field narrow"
-              name="capacity"
-              type="number"
-              min={1}
-              max={100}
-              defaultValue={10}
-              aria-label="Seats"
-            />
-            <button className="ghost" type="submit">
-              Add one named table
-            </button>
-          </div>
-        </form>
       </div>
 
-      {plan.tables.length > 0 && (
-        <div className="tgrid">
-          {plan.tables.map((t) => {
-            const pct = Math.min(100, Math.round((t.seats_used / t.capacity) * 100));
-            const shown = t.who.slice(0, 3);
-            const more = t.who.length - shown.length;
-            return (
-              <div className="tcard" key={t.id}>
-                <h3>{t.name}</h3>
-                <div className="occ">
-                  {t.seats_used} of {t.capacity} seats
-                  {t.over_capacity ? " · over" : ""}
-                </div>
-                <div className="bar">
-                  <i
-                    className={t.over_capacity ? "over" : t.seats_used >= t.capacity ? "full" : ""}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <div className="who">
-                  {t.who.length === 0 ? "Empty" : shown.join(" · ")}
-                  {more > 0 ? ` +${more}` : ""}
-                </div>
-                <details className="tedit">
-                  <summary>Edit</summary>
-                  <form action={renameTable} style={{ marginTop: 10 }}>
-                    <input type="hidden" name="event_id" value={id} />
-                    <input type="hidden" name="table_id" value={t.id} />
-                    <div className="form-row">
-                      <input
-                        className="field"
-                        name="name"
-                        defaultValue={t.name}
-                        aria-label="Table name"
-                      />
-                      <input
-                        className="field narrow"
-                        name="capacity"
-                        type="number"
-                        min={1}
-                        max={100}
-                        defaultValue={t.capacity}
-                        aria-label="Seats"
-                      />
-                      <button className="ghost" type="submit">
-                        Save
-                      </button>
-                    </div>
-                  </form>
-                  <form action={removeTable} style={{ marginTop: 8 }}>
-                    <input type="hidden" name="event_id" value={id} />
-                    <input type="hidden" name="table_id" value={t.id} />
-                    <button className="ghost" type="submit">
-                      Remove table
-                    </button>
-                  </form>
-                  {t.households > 0 && (
-                    <p className="t-sub" style={{ marginTop: 8 }}>
-                      Removing it puts {t.households}{" "}
-                      {t.households === 1 ? "household" : "households"} back on the
-                      unseated list. Nobody leaves the guest list.
-                    </p>
-                  )}
-                </details>
-              </div>
-            );
-          })}
+      {sp.seated && (
+        <div className="plan-line">
+          <b>
+            Seated {sp.seated}{" "}
+            {sp.seated === "1" ? "household" : "households"}.
+          </b>
+          {sp.waiting && sp.waiting !== "0"
+            ? ` ${sp.waiting} still need a table with room.`
+            : " Everyone who replied yes has a seat."}
         </div>
       )}
+      {sp.added && <div className="plan-line"><b>Table added.</b></div>}
+      {sp.error && <p className="form-error">That didn&rsquo;t work — try again.</p>}
 
-      <div className="card">
-        <h2>Seat a household</h2>
-        {unseated.data.length === 0 && plan.total_tables > 0 ? (
-          <div className="empty">Everyone has a seat.</div>
-        ) : unseated.data.length === 0 ? (
-          <div className="empty">No households on this part of the event yet.</div>
-        ) : (
-          <table className="list">
-            <thead>
-              <tr>
-                <th>Household</th>
-                <th>Party</th>
-                <th>Table</th>
-              </tr>
-            </thead>
-            <tbody>
-              {unseated.data.map((h) => (
-                <tr key={h.invitation_id}>
-                  <td>
-                    <div className="t-name">{h.display_name}</div>
-                    <div className="t-sub">{h.category ?? "—"}</div>
-                  </td>
-                  <td>{h.allowance}</td>
-                  <td>
-                    <form action={seatHousehold} className="form-row">
-                      <input type="hidden" name="event_id" value={id} />
-                      <input type="hidden" name="leg_id" value={leg.id} />
-                      <input
-                        type="hidden"
-                        name="invitation_id"
-                        value={h.invitation_id}
-                      />
-                      <select
-                        className="field"
-                        name="table_id"
-                        defaultValue=""
-                        aria-label={`Table for ${h.display_name}`}
-                      >
-                        <option value="">No table</option>
-                        {plan.tables.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} — {t.capacity - t.seats_used} free
-                          </option>
-                        ))}
-                      </select>
-                      <button className="ghost" type="submit">
-                        Seat
-                      </button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {plan.total_tables === 0 && (
-          <p className="sub">Add some tables first and they&rsquo;ll appear here.</p>
-        )}
+      <div className="stats five">
+        {cards.map((c) => (
+          <div className="card stat" key={c.label}>
+            <span className={`stat-icon ${c.tone}`} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d={c.d} />
+              </svg>
+            </span>
+            <div>
+              <p className="stat-label">{c.label}</p>
+              <p className="stat-value">{c.n.toLocaleString("en-NG")}</p>
+              <p className="stat-foot">{c.foot}</p>
+            </div>
+          </div>
+        ))}
+
+        <div className="card stat capacity">
+          <span className="cap-ring" aria-hidden="true">
+            <svg viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="26" className="ring-track" />
+              <circle cx="32" cy="32" r="26" className="ring-fill"
+                strokeDasharray={`${(ring * occupied) / 100} ${ring}`}
+                transform="rotate(-90 32 32)" />
+            </svg>
+          </span>
+          <div>
+            <p className="stat-label">Tables Capacity</p>
+            <p className="stat-value">{occupied}%</p>
+            <p className="stat-foot">Occupied</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid-seating">
+        <div className="card">
+          <div className="tabs">
+            <Link className={tab === "list" ? "on" : ""} href={here}>
+              Table List
+            </Link>
+            <Link className={tab === "unassigned" ? "on" : ""}
+              href={`${here}?tab=unassigned`}>
+              Unassigned Guests ({t.unseated_households})
+            </Link>
+          </div>
+
+          {tab === "list" ? (
+            <>
+              <form method="GET" className="filters">
+                <input className="field search" type="search" name="q"
+                  defaultValue={q} placeholder="Search tables…"
+                  aria-label="Search tables" />
+                <button className="ghost" type="submit">Filter</button>
+                {q && <Link className="ghost" href={here}>Clear</Link>}
+              </form>
+
+              <div className="table-wrap">
+                <table className="list guests">
+                  <thead>
+                    <tr>
+                      <th>Table Name</th>
+                      <th>Capacity</th>
+                      <th>Assigned</th>
+                      <th>Status</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shown.map((x) => {
+                      const left = x.capacity - x.assigned;
+                      return (
+                        <tr key={x.id}>
+                          <td>
+                            <div className="who">
+                              <span className="tbl-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none"
+                                  stroke="currentColor" strokeWidth="1.7"
+                                  strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6" />
+                                </svg>
+                              </span>
+                              <div>
+                                <b>{x.name}</b>
+                                <small>{x.kind ?? "No type"}</small>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="num">{x.capacity}</td>
+                          <td className="num">{x.assigned}</td>
+                          <td>
+                            {!x.is_active ? (
+                              <span className="badge d-not_sent">Inactive</span>
+                            ) : left <= 0 ? (
+                              <span className="badge attending">Full</span>
+                            ) : (
+                              <span className="badge pending">
+                                {left} Seat{left === 1 ? "" : "s"} Left
+                              </span>
+                            )}
+                          </td>
+                          <td className="right">
+                            <Link className="ghost sm" href={`${here}?tab=unassigned`}>
+                              Seat
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="pager">
+                <span className="sub">
+                  Showing {from} to {to} of {filtered.length} tables
+                </span>
+                <div className="pages">
+                  {page > 1 && (
+                    <Link className="ghost sm" href={`${here}?${qs}page=${page - 1}`}>
+                      ‹
+                    </Link>
+                  )}
+                  {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
+                    <Link key={n} className={`pagenum${n === page ? " on" : ""}`}
+                      href={`${here}?${qs}page=${n}`}>
+                      {n}
+                    </Link>
+                  ))}
+                  {page < pages && (
+                    <Link className="ghost sm" href={`${here}?${qs}page=${page + 1}`}>
+                      ›
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="sub" style={{ margin: "4px 0 14px" }}>
+                Households that replied yes and have nowhere to sit. Anyone
+                who has not replied is left out — chasing a table for a guest
+                who never arrives is how a room gets seated twice.
+              </p>
+              {data.unassigned.length === 0 ? (
+                <p className="sub">Everyone who replied yes has a seat.</p>
+              ) : (
+                <div className="table-wrap">
+                  <table className="list guests">
+                    <thead>
+                      <tr>
+                        <th>Household</th>
+                        <th>Type</th>
+                        <th>Seats</th>
+                        <th>Put them at</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.unassigned.map((g) => (
+                        <tr key={g.id}>
+                          <td><b>{g.display_name}</b></td>
+                          <td>
+                            {g.category ? (
+                              <span className="chip">{g.category}</span>
+                            ) : (
+                              <span className="none">—</span>
+                            )}
+                          </td>
+                          <td className="num">{g.allowance}</td>
+                          <td>
+                            <form action={seatHousehold} className="form-row">
+                              <input type="hidden" name="event_id" value={id} />
+                              <input type="hidden" name="leg_id" value={data.leg_id} />
+                              <input type="hidden" name="invitation_id" value={g.id} />
+                              <select className="field" name="table_id"
+                                defaultValue=""
+                                aria-label={`Table for ${g.display_name}`}>
+                                <option value="">Choose a table…</option>
+                                {data.tables
+                                  .filter(
+                                    (x) =>
+                                      x.is_active &&
+                                      x.capacity - x.assigned >= g.allowance,
+                                  )
+                                  .map((x) => (
+                                    <option key={x.id} value={x.id}>
+                                      {x.name} — {x.capacity - x.assigned} free
+                                    </option>
+                                  ))}
+                              </select>
+                              <button className="ghost sm" type="submit">Seat</button>
+                            </form>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="card" id="floor-plan">
+          <h2 className="card-title">Floor Plan View</h2>
+          <FloorPlan tables={data.tables} />
+          <ul className="plan-legend">
+            <li><i className="dot ok" />Full</li>
+            <li><i className="dot warn" />Has empty seats</li>
+            <li><i className="dot mute" />Inactive</li>
+            <li><i className="dot open" />Nobody seated</li>
+          </ul>
+          <form action={autoSeat}>
+            <input type="hidden" name="event_id" value={id} />
+            <button className="ghost wide" type="submit">
+              Seat everyone who replied yes
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div className="grid-3">
+        <section className="card mini">
+          <span className="stat-icon ok" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 20v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6" />
+            </svg>
+          </span>
+          <div>
+            <strong>
+              {fullest ? `Fullest table (${fullest.name})` : "No tables yet"}
+            </strong>
+            <small>
+              {fullest
+                ? `${fullest.assigned} / ${fullest.capacity} seats assigned`
+                : "Add a table to start seating"}
+            </small>
+            <Link href={here}>View table →</Link>
+          </div>
+        </section>
+
+        <section className="card mini">
+          <span className="stat-icon warn" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 17h.01M9.1 9a3 3 0 1 1 4.2 2.8c-.8.4-1.3 1.2-1.3 2.2" />
+            </svg>
+          </span>
+          <div>
+            <strong>Still standing</strong>
+            <small>
+              {t.unseated_households} household
+              {t.unseated_households === 1 ? "" : "s"} with no table
+              {t.unseated_people > 0 ? ` · ${t.unseated_people} people` : ""}
+            </small>
+            <Link href={`${here}?tab=unassigned`}>View unassigned →</Link>
+          </div>
+        </section>
+
+        <section className="card mini" id="add-table">
+          <span className="stat-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </span>
+          <div>
+            <strong>Add a table</strong>
+            <form action={addTables} className="form-row" style={{ marginTop: 8 }}>
+              <input type="hidden" name="event_id" value={id} />
+              <input type="hidden" name="leg_id" value={data.leg_id} />
+              <input className="field" name="name" placeholder="Table 13"
+                aria-label="Table name" required />
+              <input className="field narrow" name="capacity" type="number"
+                min={1} defaultValue={10} aria-label="Seats" />
+              <button className="primary" type="submit">Add</button>
+            </form>
+          </div>
+        </section>
       </div>
     </>
   );

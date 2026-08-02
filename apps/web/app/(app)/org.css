@@ -2174,3 +2174,265 @@ input[type="file"].field {
   font-size: 13px;
   font-weight: 500;
 }
+
+/* =====================================================================
+   Tables & seating.
+   ===================================================================== */
+
+.grid-seating {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+.grid-seating > .card {
+  margin: 0;
+}
+
+/* The capacity ring, sized to sit in a stat card without making it taller
+   than the four counts beside it. */
+.card.stat.capacity .cap-ring {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+.cap-ring svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.cap-ring .ring-track {
+  fill: none;
+  stroke: var(--p100);
+  stroke-width: 8;
+}
+.cap-ring .ring-fill {
+  fill: none;
+  stroke: var(--p600);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+/* ---------- tabs ---------- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: -4px -4px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.tabs a {
+  padding: 9px 12px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs a:hover {
+  color: var(--ink);
+}
+.tabs a.on {
+  color: var(--p600);
+  border-bottom-color: var(--p600);
+  font-weight: 600;
+}
+
+.tbl-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--p100);
+  color: var(--p600);
+}
+.tbl-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------- the room ---------- */
+.plan-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.plan-zoom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.plan-zoom button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink);
+}
+.plan-zoom button:hover {
+  border-color: var(--p600);
+}
+.plan-scroll {
+  overflow: auto;
+}
+
+/* Percent-positioned, so the same plan is right at any size. */
+.room {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  min-width: 260px;
+  border-radius: 14px;
+  border: 2px solid #e6ddcd;
+  background:
+    radial-gradient(circle at 20% 15%, #fdfbf6 0%, #f6f0e4 60%, #efe7d6 100%);
+  touch-action: none;
+  overflow: hidden;
+}
+.room-entrance {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  font-size: 9.5px;
+  letter-spacing: 1.4px;
+  color: #a89878;
+}
+
+.ptable {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  gap: 1px;
+  cursor: grab;
+  border: 2px solid var(--p600);
+  background: #fff;
+  color: var(--p900);
+  font-family: inherit;
+  padding: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+.ptable:hover {
+  z-index: 5;
+}
+.ptable.dragging {
+  cursor: grabbing;
+  z-index: 10;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+.pt-n {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+.pt-seats {
+  font-size: 8.5px;
+  color: var(--ink-2);
+  line-height: 1;
+}
+.ptable.full {
+  border-color: var(--ok);
+  background: #eaf6ea;
+}
+.ptable.part {
+  border-color: var(--warn);
+  background: #fdf4e6;
+}
+.ptable.empty {
+  border-color: #b8a6d8;
+  background: #f4f0fb;
+}
+.ptable.inactive {
+  border-color: var(--line);
+  background: #f1f1ef;
+  color: var(--ink-3);
+  border-style: dashed;
+}
+.pt-saving {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid var(--p600);
+  opacity: 0.5;
+}
+
+.plan-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 12px 0;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.plan-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dot.open {
+  background: #b8a6d8;
+}
+.ghost.wide {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* ---------- the three cards at the foot ---------- */
+.card.mini {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+}
+.card.mini > div {
+  min-width: 0;
+  flex: 1;
+}
+.card.mini strong {
+  display: block;
+  font-size: 13.5px;
+}
+.card.mini small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.card.mini a {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--p600);
+  text-decoration: none;
+}
+.card.mini a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 1180px) {
+  .grid-seating {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The seating tables have five narrow columns and live in a half-width
+   card. The 860px floor is for the eight-column guest list; here it only
+   forced a horizontal scrollbar onto a table that fits. */
+.grid-seating table.list.guests {
+  min-width: 380px;
+}
