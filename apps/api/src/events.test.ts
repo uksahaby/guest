@@ -211,3 +211,101 @@ test("attendance endpoint mirrors the leg_attendance view", async () => {
   assert.equal(a.arrived_people, 0);
   assert.equal(a.refused, 0);
 });
+
+// ---------------------------------------------------------------- guest list
+//
+// delivery_state used to be max(state::text), which ranks 'sent' above
+// 'opened' because s sorts after o. Anyone who had opened their invitation
+// was reported as merely sent — and the guest list derives "pending" (needs
+// a nudge) from "opened", so the badge contradicted the count beside it.
+
+test("a household that opened its invitation reads as opened, not sent", async () => {
+  const o = await organiser();
+  const event = await createEvent(o.token);
+
+  const [inv] = await sql`
+    insert into invitations (event_id, display_name)
+    values (${event.id}, 'Mr & Mrs Opened') returning id`;
+  await sql`
+    insert into invitation_legs (invitation_id, leg_id, allowance)
+    values (${inv!.id}, ${event.legs[0].id}, 2)`;
+
+  // Two rows, as a real send produces: the link, then the open.
+  await sql`
+    insert into invitation_deliveries
+      (invitation_id, channel, state, generated_at, sent_at)
+    values (${inv!.id}, 'whatsapp_link', 'sent', now(), now())`;
+  await sql`
+    insert into invitation_deliveries
+      (invitation_id, channel, state, generated_at, sent_at, opened_at)
+    values (${inv!.id}, 'whatsapp_link', 'opened', now(), now(), now())`;
+
+  const res = await app.inject({
+    method: "GET",
+    url: `/events/${event.id}/invitations`,
+    headers: { authorization: `Bearer ${o.token}` },
+  });
+  const row = res.json().data.find((r: { id: string }) => r.id === inv!.id);
+  assert.equal(row.delivery_state, "opened");
+});
+
+test("the guest list paginates and reports a total", async () => {
+  const o = await organiser();
+  const event = await createEvent(o.token);
+
+  for (let i = 0; i < 5; i++) {
+    const [inv] = await sql`
+      insert into invitations (event_id, display_name)
+      values (${event.id}, ${`Household ${i}`}) returning id`;
+    await sql`
+      insert into invitation_legs (invitation_id, leg_id, allowance)
+      values (${inv!.id}, ${event.legs[0].id}, 2)`;
+  }
+
+  const res = await app.inject({
+    method: "GET",
+    url: `/events/${event.id}/invitations?limit=2&offset=2`,
+    headers: { authorization: `Bearer ${o.token}` },
+  });
+  const body = res.json();
+
+  assert.equal(body.total, 5, "the total counts the list, not the page");
+  assert.equal(body.data.length, 2);
+  assert.equal(body.counts.households, 5);
+  assert.equal(body.counts.people, 10);
+});
+
+test("filtering by RSVP narrows the rows but not the counts", async () => {
+  const o = await organiser();
+  const event = await createEvent(o.token);
+
+  for (const [name, rsvp] of [
+    ["Mr Yes", "attending"],
+    ["Mr No", "declined"],
+    ["Mr Quiet", "pending"],
+  ] as const) {
+    const [inv] = await sql`
+      insert into invitations (event_id, display_name)
+      values (${event.id}, ${name}) returning id`;
+    await sql`
+      insert into invitation_legs (invitation_id, leg_id, allowance, rsvp, rsvp_count)
+      values (${inv!.id}, ${event.legs[0].id}, 2, ${rsvp}::rsvp_status,
+              ${rsvp === "attending" ? 2 : null})`;
+  }
+
+  const res = await app.inject({
+    method: "GET",
+    url: `/events/${event.id}/invitations?rsvp=confirmed`,
+    headers: { authorization: `Bearer ${o.token}` },
+  });
+  const body = res.json();
+
+  assert.equal(body.data.length, 1, "one confirmed household");
+  assert.equal(body.total, 1);
+  // The cards are the filters, so their numbers must describe the whole
+  // event — otherwise clicking one changes what the others claim.
+  assert.equal(body.counts.households, 3);
+  assert.equal(body.counts.confirmed, 1);
+  assert.equal(body.counts.declined, 1);
+  assert.equal(body.counts.no_response, 1, "never opened, so not 'pending'");
+});

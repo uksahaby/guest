@@ -127,7 +127,18 @@ export async function eventRoutes(app: FastifyInstance) {
 
   // ---- the guest list -----------------------------------------------------
 
-  app.get<{ Params: { eventId: string }; Querystring: { q?: string; limit?: string } }>(
+  app.get<{
+    Params: { eventId: string };
+    Querystring: {
+      q?: string;
+      limit?: string;
+      offset?: string;
+      /** attending | partial | declined | pending | no_response */
+      rsvp?: string;
+      category?: string;
+      table?: string;
+    };
+  }>(
     "/events/:eventId/invitations",
     { preHandler: [app.authenticate] },
     async (req, reply) =>
@@ -137,21 +148,105 @@ export async function eventRoutes(app: FastifyInstance) {
 
         const q = (req.query.q ?? "").trim();
         const limit = Math.min(Number(req.query.limit ?? 200), 500);
+        const offset = Math.max(0, Number(req.query.offset ?? 0) || 0);
+        const rsvp = (req.query.rsvp ?? "").trim();
+        const category = (req.query.category ?? "").trim();
+        const table = (req.query.table ?? "").trim();
+
+        /**
+         * "Pending" and "No response" are the same rsvp value and are not
+         * the same problem. Someone who opened their invitation and did
+         * not reply needs a nudge; someone who never opened it may never
+         * have received it, which is a different job. delivery_state is
+         * what tells them apart.
+         */
+        const where = db`
+          where i.event_id = ${eventId}
+            ${q ? db`and (i.display_name ilike ${"%" + q + "%"}
+                          or i.primary_phone like ${"%" + q + "%"}
+                          or i.primary_email ilike ${"%" + q + "%"})` : db``}
+            ${category ? db`and gc.name = ${category}` : db``}
+            ${table ? db`and exists (
+                 select 1 from invitation_legs il2
+                 join seating_tables st2 on st2.id = il2.table_id
+                 where il2.invitation_id = i.id and st2.name = ${table})` : db``}
+            ${rsvp === "confirmed" ? db`and exists (
+                 select 1 from invitation_legs il3 where il3.invitation_id = i.id
+                   and il3.rsvp in ('attending','partial'))` : db``}
+            ${rsvp === "declined" ? db`and exists (
+                 select 1 from invitation_legs il3 where il3.invitation_id = i.id
+                   and il3.rsvp = 'declined')` : db``}
+            ${rsvp === "pending" ? db`and exists (
+                 select 1 from invitation_legs il3 where il3.invitation_id = i.id
+                   and il3.rsvp = 'pending')
+               and exists (select 1 from invitation_deliveries d2
+                 where d2.invitation_id = i.id and d2.opened_at is not null)` : db``}
+            ${rsvp === "no_response" ? db`and exists (
+                 select 1 from invitation_legs il3 where il3.invitation_id = i.id
+                   and il3.rsvp = 'pending')
+               and not exists (select 1 from invitation_deliveries d2
+                 where d2.invitation_id = i.id and d2.opened_at is not null)` : db``}`;
 
         const invitations = await db`
           select i.id, i.display_name, i.primary_phone, i.primary_email,
                  gc.name as category,
                  (select count(*)::int from guests g where g.invitation_id = i.id) as named_count,
+                 -- Precedence by fact, not by alphabet. max(state::text)
+                 -- ranks 'sent' above 'opened' because s > o, so anyone
+                 -- who opened their invitation was reported as merely
+                 -- sent — and the guest list derives "pending" from this.
                  coalesce((
-                   select max(d.state::text) from invitation_deliveries d
+                   select case
+                     when bool_or(d.opened_at is not null) then 'opened'
+                     when bool_or(d.sent_at is not null) then 'sent'
+                     when bool_or(d.generated_at is not null) then 'link_generated'
+                     else 'not_sent' end
+                   from invitation_deliveries d
                    where d.invitation_id = i.id
                  ), 'not_sent') as delivery_state
           from invitations i
           left join guest_categories gc on gc.id = i.category_id
-          where i.event_id = ${eventId}
-            ${q ? db`and (i.display_name ilike ${"%" + q + "%"} or i.primary_phone like ${"%" + q + "%"})` : db``}
+          ${where}
           order by i.display_name
-          limit ${limit}`;
+          limit ${limit} offset ${offset}`;
+
+        const [totalRow] = await db<{ n: number }[]>`
+          select count(*)::int as n
+          from invitations i
+          left join guest_categories gc on gc.id = i.category_id
+          ${where}`;
+        const total = totalRow!.n;
+
+        // Counts for the whole event, not the filtered page: they are the
+        // filter buttons, so they have to say what clicking one would give.
+        const [counts] = await db`
+          select
+            count(*)::int as households,
+            coalesce(sum(il.allowance), 0)::int as people,
+            count(*) filter (where il.rsvp in ('attending','partial'))::int
+              as confirmed,
+            count(*) filter (where il.rsvp = 'declined')::int as declined,
+            count(*) filter (where il.rsvp = 'pending' and exists (
+              select 1 from invitation_deliveries d
+              where d.invitation_id = i.id and d.opened_at is not null))::int
+              as pending,
+            count(*) filter (where il.rsvp = 'pending' and not exists (
+              select 1 from invitation_deliveries d
+              where d.invitation_id = i.id and d.opened_at is not null))::int
+              as no_response
+          from invitations i
+          join invitation_legs il on il.invitation_id = i.id
+          where i.event_id = ${eventId}`;
+
+        const categories = await db`
+          select distinct gc.name from invitations i
+          join guest_categories gc on gc.id = i.category_id
+          where i.event_id = ${eventId} order by gc.name`;
+
+        const tables = await db`
+          select st.name from seating_tables st
+          join event_legs l on l.id = st.leg_id
+          where l.event_id = ${eventId} order by st.name`;
 
         const ids = invitations.map((i) => i.id);
         const legRows = ids.length
@@ -188,6 +283,12 @@ export async function eventRoutes(app: FastifyInstance) {
 
         return {
           data: invitations.map((i) => ({ ...i, legs: byInv.get(i.id) ?? [] })),
+          total,
+          limit,
+          offset,
+          counts,
+          categories: categories.map((c) => c.name),
+          tables: tables.map((t) => t.name),
           next_cursor: null,
         };
       }),

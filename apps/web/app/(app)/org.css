@@ -1368,3 +1368,242 @@ table.list tr:last-child td {
   background: var(--p100);
   color: var(--p600);
 }
+
+/* =====================================================================
+   A sidebar that stays put.
+
+   Sticky rather than fixed: it keeps its place in the flex row, so the
+   content column still gets the remaining width without anyone having to
+   hard-code a margin that then drifts out of step with the width above.
+
+   The nav scrolls on its own only if a very short window forces it; the
+   brand and the plan card stay pinned to the ends either way, so nothing
+   in here is ever reached by scrolling the page.
+   ===================================================================== */
+.side {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: hidden;
+  padding: 16px 12px 12px;
+}
+.side .brand { padding-bottom: 14px; }
+.nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.side .nav-link { padding: 8px 10px; }
+.nav-rule { margin: 12px 10px 5px; padding-top: 11px; }
+.side-foot { flex: 0 0 auto; }
+
+/* =====================================================================
+   Guest list.
+   ===================================================================== */
+
+.head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Stat cards that are also filters. The selected one is outlined rather
+   than filled: filled would compete with the primary button, and this row
+   is scanned far more often than it is clicked. */
+.card.stat.filter {
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.card.stat.filter:hover {
+  border-color: var(--p600);
+}
+.card.stat.filter.on {
+  border-color: var(--p600);
+  box-shadow: inset 0 0 0 1px var(--p600);
+}
+.stat-icon.ok {
+  background: #e2f3e3;
+  color: var(--ok);
+}
+.stat-icon.warn {
+  background: #fdf0dc;
+  color: var(--warn);
+}
+.stat-icon.err {
+  background: #fbe6e6;
+  color: var(--err);
+}
+.stat-icon.mute {
+  background: #eef0ed;
+  color: var(--ink-2);
+}
+
+/* ---------- filter bar ---------- */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.filters .field {
+  height: 38px;
+  padding: 0 11px;
+  font-size: 13.5px;
+}
+.filters .field.search {
+  flex: 1 1 260px;
+  min-width: 180px;
+}
+.filters select.field {
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+.filters .ghost {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ---------- table ---------- */
+.table-wrap {
+  overflow-x: auto;
+  margin: 0 -18px;
+  padding: 0 18px;
+}
+table.list.guests {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+}
+table.list.guests th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 0 12px 10px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+table.list.guests td {
+  padding: 11px 12px 11px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  vertical-align: middle;
+}
+table.list.guests tr:last-child td {
+  border-bottom: none;
+}
+table.list.guests td.right {
+  text-align: right;
+  padding-right: 0;
+}
+table.list.guests td.mono {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.none {
+  color: var(--ink-3);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--p600);
+  background: var(--p100);
+}
+.who b {
+  display: block;
+  font-weight: 500;
+  font-size: 13.5px;
+}
+.who small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  background: var(--p50);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* Delivery states get their own prefix so they cannot collide with the
+   RSVP badges, which share names like "sent" in nobody's favour. */
+.badge.d-not_sent {
+  background: #eef0ed;
+  color: var(--ink-2);
+}
+.badge.d-link_generated {
+  background: #fdf0dc;
+  color: var(--warn);
+}
+.badge.d-sent {
+  background: #e6eefc;
+  color: #2f5fbf;
+}
+.badge.d-opened {
+  background: #e2f3e3;
+  color: var(--ok);
+}
+
+/* ---------- pager ---------- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.pages {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.add-block {
+  margin-top: 16px;
+}
+.add-block summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+.add-block form {
+  margin-top: 14px;
+}
+.field.narrow {
+  max-width: 110px;
+}
+
+@media (max-width: 900px) {
+  .filters .field.search {
+    flex: 1 1 100%;
+  }
+}
