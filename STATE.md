@@ -234,6 +234,19 @@ the web scanner
      best-effort and stop after 60 days of no commits, so for a real
      wedding add an external monitor too.
    - CI deploys nothing.
+   - **Proven offline on real hardware** (Xiaomi, Android 14, against the
+     deployed Render + Neon stack, 2026-08-02). Aeroplane mode on, four
+     scans accepted with no network at all — verified against signing keys
+     already on the phone. Sign-out then counted the four queued rows and
+     refused to discard them. Aeroplane mode off, one *Sync now*, and the
+     server went from 5 rows to 9: nine distinct `client_uuid`s, so no
+     duplicates and the idempotency key held.
+
+     The timestamps are the point. All four were `recorded_at` 00:56:10,
+     when signal returned, and each kept its own `scanned_at` — the oldest
+     queued for **11 minutes 21 seconds**. Reports read `scanned_at`, so a
+     guest admitted at 00:44 is recorded as arriving at 00:44. An offline
+     gate does not distort the record it produces.
    - **Rehearsed at wedding size** (`npm run rehearse --workspace api`,
      default 400 households, also run at 1200). Import, RSVPs, the
      organiser's list and report, the scanner bootstrap, a queue of scans,
