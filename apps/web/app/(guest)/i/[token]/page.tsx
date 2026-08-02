@@ -243,6 +243,24 @@ function Rsvp({
         {leg.allowance === 1 && (
           <input type="hidden" name="count" value="1" />
         )}
+
+        {/* How many of them are children.
+            Optional, and blank by default: caterers need the split, but a
+            household that skips the question has said nothing, and "0" is
+            an answer we would be putting in their mouth. Plain number
+            input — this page carries no client JavaScript, because on
+            Nigerian mobile data that is not a hypothetical. */}
+        <label className="kids">
+          <span>Any children in your party?</span>
+          <input
+            type="number"
+            name="children"
+            min={0}
+            max={leg.allowance}
+            placeholder="Optional"
+            inputMode="numeric"
+          />
+        </label>
         <button className="btn" type="submit" name="intent" value="confirm">
           {leg.allowance === 1 ? "We'll be there" : "Confirm"}
         </button>

@@ -47,6 +47,7 @@ export async function postRsvp(
   legId: string,
   attending: boolean,
   count?: number,
+  children?: number,
 ): Promise<Response> {
   return fetch(
     `${API_URL}/public/invitations/${encodeURIComponent(token)}/rsvp`,
@@ -57,6 +58,7 @@ export async function postRsvp(
         leg_id: legId,
         attending,
         ...(count !== undefined ? { count } : {}),
+        ...(children !== undefined ? { children } : {}),
       }),
     },
   );

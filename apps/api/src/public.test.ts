@@ -151,3 +151,103 @@ test("rsvp for a leg the household is not invited to is a 404", async () => {
   const res = await rsvp(token, { leg_id: s2.legId, attending: true });
   assert.equal(res.statusCode, 404);
 });
+
+// ---------------------------------------------------------- children split
+//
+// Caterers price and seat children differently and the RSVP screen shows
+// the split, so the guest page asks. "None of us are children" and "nobody
+// asked" are different answers and only one of them is a fact.
+
+test("a guest can say how many of the party are children", async () => {
+  const s0 = await seedEvent(app);
+  const token = await passTokenFor(s0.passId, s0.eventId);
+  const legId = s0.legId;
+
+  const res = await app.inject({
+    method: "POST",
+    url: `/public/invitations/${token}/rsvp`,
+    payload: { leg_id: legId, attending: true, count: 4, children: 2 },
+  });
+  assert.equal(res.statusCode, 200);
+
+  const [row] = await sql`
+    select rsvp, rsvp_count, adults, children from invitation_legs
+    where leg_id = ${legId} and invitation_id = ${s0.invitationId}`;
+  assert.equal(row!.rsvp, "attending");
+  assert.equal(row!.rsvp_count, 4);
+  assert.equal(row!.children, 2);
+  assert.equal(row!.adults, 2, "adults is the remainder, never asked twice");
+});
+
+test("skipping the question leaves both null, not zero", async () => {
+  const s0 = await seedEvent(app);
+  const token = await passTokenFor(s0.passId, s0.eventId);
+  const legId = s0.legId;
+
+  await app.inject({
+    method: "POST",
+    url: `/public/invitations/${token}/rsvp`,
+    payload: { leg_id: legId, attending: true, count: 3 },
+  });
+
+  const [row] = await sql`
+    select adults, children from invitation_legs
+    where leg_id = ${legId} and invitation_id = ${s0.invitationId}`;
+  assert.equal(row!.children, null, "nobody asked is not the same as none");
+  assert.equal(row!.adults, null);
+});
+
+test("more children than people is clamped, not stored", async () => {
+  const s0 = await seedEvent(app);
+  const token = await passTokenFor(s0.passId, s0.eventId);
+  const legId = s0.legId;
+
+  await app.inject({
+    method: "POST",
+    url: `/public/invitations/${token}/rsvp`,
+    payload: { leg_id: legId, attending: true, count: 2, children: 9 },
+  });
+
+  const [row] = await sql`
+    select rsvp_count, adults, children from invitation_legs
+    where leg_id = ${legId} and invitation_id = ${s0.invitationId}`;
+  assert.equal(row!.children, 2);
+  assert.equal(row!.adults, 0, "a mis-tap cannot invent people");
+});
+
+test("declining clears the split rather than leaving a stale one", async () => {
+  const s0 = await seedEvent(app);
+  const token = await passTokenFor(s0.passId, s0.eventId);
+  const legId = s0.legId;
+
+  await app.inject({
+    method: "POST",
+    url: `/public/invitations/${token}/rsvp`,
+    payload: { leg_id: legId, attending: true, count: 4, children: 2 },
+  });
+  await app.inject({
+    method: "POST",
+    url: `/public/invitations/${token}/rsvp`,
+    payload: { leg_id: legId, attending: false },
+  });
+
+  const [row] = await sql`
+    select rsvp, rsvp_count, adults, children from invitation_legs
+    where leg_id = ${legId} and invitation_id = ${s0.invitationId}`;
+  assert.equal(row!.rsvp, "declined");
+  assert.equal(row!.rsvp_count, 0);
+  assert.equal(row!.children, null, "nobody is coming, so nobody is a child");
+  assert.equal(row!.adults, null);
+});
+
+test("a negative children count is refused", async () => {
+  const s0 = await seedEvent(app);
+  const token = await passTokenFor(s0.passId, s0.eventId);
+  const legId = s0.legId;
+  const res = await app.inject({
+    method: "POST",
+    url: `/public/invitations/${token}/rsvp`,
+    payload: { leg_id: legId, attending: true, count: 2, children: -1 },
+  });
+  assert.equal(res.statusCode, 400);
+});

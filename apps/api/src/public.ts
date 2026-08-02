@@ -173,19 +173,26 @@ export async function publicRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { token: string };
-    Body: { leg_id?: string; attending?: boolean; count?: number };
+    Body: {
+      leg_id?: string;
+      attending?: boolean;
+      count?: number;
+      children?: number;
+    };
   }>("/public/invitations/:token/rsvp", async (req, reply) => {
-    const { leg_id, attending, count } = req.body ?? {};
+    const { leg_id, attending, count, children } = req.body ?? {};
     if (typeof leg_id !== "string" || typeof attending !== "boolean") {
       return reply
         .code(400)
         .send({ code: "bad_request", message: "leg_id and attending are required." });
     }
-    if (count !== undefined && (!Number.isInteger(count) || count < 0)) {
-      return reply.code(400).send({
-        code: "bad_request",
-        message: "count must be a non-negative integer.",
-      });
+    for (const [name, v] of [["count", count], ["children", children]] as const) {
+      if (v !== undefined && (!Number.isInteger(v) || v < 0)) {
+        return reply.code(400).send({
+          code: "bad_request",
+          message: `${name} must be a non-negative integer.`,
+        });
+      }
     }
 
     const passId = await verifiedPassId(req.params.token);
@@ -227,9 +234,28 @@ export async function publicRoutes(app: FastifyInstance) {
         rsvp = rsvpCount < legRow.allowance ? "partial" : "attending";
       }
 
+      /**
+       * How many of them are children. Caterers price and seat children
+       * differently, and asking the household is the only way to know.
+       *
+       * Left null when the guest does not say, rather than defaulted to
+       * zero: "none of us are children" and "nobody asked" are different
+       * answers, and only one of them should reach a caterer as a fact.
+       * Clamped to the party actually confirmed, so a mis-tap cannot
+       * produce more children than people.
+       */
+      const kids =
+        rsvpCount > 0 && children !== undefined
+          ? Math.min(children, rsvpCount)
+          : null;
+
       await db`
         update invitation_legs
-        set rsvp = ${rsvp}::rsvp_status, rsvp_count = ${rsvpCount}, responded_at = now()
+        set rsvp = ${rsvp}::rsvp_status,
+            rsvp_count = ${rsvpCount},
+            children = ${kids},
+            adults = ${kids === null ? null : rsvpCount - kids},
+            responded_at = now()
         where invitation_id = ${h.invitationId} and leg_id = ${leg_id}`;
 
       return publicInvitation(db, req.params.token, h);

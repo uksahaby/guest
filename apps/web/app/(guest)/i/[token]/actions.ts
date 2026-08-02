@@ -12,6 +12,10 @@ export async function reply(formData: FormData): Promise<void> {
   const legId = String(formData.get("leg_id") ?? "");
   const intent = String(formData.get("intent") ?? "");
   const count = Number(formData.get("count") ?? 0);
+  // Blank means "did not say", which is not the same as none. Only a
+  // number the guest actually chose is sent.
+  const rawKids = String(formData.get("children") ?? "").trim();
+  const children = rawKids === "" ? undefined : Number(rawKids);
 
   if (!token || !legId) redirect("/");
 
@@ -20,7 +24,13 @@ export async function reply(formData: FormData): Promise<void> {
     redirect(`/i/${encodeURIComponent(token)}?replied=1`);
   }
 
-  await postRsvp(token, legId, true, count >= 1 ? count : undefined);
+  await postRsvp(
+    token,
+    legId,
+    true,
+    count >= 1 ? count : undefined,
+    Number.isInteger(children) && children! >= 0 ? children : undefined,
+  );
   redirect(`/i/${encodeURIComponent(token)}?replied=1`);
 }
 

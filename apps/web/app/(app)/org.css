@@ -1779,3 +1779,85 @@ table.list.guests td.mono {
 @media (max-width: 1180px) {
   .rsvp-top { grid-template-columns: 1fr; }
 }
+
+/* =====================================================================
+   Corrections against the mockups.
+   ===================================================================== */
+
+/* The filter bar is a ROW. Every control here inherits `.field`, which is
+   width:100% for the stacked forms elsewhere — so each one claimed a full
+   line and the bar became a column. */
+.filters .field {
+  width: auto;
+}
+.filters select.field {
+  min-width: 150px;
+  max-width: 210px;
+}
+.filters .field.search {
+  flex: 1 1 240px;
+  min-width: 160px;
+  max-width: none;
+}
+.filters {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.filters > * {
+  flex-shrink: 0;
+}
+
+/* Status cards: shorter. The mockup's are about two thirds the height
+   these had grown to — a smaller icon, tighter number, no wasted leading. */
+.card.stat {
+  padding: 13px 14px;
+  gap: 11px;
+}
+.stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.stat-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.stat-label {
+  font-size: 12px;
+  line-height: 1.2;
+}
+.stat-value {
+  font-size: 23px;
+  line-height: 1.1;
+  margin: 1px 0;
+}
+.stat-foot {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+@media (max-width: 900px) {
+  /* Only here does stacking help: a horizontal scroll on a phone is
+     worse than a column. */
+  .filters {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .filters .field.search {
+    flex: 1 1 100%;
+  }
+}
+
+/* The status cards sit beside a much taller ring card. Stretching made
+   them grow to match it, which is why they looked nothing like the
+   mockup's short cards — the padding was never the problem. */
+.rsvp-top {
+  align-items: start;
+}
+.rsvp-top .stats {
+  align-content: start;
+}
+.card.stat {
+  align-self: start;
+}
