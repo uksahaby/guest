@@ -2436,3 +2436,80 @@ input[type="file"].field {
 .grid-seating table.list.guests {
   min-width: 380px;
 }
+
+/* ---------- QR passes ---------- */
+.qr-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--p600);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.qr-view:hover { text-decoration: underline; }
+.qr-view svg { width: 15px; height: 15px; }
+
+.checked {
+  display: block;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.checked b {
+  font-size: 13px;
+  font-weight: 600;
+}
+.checked small {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.checked.yes b { color: var(--ok); }
+.checked.no b { color: var(--err); }
+
+/* A quick action that posts rather than navigates, styled to match the
+   links beside it — the row should not care which it is. */
+.action-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+.actions li:has(.action-btn) { padding: 0; }
+.action-btn:hover strong { color: var(--p600); }
+.action-btn strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.action-btn small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+/* The pass table has seven columns in a card that shares its row with the
+   rail, so it needs less floor than the eight-column guest list. */
+.grid-side table.list.guests { min-width: 640px; }
+
+/* In the two-column layouts the filter card is ~600px, not the full
+   width, so six controls do not fit on one line. Wrapping beats a
+   horizontal scrollbar on a row of dropdowns — the nowrap rule is for the
+   full-width pages, where they do fit. */
+.grid-side .filters {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+.grid-side .filters select.field {
+  min-width: 132px;
+  max-width: 178px;
+}
+.grid-side table.list.guests {
+  min-width: 560px;
+}

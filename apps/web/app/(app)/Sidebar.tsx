@@ -30,6 +30,7 @@ function eventItems(id: string): Item[] {
     { label: "Invitations", href: `/events/${id}/invitations`, icon: "send" },
     { label: "RSVPs", href: `/events/${id}/rsvps`, icon: "reply" },
     { label: "Tables & Seating", href: `/events/${id}/tables`, icon: "grid" },
+    { label: "QR Passes", href: `/events/${id}/passes`, icon: "qr" },
     { label: "Check-in", href: `/events/${id}/live`, icon: "scan" },
     { label: "Reports", href: `/events/${id}/report`, icon: "chart" },
     { label: "Gates & Team", href: `/events/${id}/team`, icon: "gate" },
@@ -53,6 +54,7 @@ function Icon({ name }: { name: string }) {
     layout: "M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z",
     send: "M22 2 11 13M22 2l-7 20-4-9-9-4z",
     reply: "M9 10 4 15l5 5M4 15h11a5 5 0 0 0 5-5V4",
+    qr: "M4 8V5h3m10 0h3v3M4 16v3h3m13-3v3h-3M8 12h8",
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
