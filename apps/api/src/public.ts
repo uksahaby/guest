@@ -171,6 +171,34 @@ export async function publicRoutes(app: FastifyInstance) {
     },
   );
 
+  /**
+   * The event's cover photo, for the household holding this pass.
+   *
+   * Scoped to the token like everything else a guest can see. There is no
+   * route keyed on the event id, because that would let anyone walk ids
+   * and collect photographs of couples they were never invited to.
+   */
+  app.get<{ Params: { token: string } }>(
+    "/public/invitations/:token/cover",
+    async (req, reply) => {
+      const passId = await verifiedPassId(req.params.token);
+      if (!passId) return notFound(reply);
+
+      return asPass(passId, async (db) => {
+        const [row] = await db`
+          select e.cover, e.cover_mime
+          from events e
+          join invitations i on i.event_id = e.id
+          where i.id = app_pass_invitation()`;
+        if (!row?.cover) return notFound(reply);
+        return reply
+          .header("content-type", row.cover_mime ?? "application/octet-stream")
+          .header("cache-control", "private, max-age=300")
+          .send(row.cover);
+      });
+    },
+  );
+
   app.post<{
     Params: { token: string };
     Body: {

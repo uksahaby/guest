@@ -597,8 +597,13 @@ export async function authRoutes(
   app.get("/me", { preHandler: [app.authenticate] }, async (req) => {
     const userId = (req.user as { sub: string }).sub;
     return asUser(sqlRw, userId, async (db) => {
+      // avatar is not sent here — it is bytes, and a JSON body is the
+      // wrong place for them. Callers ask GET /me/avatar for the image and
+      // use this flag to decide whether to bother.
       const [user] = await db`
-        select id, full_name, phone, email from users where id = ${userId}`;
+        select id, full_name, phone, email,
+               (avatar is not null) as has_avatar
+        from users where id = ${userId}`;
       // RLS narrows this to workspaces the caller owns or belongs to; the
       // where clause is belt to the policy's braces.
       const workspaces = await db`

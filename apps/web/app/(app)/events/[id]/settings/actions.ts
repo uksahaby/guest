@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { api } from "@/lib/org-api";
+import { api, getToken, API_URL } from "@/lib/org-api";
 
 /**
  * Settings actions. Each toggle is its own form, so a change saves on the
@@ -89,4 +89,45 @@ export async function deleteEvent(formData: FormData): Promise<void> {
   if (status !== 204) back(eventId, false);
   revalidatePath("/events");
   redirect("/events?deleted=1");
+}
+
+/**
+ * The event's cover photo — the picture of the couple that appears on the
+ * dashboard, the overview and the guest's own invitation page.
+ *
+ * Streamed as multipart rather than JSON: a 2 MB image base64-encoded is
+ * 2.7 MB of memory held for no reason.
+ */
+export async function uploadCover(formData: FormData): Promise<void> {
+  const eventId = String(formData.get("event_id") ?? "");
+  const file = formData.get("cover");
+
+  if (!eventId) redirect("/events");
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/events/${eventId}/settings?error=no_file`);
+  }
+
+  const token = await getToken();
+  if (!token) redirect("/login");
+
+  const body = new FormData();
+  body.set("file", file, file.name || "cover");
+
+  const res = await fetch(`${API_URL}/events/${eventId}/cover`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` },
+    body,
+  });
+
+  if (!res.ok) {
+    const problem = await res.json().catch(() => ({ code: "failed" }));
+    redirect(
+      `/events/${eventId}/settings?error=${encodeURIComponent(problem.code ?? "failed")}`,
+    );
+  }
+
+  revalidatePath(`/events/${eventId}`);
+  revalidatePath(`/events/${eventId}/settings`);
+  revalidatePath("/dashboard");
+  redirect(`/events/${eventId}/settings?saved=1`);
 }

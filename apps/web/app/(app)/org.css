@@ -1923,3 +1923,254 @@ table.list.guests td.mono {
   margin-top: 0;
   margin-bottom: 0;
 }
+
+/* Legends that fit their card.
+
+   The by-type card is only ~225px in a three-across row, and a ring beside
+   a legend reading "Bride's family  36 (18.3%)" needs about 280. It was
+   spilling 54px past the edge. The ring now sits above the legend when
+   there is not room beside it, the label truncates, and the number never
+   does — a percentage with its tail cut off is worse than no percentage. */
+.donut-row {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+.ring.small {
+  width: 104px;
+}
+.donut-row .legend {
+  flex: 1 1 150px;
+  min-width: 0;
+  font-size: 11.5px;
+  gap: 5px;
+}
+.legend li {
+  min-width: 0;
+}
+.legend .lbl {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.legend b {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: 6px;
+  white-space: nowrap;
+}
+
+/* Nothing in a card may paint outside it. A guard, not a fix — the fix is
+   above — so that the next long label is clipped rather than spilling
+   across whatever sits to its right. */
+.card {
+  overflow: hidden;
+}
+.card-title .muted-count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =====================================================================
+   Top bar: the bell and the profile menu.
+   ===================================================================== */
+
+.topbar {
+  gap: 6px;
+}
+.bell {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--ink-2);
+}
+.bell:hover {
+  background: var(--p50);
+  color: var(--ink);
+}
+.bell svg {
+  width: 19px;
+  height: 19px;
+}
+.badge-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--err);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* A <details>, so it opens without JavaScript and closes on Escape. */
+.profile {
+  position: relative;
+}
+.profile > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px 5px 5px;
+  border-radius: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+.profile > summary::-webkit-details-marker {
+  display: none;
+}
+.profile > summary:hover {
+  background: var(--p50);
+}
+.me-avatar {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--p100);
+  color: var(--p600);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.me-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.me-avatar.big {
+  width: 88px;
+  height: 88px;
+  font-size: 28px;
+}
+.me-who strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.me-who small {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.profile .chev {
+  width: 15px;
+  height: 15px;
+  color: var(--ink-3);
+}
+.profile[open] .chev {
+  transform: rotate(180deg);
+}
+
+.profile-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 214px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.14);
+}
+.menu-head {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+}
+.menu-head strong {
+  display: block;
+  font-size: 13.5px;
+}
+.menu-head small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.profile-menu a,
+.profile-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.profile-menu a:hover,
+.profile-menu button:hover {
+  background: var(--p50);
+}
+.profile-menu form {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.profile-menu button {
+  color: var(--err);
+}
+
+/* ---------- uploads ---------- */
+.avatar-row {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.avatar-row > div,
+.avatar-row > form {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.cover-preview {
+  width: 132px;
+  height: 132px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  overflow: hidden;
+  display: block;
+  background: var(--p100);
+  border: 1px solid var(--line);
+}
+.cover-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+input[type="file"].field {
+  padding: 9px 11px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lbl-block {
+  display: block;
+  margin-bottom: 14px;
+}
+.lbl-block > span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}

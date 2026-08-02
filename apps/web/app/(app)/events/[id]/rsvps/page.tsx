@@ -258,11 +258,13 @@ export default async function RsvpsPage({
             sub="Response Rate" />
           <ul className="legend spread">
             <li>
-              <i className="dot ok" />Responded
+              <i className="dot ok" />
+              <span className="lbl">Responded</span>
               <b>{responded} ({responseRate}%)</b>
             </li>
             <li>
-              <i className="dot mute" />No Response
+              <i className="dot mute" />
+              <span className="lbl">No Response</span>
               <b>
                 {noResponse} (
                 {c.households > 0
@@ -563,7 +565,7 @@ function TypeDonut({
         {byType.map((t, i) => (
           <li key={t.name}>
             <i className="dot" style={{ background: SLICE[i % SLICE.length] }} />
-            {t.name}
+            <span className="lbl">{t.name}</span>
             <b>
               {t.n} ({total > 0 ? ((t.n / total) * 100).toFixed(1) : "0.0"}%)
             </b>

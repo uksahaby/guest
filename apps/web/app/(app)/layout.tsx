@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { Inter } from "next/font/google";
 import { api, requireToken, type EventShape } from "@/lib/org-api";
-import { signOut } from "../login/actions";
 import { Sidebar } from "./Sidebar";
+import { Topbar } from "./Topbar";
 import "./org.css";
 
 const inter = Inter({
@@ -25,6 +25,12 @@ export default async function AppLayout({
   // already makes; the page's own data stays its own concern.
   const { data: events } = await api<EventShape[]>("/events");
 
+  // Who is signed in, and whether anything is due. Both belong to the top
+  // bar, which every page inherits, so they are fetched once here.
+  const { data: me } = await api<{
+    user: { full_name: string | null; has_avatar: boolean };
+  }>("/me");
+
   const soonest =
     events.find((e) =>
       e.legs?.some((l) => new Date(l.starts_at) >= new Date()),
@@ -46,14 +52,12 @@ export default async function AppLayout({
         </Suspense>
 
         <div className="col">
-          <header className="topbar">
-            <div className="spacer" />
-            <form action={signOut}>
-              <button className="ghost sm" type="submit">
-                Sign out
-              </button>
-            </form>
-          </header>
+          <Topbar
+            name={me.user?.full_name ?? null}
+            hasAvatar={Boolean(me.user?.has_avatar)}
+            dueNow={0}
+            eventId={soonest?.id ?? null}
+          />
           <main className="main">{children}</main>
         </div>
       </div>

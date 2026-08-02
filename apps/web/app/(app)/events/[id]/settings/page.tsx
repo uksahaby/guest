@@ -7,6 +7,7 @@ import {
   reissuePasses,
   updateEvent,
   updateLeg,
+  uploadCover,
 } from "./actions";
 
 /**
@@ -142,6 +143,40 @@ export default async function SettingsPage({
           </div>
         </div>
       )}
+
+      {/* ------------------------------------------------------- the cover */}
+      <div className="card">
+        <h2>Cover photo</h2>
+        <p className="t-sub" style={{ marginBottom: 14 }}>
+          The picture of the couple. It appears on your dashboard, on this
+          event&rsquo;s overview, and on every guest&rsquo;s invitation page.
+        </p>
+        <div className="avatar-row">
+          <span className="cover-preview" aria-hidden="true">
+            {/* Cache-busted on save so a new photo appears at once rather
+                than after the browser decides to look again. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/api/events/${id}/cover`} alt="" />
+          </span>
+          <form action={uploadCover}>
+            <input type="hidden" name="event_id" value={id} />
+            <input
+              className="field"
+              type="file"
+              name="cover"
+              accept="image/jpeg,image/png,image/webp"
+              required
+              aria-label="Choose a cover photo"
+            />
+            <div className="form-row" style={{ marginTop: 10 }}>
+              <button className="primary" type="submit">Upload cover</button>
+            </div>
+            <p className="sub sm" style={{ marginTop: 8 }}>
+              JPEG, PNG or WebP, under 2 MB.
+            </p>
+          </form>
+        </div>
+      </div>
 
       {/* ---------------------------------------------------- the basics */}
       <div className="card">
