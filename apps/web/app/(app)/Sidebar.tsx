@@ -28,6 +28,7 @@ function eventItems(id: string): Item[] {
     { label: "Overview", href: `/events/${id}`, icon: "layout" },
     { label: "Guests", href: `/events/${id}/guests`, icon: "users" },
     { label: "Invitations", href: `/events/${id}/invitations`, icon: "send" },
+    { label: "RSVPs", href: `/events/${id}/rsvps`, icon: "reply" },
     { label: "Tables & Seating", href: `/events/${id}/tables`, icon: "grid" },
     { label: "Check-in", href: `/events/${id}/live`, icon: "scan" },
     { label: "Reports", href: `/events/${id}/report`, icon: "chart" },
@@ -51,6 +52,7 @@ function Icon({ name }: { name: string }) {
     plan: "M12 3l2.5 5.5L20 9.5l-4 4 1 6-5-2.8L7 19.5l1-6-4-4 5.5-1z",
     layout: "M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z",
     send: "M22 2 11 13M22 2l-7 20-4-9-9-4z",
+    reply: "M9 10 4 15l5 5M4 15h11a5 5 0 0 0 5-5V4",
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"

@@ -17,6 +17,7 @@ import { settingsRoutes } from "./settings.ts";
 import { teamRoutes } from "./team.ts";
 import { webScanRoutes } from "./webscan.ts";
 import { dashboardRoutes } from "./dashboard.ts";
+import { rsvpRoutes } from "./rsvps.ts";
 import multipart from "@fastify/multipart";
 import { makeProvider, type PaymentProvider } from "./paystack.ts";
 import { makeSender, type SmsSender } from "./sms.ts";
@@ -125,6 +126,7 @@ export function buildServer(
   app.register(teamRoutes);
   app.register(webScanRoutes);
   app.register(dashboardRoutes);
+  app.register(rsvpRoutes);
 
   // Smoke route proving the whole vertical slice works: issue-side data in
   // Postgres, verify-side logic from checkin-core. Dev only.

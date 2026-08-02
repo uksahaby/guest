@@ -1650,3 +1650,132 @@ table.list.guests td.mono {
   .stats.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid-side { grid-template-columns: 1fr; }
 }
+
+/* ---------- RSVP screen ---------- */
+.rsvp-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+.rsvp-top .stats { margin-bottom: 0; }
+.rate-card .ring { width: 140px; margin-top: 4px; }
+
+.grid-3.charts { align-items: stretch; }
+.grid-3.charts .card { display: flex; flex-direction: column; }
+
+.chart { margin-top: 4px; }
+.chart svg {
+  width: 100%;
+  height: 118px;
+  display: block;
+}
+.chart .area {
+  fill: var(--p100);
+}
+.chart .line {
+  fill: none;
+  stroke: var(--p600);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 118px;
+}
+.bar {
+  flex: 1 1 auto;
+  background: var(--p600);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+.yhint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.donut-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ring.small { width: 116px; margin: 0; flex: 0 0 auto; }
+.donut-row .legend {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  gap: 6px;
+}
+.donut-row .legend b {
+  margin-left: auto;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.slice {
+  fill: none;
+  stroke-width: 13;
+  stroke-linecap: butt;
+}
+.dot.mute { background: var(--ink-3); }
+
+.inline-select {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.field.xs,
+.ghost.xs {
+  height: 27px;
+  font-size: 11.5px;
+  padding: 0 7px;
+}
+
+.rsvp-table td.num {
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.rsvp-table small.stack {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.note {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.pagenum {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+.pagenum:hover { border-color: var(--line); }
+.pagenum.on {
+  background: var(--p900);
+  border-color: var(--p900);
+  color: #fff;
+  font-weight: 600;
+}
+
+@media (max-width: 1180px) {
+  .rsvp-top { grid-template-columns: 1fr; }
+}
