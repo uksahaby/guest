@@ -27,6 +27,7 @@ function eventItems(id: string): Item[] {
   return [
     { label: "Overview", href: `/events/${id}`, icon: "layout" },
     { label: "Guests", href: `/events/${id}/guests`, icon: "users" },
+    { label: "Invitations", href: `/events/${id}/invitations`, icon: "send" },
     { label: "Tables & Seating", href: `/events/${id}/tables`, icon: "grid" },
     { label: "Check-in", href: `/events/${id}/live`, icon: "scan" },
     { label: "Reports", href: `/events/${id}/report`, icon: "chart" },
@@ -49,6 +50,7 @@ function Icon({ name }: { name: string }) {
     cog: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.5 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 2.6 7.5a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H7a1.6 1.6 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V7a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z",
     plan: "M12 3l2.5 5.5L20 9.5l-4 4 1 6-5-2.8L7 19.5l1-6-4-4 5.5-1z",
     layout: "M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z",
+    send: "M22 2 11 13M22 2l-7 20-4-9-9-4z",
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"

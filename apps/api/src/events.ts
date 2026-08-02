@@ -137,6 +137,8 @@ export async function eventRoutes(app: FastifyInstance) {
       rsvp?: string;
       category?: string;
       table?: string;
+      /** not_sent | link_generated | sent | opened | responded */
+      status?: string;
     };
   }>(
     "/events/:eventId/invitations",
@@ -152,6 +154,7 @@ export async function eventRoutes(app: FastifyInstance) {
         const rsvp = (req.query.rsvp ?? "").trim();
         const category = (req.query.category ?? "").trim();
         const table = (req.query.table ?? "").trim();
+        const status = (req.query.status ?? "").trim();
 
         /**
          * "Pending" and "No response" are the same rsvp value and are not
@@ -181,6 +184,25 @@ export async function eventRoutes(app: FastifyInstance) {
                    and il3.rsvp = 'pending')
                and exists (select 1 from invitation_deliveries d2
                  where d2.invitation_id = i.id and d2.opened_at is not null)` : db``}
+            ${status === "not_sent" ? db`and not exists (
+                 select 1 from invitation_deliveries d2
+                 where d2.invitation_id = i.id and d2.generated_at is not null)` : db``}
+            ${status === "link_generated" ? db`and exists (
+                 select 1 from invitation_deliveries d2
+                 where d2.invitation_id = i.id and d2.generated_at is not null)
+               and not exists (select 1 from invitation_deliveries d2
+                 where d2.invitation_id = i.id and d2.sent_at is not null)` : db``}
+            ${status === "sent" ? db`and exists (
+                 select 1 from invitation_deliveries d2
+                 where d2.invitation_id = i.id and d2.sent_at is not null)
+               and not exists (select 1 from invitation_deliveries d2
+                 where d2.invitation_id = i.id and d2.opened_at is not null)` : db``}
+            ${status === "opened" ? db`and exists (
+                 select 1 from invitation_deliveries d2
+                 where d2.invitation_id = i.id and d2.opened_at is not null)` : db``}
+            ${status === "responded" ? db`and exists (
+                 select 1 from invitation_legs il4
+                 where il4.invitation_id = i.id and il4.responded_at is not null)` : db``}
             ${rsvp === "no_response" ? db`and exists (
                  select 1 from invitation_legs il3 where il3.invitation_id = i.id
                    and il3.rsvp = 'pending')
@@ -203,7 +225,13 @@ export async function eventRoutes(app: FastifyInstance) {
                      else 'not_sent' end
                    from invitation_deliveries d
                    where d.invitation_id = i.id
-                 ), 'not_sent') as delivery_state
+                 ), 'not_sent') as delivery_state,
+                 (select min(d.sent_at) from invitation_deliveries d
+                    where d.invitation_id = i.id) as sent_at,
+                 (select min(d.opened_at) from invitation_deliveries d
+                    where d.invitation_id = i.id) as opened_at,
+                 (select min(il.responded_at) from invitation_legs il
+                    where il.invitation_id = i.id) as responded_at
           from invitations i
           left join guest_categories gc on gc.id = i.category_id
           ${where}
@@ -236,6 +264,35 @@ export async function eventRoutes(app: FastifyInstance) {
               as no_response
           from invitations i
           join invitation_legs il on il.invitation_id = i.id
+          where i.event_id = ${eventId}`;
+
+        /**
+         * The invitations screen counts stages of delivery, not replies.
+         * There is no "delivered" here and there cannot be: this product
+         * hands the organiser a WhatsApp link to send themselves, so
+         * nothing ever reports a receipt. Generated, sent, opened and
+         * responded are the four things actually known.
+         */
+        const [delivery] = await db`
+          select
+            count(*)::int as households,
+            count(*) filter (where exists (
+              select 1 from invitation_deliveries d
+              where d.invitation_id = i.id and d.generated_at is not null))::int
+              as generated,
+            count(*) filter (where exists (
+              select 1 from invitation_deliveries d
+              where d.invitation_id = i.id and d.sent_at is not null))::int
+              as sent,
+            count(*) filter (where exists (
+              select 1 from invitation_deliveries d
+              where d.invitation_id = i.id and d.opened_at is not null))::int
+              as opened,
+            count(*) filter (where exists (
+              select 1 from invitation_legs il
+              where il.invitation_id = i.id and il.responded_at is not null))::int
+              as responded
+          from invitations i
           where i.event_id = ${eventId}`;
 
         const categories = await db`
@@ -287,6 +344,7 @@ export async function eventRoutes(app: FastifyInstance) {
           limit,
           offset,
           counts,
+          delivery,
           categories: categories.map((c) => c.name),
           tables: tables.map((t) => t.name),
           next_cursor: null,
