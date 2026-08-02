@@ -234,6 +234,31 @@ the web scanner
      best-effort and stop after 60 days of no commits, so for a real
      wedding add an external monitor too.
    - CI deploys nothing.
+   - **Rehearsed at wedding size** (`npm run rehearse --workspace api`,
+     default 400 households, also run at 1200). Import, RSVPs, the
+     organiser's list and report, the scanner bootstrap, a queue of scans,
+     and the morning-after report — all against a real database, none of
+     it touching the deployed system.
+
+     | | 400 households | 1200 |
+     |---|---|---|
+     | CSV import | 0.75 s | 2.1 s |
+     | Guest list page | 0.10 s | 0.10 s |
+     | Report | 0.26 s | 0.64 s |
+     | Scanner bootstrap | **84 KB** | **250 KB** |
+     | Per scan | 4.9 ms | 4.9 ms |
+
+     The bootstrap size is the one that mattered: it is what a phone
+     downloads over Nigerian mobile data before the gate opens, and 250 KB
+     for a very large wedding is seconds even on 3G. Scan latency is flat
+     in list size, which is the other thing a queue depends on.
+
+     **It found no product bug.** Both failures were the harness's own —
+     a scan without `client_uuid` (the API refused it correctly, which is
+     the idempotency guard working) and a cartesian join in a counting
+     query. Reports reconcile: 92 admitted plus 8 `rsvp_declined` equals
+     100 logged rows. Worth saying plainly, because "the rehearsal passed"
+     is only worth something if a failure would have been reported too.
 2. **Payments have never met real Paystack.** Everything so far is the
    offline `StubProvider`; the signed-webhook path is tested against our
    own signature, never theirs.
