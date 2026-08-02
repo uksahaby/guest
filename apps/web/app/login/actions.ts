@@ -67,7 +67,7 @@ export async function verifyCode(formData: FormData): Promise<void> {
   // else will ever ask. Do it before /events: the implicit workspace is
   // named from full_name when the first event is created.
   if (!String(session.user?.full_name ?? "").trim()) redirect("/welcome");
-  redirect("/events");
+  redirect("/dashboard");
 }
 
 export async function signOut(): Promise<void> {
@@ -100,5 +100,5 @@ export async function signInWithPassword(formData: FormData): Promise<void> {
     path: "/",
   });
   if (!String(session.user?.full_name ?? "").trim()) redirect("/welcome");
-  redirect("/events");
+  redirect("/dashboard");
 }

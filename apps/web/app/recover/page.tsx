@@ -13,7 +13,7 @@ export default async function RecoverPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const sp = await searchParams;
-  if ((await cookies()).get("jwt")) redirect("/events");
+  if ((await cookies()).get("jwt")) redirect("/dashboard");
 
   return (
     <div className="org-root login-wrap">

@@ -26,5 +26,5 @@ export async function saveName(formData: FormData): Promise<void> {
     if (pw.status !== 204) redirect("/welcome?error=password");
   }
 
-  redirect("/events");
+  redirect("/dashboard");
 }

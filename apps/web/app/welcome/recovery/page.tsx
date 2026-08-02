@@ -18,7 +18,7 @@ export default async function RecoveryPage() {
 
   // Nothing to show means it has already been read, or someone wandered
   // here later. Either way there is no second look.
-  if (!code) redirect("/events");
+  if (!code) redirect("/dashboard");
 
   return (
     <div className="org-root login-wrap">
@@ -52,7 +52,7 @@ export default async function RecoveryPage() {
           action={async () => {
             "use server";
             (await cookies()).delete("recovery_code");
-            redirect("/events");
+            redirect("/dashboard");
           }}
         >
           <button className="primary" type="submit">

@@ -22,7 +22,7 @@ export default async function WelcomePage({
   // Nothing to ask if they already have a name — someone landing here by
   // typing the URL should not be made to re-enter it.
   const { data } = await api<{ user: { full_name: string | null } }>("/me");
-  if (String(data?.user?.full_name ?? "").trim()) redirect("/events");
+  if (String(data?.user?.full_name ?? "").trim()) redirect("/dashboard");
 
   return (
     <div className="org-root login-wrap">

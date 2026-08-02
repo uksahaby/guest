@@ -53,7 +53,10 @@ export async function api<T = unknown>(
     ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
     cache: "no-store",
   });
-  if (res.status === 401) redirect("/login");
+  // /logout, not /login: the cookie is still set and still refused, and
+  // /login bounces anyone holding a cookie back to the dashboard — which
+  // is a loop, not a login page. Only a route handler can delete it.
+  if (res.status === 401) redirect("/logout");
   const data = res.status === 204 ? null : await res.json();
   return { status: res.status, data: data as T };
 }

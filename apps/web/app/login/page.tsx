@@ -13,7 +13,7 @@ export default async function LoginPage({
 }) {
   const sp = await searchParams;
   const jar = await cookies();
-  if (jar.get("jwt")) redirect("/events");
+  if (jar.get("jwt")) redirect("/dashboard");
 
   const password = sp.mode === "password";
   const step = sp.step === "code" && jar.get("login_phone") ? "code" : "phone";

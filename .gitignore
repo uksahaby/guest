@@ -4,8 +4,9 @@ node_modules/
 !.env.example
 dist/
 .next/
-# A second dev server needs its own build dir (see apps/web/next.config.ts)
-.next-verify/
+# A second dev server needs its own build dir (see apps/web/next.config.ts).
+# Wildcard: every NEXT_DIST_DIR anyone invents is still a build directory.
+.next-*/
 *.log
 .DS_Store
 # Database dumps: every guest's name and phone number, in one file. These
