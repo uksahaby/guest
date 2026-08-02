@@ -280,8 +280,10 @@ the web scanner
    repeats for wait, low and falling for refused. `tool/make_sounds.py`
    regenerates them; the WAVs are committed so a build never needs Python.
    A persisted mute exists for a ceremony, and haptics continue when muted.
-   **Nobody has judged them by ear yet** — the tests prove the right cue
-   fires for the right verdict, not that a refusal cuts through a crowd.
+   Heard on the device and confirmed working (2026-08-02). Judged in a
+   quiet room, not a crowd with a generator — if they ever turn out to be
+   too subtle at a real gate, the fix is `tool/make_sounds.py` and a
+   rebuild, not new sound files from anywhere.
 4. **Event creation is one thin form.** The setup mockup has five steps
    (details, venue, guests & entry, tables, review).
 5. **Small scanner gaps found on the device.** A back-press on the scan
