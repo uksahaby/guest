@@ -1861,3 +1861,65 @@ table.list.guests td.mono {
 .card.stat {
   align-self: start;
 }
+
+/* The RSVP header block, as the mockup arranges it.
+
+   Two columns. The left one stacks the four status cards over the three
+   charts; the right one holds the response rate, which stands the full
+   height of both rows. That height is never declared — the grid row is as
+   tall as the left column, and the card stretches into it, so the two
+   stay level whatever the charts end up measuring. */
+.rsvp-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+.rsvp-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.rsvp-main .stats,
+.rsvp-main .grid-3 {
+  margin-bottom: 0;
+}
+/* The charts share the leftover height rather than each claiming their
+   own, so the row bottoms line up with the card beside them. */
+.rsvp-main .grid-3.charts {
+  flex: 1;
+}
+.rate-card {
+  display: flex;
+  flex-direction: column;
+}
+/* The ring sits in the middle of whatever height it is given. */
+.rate-card .ring {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+.rate-card .legend {
+  margin-top: auto;
+}
+
+@media (max-width: 1180px) {
+  .rsvp-grid {
+    grid-template-columns: 1fr;
+  }
+  .rate-card .ring,
+  .rate-card .legend {
+    margin-top: 12px;
+    margin-bottom: 0;
+  }
+}
+
+/* The base stylesheet gives section.card a top margin, which pushed the
+   rate card 8px below the status cards beside it. Inside this grid the
+   gap is the only spacing there should be. */
+.rsvp-grid > *,
+.rsvp-main > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}

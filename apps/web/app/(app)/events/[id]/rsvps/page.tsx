@@ -184,31 +184,72 @@ export default async function RsvpsPage({
         </div>
       </div>
 
-      {/* Four status cards and the response rate, on one row. */}
-      <div className="rsvp-top">
-        <div className="stats four">
-          {cards.map((card) => {
-            const on = (sp.rsvp ?? "") === card.key;
-            return (
-              <Link
-                key={card.key}
-                href={`${here}${withParams(base, { rsvp: on ? undefined : card.key, page: undefined })}`}
-                className={`card stat filter${on ? " on" : ""}`}
-              >
-                <span className={`stat-icon ${card.tone}`} aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d={card.d} />
-                  </svg>
-                </span>
-                <div>
-                  <p className="stat-label">{card.label}</p>
-                  <p className="stat-value">{card.n.toLocaleString("en-NG")}</p>
-                  <p className="stat-foot">{pct(card.n)}%</p>
-                </div>
-              </Link>
-            );
-          })}
+      {/* Left column: the four status cards, then the three charts.
+          Right column: the response rate, standing the full height of
+          both rows — which is what the mockup draws, and what a single
+          two-column grid gives without any height being hard-coded. */}
+      <div className="rsvp-grid">
+        <div className="rsvp-main">
+          <div className="stats four">
+            {cards.map((card) => {
+              const on = (sp.rsvp ?? "") === card.key;
+              return (
+                <Link
+                  key={card.key}
+                  href={`${here}${withParams(base, { rsvp: on ? undefined : card.key, page: undefined })}`}
+                  className={`card stat filter${on ? " on" : ""}`}
+                >
+                  <span className={`stat-icon ${card.tone}`} aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={card.d} />
+                    </svg>
+                  </span>
+                  <div>
+                    <p className="stat-label">{card.label}</p>
+                    <p className="stat-value">{card.n.toLocaleString("en-NG")}</p>
+                    <p className="stat-foot">{pct(card.n)}%</p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
+
+        <div className="grid-3 charts">
+          <section className="card">
+            <h2 className="card-title">
+              RSVP Progress
+              <span className="muted-count">
+                {responded} of {c.households} responded
+              </span>
+            </h2>
+            <AreaChart trend={data.trend} />
+          </section>
+
+          <section className="card">
+            <h2 className="card-title">Responses by Guest Type</h2>
+            <TypeDonut byType={data.by_type} total={responded} />
+          </section>
+
+          <section className="card">
+            <h2 className="card-title">
+              Response Trend
+              <form method="GET" className="inline-select">
+                {q && <input type="hidden" name="q" value={q} />}
+                {sp.rsvp && <input type="hidden" name="rsvp" value={sp.rsvp} />}
+                <select className="field xs" name="days" defaultValue={days}
+                  aria-label="Trend window">
+                  <option value="7">Last 7 Days</option>
+                  <option value="30">Last 30 Days</option>
+                  <option value="90">Last 90 Days</option>
+                </select>
+                <button className="ghost xs" type="submit">Go</button>
+              </form>
+            </h2>
+            <BarChart trend={data.trend} />
+          </section>
+        </div>
         </div>
 
         <section className="card rate-card">
@@ -231,42 +272,6 @@ export default async function RsvpsPage({
               </b>
             </li>
           </ul>
-        </section>
-      </div>
-
-      {/* Progress · by guest type · trend. */}
-      <div className="grid-3 charts">
-        <section className="card">
-          <h2 className="card-title">
-            RSVP Progress
-            <span className="muted-count">
-              {responded} of {c.households} responded
-            </span>
-          </h2>
-          <AreaChart trend={data.trend} />
-        </section>
-
-        <section className="card">
-          <h2 className="card-title">Responses by Guest Type</h2>
-          <TypeDonut byType={data.by_type} total={responded} />
-        </section>
-
-        <section className="card">
-          <h2 className="card-title">
-            Response Trend
-            <form method="GET" className="inline-select">
-              {q && <input type="hidden" name="q" value={q} />}
-              {sp.rsvp && <input type="hidden" name="rsvp" value={sp.rsvp} />}
-              <select className="field xs" name="days" defaultValue={days}
-                aria-label="Trend window">
-                <option value="7">Last 7 Days</option>
-                <option value="30">Last 30 Days</option>
-                <option value="90">Last 90 Days</option>
-              </select>
-              <button className="ghost xs" type="submit">Go</button>
-            </form>
-          </h2>
-          <BarChart trend={data.trend} />
         </section>
       </div>
 
