@@ -144,6 +144,101 @@ async function gates(db: Db, legId: string) {
 export async function liveRoutes(app: FastifyInstance) {
   const uid = (req: { user: unknown }) => (req.user as { sub: string }).sub;
 
+  /**
+   * Everything the Check-in screen shows, in one request.
+   *
+   * The same numbers the gate itself is producing — counted from
+   * check_in_events, never from a stored total. A dashboard that keeps its
+   * own tally is a dashboard that eventually disagrees with the door.
+   */
+  app.get<{ Params: { eventId: string } }>(
+    "/events/:eventId/checkin",
+    { preHandler: [app.authenticate] },
+    async (req, reply) =>
+      asUser(sqlRw, uid(req), async (db) => {
+        const { eventId } = req.params;
+        const [leg] = await db`
+          select id from event_legs where event_id = ${eventId}
+          order by starts_at limit 1`;
+        if (!leg) return reply.code(404).send({ code: "not_found" });
+
+        const legId = leg.id as string;
+
+        const [totals] = await db`
+          select
+            coalesce(sum(il.allowance), 0)::int as invited_people,
+            count(*)::int as households
+          from invitation_legs il
+          join invitations i on i.id = il.invitation_id
+          where il.leg_id = ${legId}`;
+
+        const [arrived] = await db`
+          select
+            coalesce(sum(admitted_count), 0)::int as people,
+            count(*)::int as scans,
+            coalesce(sum(admitted_count) filter (
+              where scanned_at >= date_trunc('day', now())), 0)::int as today,
+            max(scanned_at) as last_scan_at
+          from check_in_events
+          where leg_id = ${legId} and result in ${db(ADMITTING)}`;
+
+        /**
+         * Arrivals by hour, for the timeline. Generated from a series so
+         * a quiet hour is a bar of zero rather than a gap — a missing
+         * hour reads as "no data", and at a gate that is a different and
+         * much more alarming thing than "nobody came".
+         */
+        const timeline = await db`
+          select to_char(h, 'HH24:00') as hour,
+                 coalesce(sum(c.admitted_count), 0)::int as n
+          from generate_series(
+                 date_trunc('hour', now()) - interval '11 hours',
+                 date_trunc('hour', now()),
+                 interval '1 hour') h
+          left join check_in_events c
+            on c.leg_id = ${legId}
+           and c.result in ${db(ADMITTING)}
+           and c.scanned_at >= h and c.scanned_at < h + interval '1 hour'
+          group by h order by h`;
+
+        const entrances = await gates(db, legId);
+
+        const recent = await db`
+          select c.id, c.admitted_count, c.scanned_at, c.result,
+                 coalesce(i.display_name, 'Unknown pass') as display_name,
+                 en.name as entrance_name,
+                 u.full_name as staff_name,
+                 st.name as table_name
+          from check_in_events c
+          left join invitations i on i.id = c.invitation_id
+          left join entrances en on en.id = c.entrance_id
+          left join users u on u.id = c.staff_user_id
+          left join invitation_legs il
+            on il.invitation_id = c.invitation_id and il.leg_id = c.leg_id
+          left join seating_tables st on st.id = il.table_id
+          where c.leg_id = ${legId} and c.result in ${db(ADMITTING)}
+          order by c.scanned_at desc
+          limit 10`;
+
+        return {
+          leg_id: legId,
+          totals: {
+            invited_people: totals!.invited_people,
+            households: totals!.households,
+            checked_in: arrived!.people,
+            not_checked_in: Math.max(0,
+              totals!.invited_people - arrived!.people),
+            scans: arrived!.scans,
+            today: arrived!.today,
+            last_scan_at: arrived!.last_scan_at ?? null,
+          },
+          timeline,
+          entrances,
+          recent,
+        };
+      }),
+  );
+
   /** A plain snapshot, for the first paint and for clients without SSE. */
   app.get<{ Params: { legId: string } }>(
     "/legs/:legId/live",
