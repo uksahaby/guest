@@ -272,9 +272,25 @@ the web scanner
      query. Reports reconcile: 92 admitted plus 8 `rsvp_declined` equals
      100 logged rows. Worth saying plainly, because "the rehearsal passed"
      is only worth something if a failure would have been reported too.
-2. **Payments have never met real Paystack.** Everything so far is the
-   offline `StubProvider`; the signed-webhook path is tested against our
-   own signature, never theirs.
+2. ~~Payments have never met real Paystack.~~ **Done** (2026-08-02). A
+   real test-mode charge against the deployed API: Paystack signed the
+   webhook, the signature verified, and the event went `free/150` to
+   `standard/600` with a `payments` row marked successful. Forged webhooks
+   are refused — unsigned and wrongly-signed both get `401 bad_signature`
+   before anything touches the database.
+
+   The plan and limit come from the payment row quoted at checkout, never
+   from the webhook payload, so a webhook claiming a bigger plan cannot
+   grant one. Untested still: the **amount-mismatch** path, which marks a
+   payment failed rather than applying it — reaching it needs a charge
+   whose amount differs from the quote, which Paystack's test flow will
+   not produce on its own.
+
+   Paystack's test-mode success page did not redirect back to the app.
+   Cosmetic: the webhook is the source of truth, which is why the upgrade
+   landed while the browser was still sitting on Paystack. `WEB_URL` was
+   confirmed correct. Worth re-checking against a live-mode payment before
+   deciding it needs anything.
 3. ~~No audio at the gate.~~ **Done.** Four generated cues, one per tone,
    told apart by contour rather than pitch — rising for admitted, two flat
    repeats for wait, low and falling for refused. `tool/make_sounds.py`
