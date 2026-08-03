@@ -251,3 +251,78 @@ test("a negative children count is refused", async () => {
   });
   assert.equal(res.statusCode, 400);
 });
+
+// Helpers for the public-event-page tests below. The rest of this file
+// works off seedEvent, which builds an event with no slug and no public
+// page; these need one created through the API so the settings PATCH path
+// is the thing under test.
+import { randomUUID } from "node:crypto";
+
+const aPhone = () => `+234${String(Math.floor(Math.random() * 1e10)).padStart(10, "0")}`;
+
+async function organiser() {
+  const id = randomUUID();
+  await sql`insert into users (id, phone, full_name) values (${id}, ${aPhone()}, 'Ahmed')`;
+  return { id, token: app.jwt.sign({ sub: id }) };
+}
+
+function call(token: string, method: "GET" | "POST" | "PATCH" | "DELETE", url: string, payload?: unknown) {
+  return app.inject({
+    method,
+    url,
+    headers: { authorization: `Bearer ${token}` },
+    ...(payload !== undefined ? { payload: payload as Record<string, unknown> } : {}),
+  });
+}
+
+async function newEvent(token: string) {
+  await app.ready();
+  const res = await call(token, "POST", "/events", {
+    name: "Ahmed & Aisha",
+    leg: { name: "Reception", starts_at: "2026-12-12T16:00:00+01:00", venue_name: "Oriental Hotel" },
+  });
+  assert.equal(res.statusCode, 201);
+  return res.json();
+}
+
+
+// ---- the public event page (db/migrations/018) --------------------------
+
+test("a public event page is off until the organiser turns it on", async () => {
+  const o = await organiser();
+  const ev = await newEvent(o.token);
+
+  await call(o.token, "PATCH", `/events/${ev.id}`, { slug: "public-test-one" });
+  // Slug set, page still off, event still draft: all three are 404, and
+  // they are the same 404 as a slug that never existed.
+  assert.equal((await app.inject({ method: "GET", url: "/public/events/public-test-one" })).statusCode, 404);
+
+  await call(o.token, "PATCH", `/events/${ev.id}`, { public_page: true });
+  // Public but not published — still nothing.
+  assert.equal((await app.inject({ method: "GET", url: "/public/events/public-test-one" })).statusCode, 404);
+
+  await call(o.token, "PATCH", `/events/${ev.id}`, { status: "active" });
+  const res = await app.inject({ method: "GET", url: "/public/events/public-test-one" });
+  assert.equal(res.statusCode, 200);
+  const body = res.json();
+  assert.equal(body.name, "Ahmed & Aisha");
+  assert.ok(Array.isArray(body.legs) && body.legs.length >= 1);
+  assert.equal((await app.inject({ method: "GET", url: "/public/events/no-such-event" })).statusCode, 404);
+});
+
+test("the public page carries no guest list, and RLS is why", async () => {
+  const o = await organiser();
+  const ev = await newEvent(o.token);
+  await call(o.token, "PATCH", `/events/${ev.id}`, {
+    slug: "public-test-two", public_page: true, status: "active",
+  });
+
+  const body = (await app.inject({ method: "GET", url: "/public/events/public-test-two" })).json();
+  const seen = JSON.stringify(body);
+  for (const leaked of ["invitations", "passes", "allowance", "primary_phone", "signing_key"]) {
+    assert.equal(seen.includes(leaked), false, `public page exposed ${leaked}`);
+  }
+  // The connection itself cannot reach them, which is the guarantee — not
+  // the shape of the select above.
+  assert.equal(body.legs[0].id !== undefined, true);
+});

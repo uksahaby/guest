@@ -104,6 +104,19 @@ export async function asPass<T>(
 }
 
 /**
+ * The public event page: no pass, no user, no context at all.
+ *
+ * Deliberately sets nothing. Every other app_public policy is keyed on
+ * app_pass_invitation(), which is null here, so with no context this
+ * connection can see exactly the two things db/migrations/018 opened —
+ * events and legs whose organiser turned the public page on — and none of
+ * the guest data those policies protect.
+ */
+export async function asPublic<T>(fn: (db: Db) => Promise<T>): Promise<T> {
+  return sqlPublic.begin(async (tx) => fn(tx as Db)) as Promise<T>;
+}
+
+/**
  * The login path has no user yet — find-or-create by phone happens before
  * a session exists. users and auth_otp_codes carry no RLS for that reason
  * (see 003_rls.sql) and are reachable only by app_rw.

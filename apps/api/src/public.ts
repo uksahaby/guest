@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { asPass, sqlVerify, type Db } from "./db.ts";
+import { asPass, asPublic, sqlVerify, type Db } from "./db.ts";
 import { verifyToken } from "checkin-core/token";
 import { tooMany } from "./ratelimit.ts";
 
@@ -150,6 +150,45 @@ export async function publicRoutes(app: FastifyInstance) {
       return tooMany(reply, burst, "Too many requests. Try again in a moment.");
     }
   });
+
+  /**
+   * GET /public/events/:slug — the public event page.
+   *
+   * The one guest-facing route that is not keyed on a pass. It carries the
+   * date, the venue and the organiser's own description, and deliberately
+   * nothing else: no guest list, no counts, no pass. RLS is what enforces
+   * that rather than this select (db/migrations/018), so forgetting a
+   * column here cannot leak anything.
+   *
+   * A slug that is unknown, or belongs to an event whose public page is
+   * off, is the same 404. An organiser who has not opted in has not
+   * confirmed the event exists either.
+   */
+  app.get<{ Params: { slug: string } }>(
+    "/public/events/:slug",
+    async (req, reply) => {
+      const slug = (req.params.slug ?? "").trim().toLowerCase();
+      const dead = { code: "not_found", message: "No such event." };
+      if (!slug || slug.length > 60) return reply.code(404).send(dead);
+
+      const out = await asPublic(async (db) => {
+        const [event] = await db`
+          select id, name, event_type, description, tags, end_date, timezone,
+                 cover is not null as has_cover
+          from events where slug = ${slug}`;
+        if (!event) return null;
+
+        const legs = await db`
+          select id, name, sequence, starts_at, doors_close_at, all_day,
+                 venue_name, address_line, city, latitude, longitude
+          from event_legs where event_id = ${event.id} order by sequence`;
+        return { ...event, legs };
+      });
+
+      if (!out) return reply.code(404).send(dead);
+      return out;
+    },
+  );
 
   app.get<{ Params: { token: string } }>(
     "/public/invitations/:token",

@@ -71,7 +71,7 @@ re-triggers the "Allow USB debugging?" prompt on the handset.
 ### Tests
 
 ```bash
-npm test --workspace api            # 301
+npm test --workspace api            # 345
 npm test --workspace checkin-core   # 40
 npm test --workspace web            # 3  (the QR decoder, pinned)
 cd apps/scanner && flutter test     # 89
@@ -106,6 +106,7 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 | Auth | `POST /auth/signup` · `POST /auth/password/login` · `POST /auth/password` · `POST /auth/recovery-code` · `POST /auth/recovery/reset` · `POST /auth/otp/request` · `POST /auth/otp/verify` · `GET/PATCH /me` |
 | Usher access | `POST /staff/:id/invite` (organiser) · `POST /public/staff-invites/:token/accept` |
 | Events | `GET/POST /events` · `GET/PATCH/DELETE /events/:id` · `GET /events/:id/settings` · `POST /events/:id/reissue-passes` · `PATCH /legs/:id` |
+| Public event page | `GET /public/events/:slug` — no pass, no guest list; RLS-gated on `public_page` (018) |
 | Guest list | `GET/POST /events/:id/invitations` · `POST /events/:id/invitations/import` · `PUT/DELETE /invitations/:id/legs/:legId` |
 | Sending | `POST /events/:id/delivery-links` (wa.me — **the billing gate**) |
 | Gates & team | `GET/POST /legs/:id/entrances` · `PATCH/DELETE /entrances/:id` · `GET/POST /legs/:id/staff` · `PATCH/DELETE /staff/:id` |
@@ -301,7 +302,8 @@ the web scanner
    too subtle at a real gate, the fix is `tool/make_sounds.py` and a
    rebuild, not new sound files from anywhere.
 4. **Event creation is one thin form.** The setup mockup has five steps
-   (details, venue, guests & entry, tables, review).
+   (details, venue, guests & entry, tables, review). Event *settings* is
+   now the full eleven-tab screen (3 August); creation is the gap left.
 5. **Small scanner gaps found on the device.** A back-press on the scan
    screen drops the usher out of the leg with no confirm, even mid-result;
    the app installs under the label `scanner` (`android:label`, never set);
@@ -354,6 +356,18 @@ business account · the first real couple.
 ---
 
 ## 5. Things that will bite you
+
+**Restart the API after adding a route.** Hit again on 3 August building
+the public event page: `/e/<slug>` 404'd in the browser while the tests
+were green, because the running server predated `GET /public/events/:slug`.
+Curl the endpoint before debugging the client.
+
+**A form inside a form is dropped silently by the browser.** The settings
+mockup puts "Upload Event Image" inside the card that Save Changes
+batches, and a file has to post as multipart while the card posts JSON.
+Nesting them renders, hydrates with a warning, and then uploads to the
+wrong action. The `form="..."` attribute is the fix: the input sits where
+the design wants it and belongs to a form rendered as a sibling.
 
 **`req.ip` is a lie until `TRUST_PROXY` is set.** Every guest-facing call
 is made *by the web server*, not by a browser — so without it the API sees
