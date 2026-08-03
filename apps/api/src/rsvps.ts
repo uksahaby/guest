@@ -99,6 +99,14 @@ export async function rsvpRoutes(app: FastifyInstance): Promise<void> {
             count(*) filter (where il.rsvp = 'pending' and ${opened})::int as pending,
             count(*) filter (where il.rsvp = 'pending' and not ${opened})::int as no_response,
             count(*) filter (where il.responded_at is not null)::int as responded,
+            -- People, not households. A funnel that counts its first and
+            -- last stage in people and the middle in households produces
+            -- "148 confirmed, 301 arrived", which is impossible and was
+            -- exactly what the reports page drew before this existed.
+            coalesce(sum(il.allowance) filter (
+              where il.responded_at is not null), 0)::int as responded_people,
+            coalesce(sum(il.rsvp_count) filter (
+              where il.rsvp in ('attending','partial')), 0)::int as confirmed_people,
             coalesce(sum(il.allowance), 0)::int as invited_people,
             coalesce(sum(il.adults), 0)::int as adults,
             coalesce(sum(il.children), 0)::int as children
