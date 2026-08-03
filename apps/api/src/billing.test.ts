@@ -391,3 +391,66 @@ test("the whole loop: over limit → checkout → webhook → headroom", async (
   assert.equal(b.over_limit, false);
   assert.equal(b.amount_paid_minor, 7_500 * 100);
 });
+
+
+// ---- what the Billing & Plans page reads ---------------------------------
+
+test("billing carries the payment history, successes and failures alike", async () => {
+  const o = await organiser();
+  const event = await newEvent(o.token);
+
+  // Nothing bought yet: an empty history, not a missing field.
+  let b = (await call(o.token, "GET", `/events/${event.id}/billing`)).json();
+  assert.deepEqual(b.payments, []);
+  assert.equal(b.purchased_at, null);
+  assert.equal(b.amount_paid_minor, 0);
+
+  // One that succeeds...
+  const first = (await call(o.token, "POST", `/events/${event.id}/checkout`, {
+    plan: "standard",
+  })).json();
+  await webhook(chargeSuccess(first.reference, PLANS.standard.amountMinor));
+
+  // ...and one that never completes.
+  const second = (await call(o.token, "POST", `/events/${event.id}/checkout`, {
+    plan: "large",
+  })).json();
+
+  b = (await call(o.token, "GET", `/events/${event.id}/billing`)).json();
+  assert.equal(b.payments.length, 2);
+
+  const paid = b.payments.find((p: { provider_ref: string }) => p.provider_ref === first.reference);
+  assert.equal(paid.status, "successful");
+  assert.equal(paid.plan, "standard");
+  assert.equal(paid.amount_minor, PLANS.standard.amountMinor);
+  // The page prints this straight out; formatting it server-side keeps one
+  // authority over what a price looks like.
+  assert.equal(paid.price, "₦15,000");
+  assert.ok(paid.paid_at);
+
+  // An abandoned attempt is still shown. An organiser who thinks they paid
+  // deserves to see the row that says otherwise.
+  const pending = b.payments.find((p: { provider_ref: string }) => p.provider_ref === second.reference);
+  assert.equal(pending.status, "pending");
+  assert.equal(pending.paid_at, null);
+
+  // Newest first, and only the successful one counts as bought.
+  assert.equal(b.payments[0].provider_ref, second.reference);
+  assert.equal(b.amount_paid_minor, PLANS.standard.amountMinor);
+  assert.ok(b.purchased_at);
+});
+
+test("one event's payment history never leaks into another's", async () => {
+  const o = await organiser();
+  const mine = await newEvent(o.token);
+  const other = await newEvent(o.token);
+
+  const r = (await call(o.token, "POST", `/events/${mine.id}/checkout`, {
+    plan: "standard",
+  })).json();
+  await webhook(chargeSuccess(r.reference, PLANS.standard.amountMinor));
+
+  const b = (await call(o.token, "GET", `/events/${other.id}/billing`)).json();
+  assert.deepEqual(b.payments, []);
+  assert.equal(b.amount_paid_minor, 0);
+});

@@ -3434,3 +3434,244 @@ select.field {
   .fgrid, .fgrid.three { grid-template-columns: minmax(0, 1fr); }
   .grid-settings .rail { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---------- billing & plans ---------- */
+
+.planrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.planside .planname {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 3px;
+}
+
+.planside .planname strong { font-size: 19px; font-weight: 600; }
+
+.usage { min-width: 0; }
+
+.usage-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.usage-pct { font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+
+.usage-n { margin: 2px 0 10px; }
+.usage-n strong { font-size: 30px; font-weight: 600; letter-spacing: -0.5px; }
+.usage-n span { font-size: 15px; color: var(--ink-3); }
+
+.meter {
+  height: 9px;
+  border-radius: 999px;
+  background: #eceee9;
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--p600);
+}
+
+.meter span.over { background: var(--err); }
+
+/* ---------- the info strips ---------- */
+
+.infobar {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f2f6f1;
+  border: 1px solid var(--p100);
+}
+
+.infobar.plain { background: var(--surface); border-color: var(--line); }
+
+.infobar svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  color: var(--p600);
+  margin-top: 1px;
+}
+
+.infobar strong { display: block; font-size: 13px; font-weight: 600; }
+
+.infobar small {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-2);
+  margin-top: 3px;
+  line-height: 1.55;
+}
+
+/* ---------- the plan cards ---------- */
+
+.plangrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.plancard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 13px;
+  min-width: 0;
+}
+
+.plancard.popular {
+  border-color: var(--p600);
+  box-shadow: inset 0 0 0 1px var(--p600);
+}
+
+.plancard.on { background: var(--p50); }
+
+/* The badge wraps under the name rather than forcing the card wide. Four
+   cards in a column that also carries a 300px rail is genuinely narrow,
+   and "Most popular" set to nowrap beside the title overflowed it. */
+.plancard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.plancard-head strong { font-size: 15px; font-weight: 600; }
+
+.pop {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: var(--p100);
+  color: var(--p900);
+  padding: 3px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.plancard .amt {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  margin: 12px 0 2px;
+}
+
+.plancard .amt span {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+  letter-spacing: 0;
+}
+
+.plancard .upto {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.feats { list-style: none; margin: 13px 0 16px; flex: 1; }
+
+.feats li {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+.feats .tick {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--p600);
+  margin-top: 1px;
+}
+
+.plan-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+}
+
+.plan-btn.buy:hover { background: var(--p50); border-color: var(--p600); color: var(--p600); }
+
+.plancard.popular .plan-btn.buy {
+  background: var(--p900);
+  border-color: transparent;
+  color: #fff;
+}
+
+.plancard.popular .plan-btn.buy:hover { background: #1e4600; }
+
+.plan-btn.current {
+  background: var(--p900);
+  border-color: transparent;
+  color: #fff;
+  cursor: default;
+}
+
+.plan-btn.dim { color: var(--ink-3); background: #f7f7f4; cursor: not-allowed; }
+
+/* ---------- the summary list ---------- */
+
+.sumlist { margin-top: 10px; }
+
+.sumlist > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sumlist > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.sumlist dt { font-size: 12.5px; color: var(--ink-3); flex: 0 0 auto; }
+
+.sumlist dd {
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1180px) {
+  .plangrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 860px) {
+  .planrow { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .plangrid { grid-template-columns: minmax(0, 1fr); }
+}

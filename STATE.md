@@ -71,7 +71,7 @@ re-triggers the "Allow USB debugging?" prompt on the handset.
 ### Tests
 
 ```bash
-npm test --workspace api            # 345
+npm test --workspace api            # 347
 npm test --workspace checkin-core   # 40
 npm test --workspace web            # 3  (the QR decoder, pinned)
 cd apps/scanner && flutter test     # 89
@@ -115,7 +115,7 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 | Web scanner | `POST /scanner/legs/:id/scan` (server decides) · `GET /scanner/legs/:id/guests` · `POST /scanner/legs/:id/walk-ins` |
 | Live | `GET /legs/:id/attendance` · `GET /legs/:id/live` · `GET /legs/:id/stream` (SSE) |
 | Reports | `GET /events/:id/report` (+ `?format=csv`) |
-| Money | `GET /events/:id/billing` · `POST /events/:id/checkout` · `POST /webhooks/paystack` |
+| Money | `GET /events/:id/billing` (plan, usage, **payment history**) · `POST /events/:id/checkout` · `POST /webhooks/paystack` |
 | Guest | `GET /public/invitations/:token` · `POST /public/invitations/:token/rsvp` |
 
 ### Web pages
@@ -134,6 +134,18 @@ the web scanner
 ---
 
 ## 3. Decisions already made — don't re-litigate
+
+- **The billing mockup does not describe this product, and the product
+  won.** The Billing & Plans design was drawn around yearly subscriptions
+  (₦2,500–₦15,000/year), renewals, per-tier feature gating, saved cards and
+  guest credits. None of that is what is sold: one payment per event,
+  ₦7,500–₦40,000 priced by people, nothing renews, **every feature on every
+  plan**, and the public pricing page already says so to the world. The
+  page therefore uses the mockup's layout and the product's substance.
+  Reopening this is a pricing decision with revenue attached, not a UI
+  change — and it would need `plans.ts`, the marketing page and Paystack
+  moved together.
+
 
 - **The unit is a household.** One row, one allowance, one pass, one QR.
   A seat is a *person*: a household of four fills four seats.
@@ -214,11 +226,21 @@ the web scanner
    - Rate limiting is now **done** (see §5 and `DEPLOY.md` §6) — but it
      needs `TRUST_PROXY` set on the box or it collapses into one shared
      bucket for the whole internet.
-   - **Backups** exist: `npm run backup --workspace api`, verified by a
-     dump → drop → restore drill that also checks 49 RLS policies and the
-     append-only triggers come back (`DEPLOY.md` §7). Two caveats, both
-     load-bearing: nothing runs it on a schedule, and the drill was against
-     local Postgres — **nobody has restored the real Neon database yet.**
+   - **Backups**: `npm run backup --workspace api`. The drill has now been
+     run against the **real Neon database** (3 August) rather than a local
+     stand-in — dump → restore → compare, with every row count matching
+     including the 9 irreplaceable `check_in_events`, plus 54 policies, 18
+     RLS tables, 51 functions, and a `DELETE` on the restored log still
+     refused by the append-only trigger (`DEPLOY.md` §7).
+     - Until this session the documented command **did not work**:
+       `backup.ts` never read `apps/api/.env`, so it failed with "set
+       SUPERUSER_URL" on a machine whose URL was sitting in that file. Both
+       it and `env.ts` now share `src/dotenv.ts`.
+     - Two caveats remain, both load-bearing: **nothing runs it on a
+       schedule**, and the single dump that exists is on one laptop.
+       Neon's own history-retention window has never been looked at. A
+       backup that lives on the same disk as nothing else is a rehearsal,
+       not a policy.
    - **Error monitoring** exists (`src/errors.ts`, `DEPLOY.md` §8): every
      500 carries a request id the caller can quote, the cause never leaves
      the server, a crash kills the process so Render restarts it, and an

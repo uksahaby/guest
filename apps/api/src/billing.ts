@@ -63,6 +63,22 @@ export async function billingRoutes(
           from payments
           where event_id = ${eventId} and status = 'successful'`;
 
+        // The billing page's Payment History. Every attempt, not only the
+        // successful ones: an organiser who thinks they paid and finds a
+        // failed row has an answer, and one who finds nothing at all is
+        // owed a different conversation. provider_ref is what Paystack
+        // support asks for, so it is here rather than hidden.
+        const history = await db`
+          select id, plan, amount_minor, currency, status, provider,
+                 provider_ref, created_at, paid_at
+          from payments
+          where event_id = ${eventId}
+          -- Ordered by the same date the page prints. Sorting on created_at
+          -- while showing paid_at puts a charge that settled on Monday
+          -- above one started on Wednesday, and the list reads as broken.
+          order by coalesce(paid_at, created_at) desc
+          limit 50`;
+
         const billable = Number(counted!.billable);
         const limit = event!.people_limit as number;
 
@@ -74,6 +90,21 @@ export async function billingRoutes(
           over_limit: billable > limit,
           amount_paid_minor: Number(paid!.total),
           currency: "NGN",
+          payments: history.map((p) => ({
+            id: p.id,
+            plan: p.plan,
+            amount_minor: Number(p.amount_minor),
+            price: formatNaira(Number(p.amount_minor)),
+            currency: p.currency,
+            status: p.status,
+            provider: p.provider,
+            provider_ref: p.provider_ref,
+            created_at: p.created_at,
+            paid_at: p.paid_at,
+          })),
+          /** When this event's plan was actually bought. */
+          purchased_at:
+            history.find((p) => p.status === "successful")?.paid_at ?? null,
           // Everything the plan chooser needs, priced by the server.
           suggested_plan: smallestPlanFor(billable)?.code ?? null,
           plans: ONE_OFF_PLANS.map((p) => ({
