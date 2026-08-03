@@ -23,9 +23,16 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadDotEnv } from "../src/dotenv.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..");
+
+// The connection string lives in apps/api/.env like everything else. Read
+// it, or the documented `npm run backup` fails with "set SUPERUSER_URL" on
+// a machine that has one.
+loadDotEnv(join(here, "..", ".env"));
+
 const outDir = process.env.BACKUP_DIR ?? join(root, "backups");
 
 /** Superuser: a backup that cannot read every row is not a backup. */

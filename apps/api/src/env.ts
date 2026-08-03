@@ -1,21 +1,15 @@
 // Minimal env loading — no dotenv dependency; parse .env ourselves so the
 // file works the same under tsx, tests, and production (where real env
 // vars simply win).
-import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadDotEnv } from "./dotenv.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-try {
-  const raw = readFileSync(join(here, "..", ".env"), "utf8");
-  for (const line of raw.split(/\r?\n/)) {
-    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (m && process.env[m[1]!] === undefined) process.env[m[1]!] = m[2]!;
-  }
-} catch {
-  // No .env file — rely on real environment variables.
-}
+// Shared with scripts/backup.ts, which needs the same file read without
+// also inheriting the required() calls below.
+loadDotEnv(join(here, "..", ".env"));
 
 function required(name: string): string {
   const v = process.env[name];

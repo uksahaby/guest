@@ -238,23 +238,47 @@ insist on a `postgres` role that Neon does not have.
 
 ### What a restore was verified to bring back
 
-Dump → drop the database → restore → check, against a database built the
-normal way (schema + all 10 migrations):
+Run on **3 August 2026**, against the real Neon database rather than a
+local stand-in: dump Neon → restore into an empty database → compare the
+two, side by side.
 
-| | |
-|---|---|
-| Row data | ✓ |
-| `schema_migrations` | 10 rows — the next deploy does not re-run everything |
-| RLS policies | 49 |
-| Tables with RLS enabled | 15 |
-| Append-only triggers on `check_in_events` | 2 |
+| | Neon | Restored |
+|---|---|---|
+| `users` / `events` / `event_legs` | 23 / 3 / 3 | 23 / 3 / 3 |
+| `invitations` / `invitation_legs` / `passes` | 3 / 3 / 3 | 3 / 3 / 3 |
+| **`check_in_events`** | **9** | **9** |
+| RLS policies | 54 | 54 |
+| Tables with RLS enabled | 18 | 18 |
+| Non-internal triggers | 2 | 2 |
+| Functions | 51 | 51 |
+| Events with a signing key | 3 | 3 |
 
 The policy count is the one that matters. A restore that returns data
-without its policies looks healthy and is wide open.
+without its policies looks healthy and is wide open. `check_in_events` is
+the one that cannot be rebuilt from anything.
 
-**Not yet done: nobody has restored the real Neon database.** The drill ran
-against local Postgres. Run it once against a scratch Neon branch before
-trusting any of this with a wedding.
+Then the behaviour, not just the counts — a `DELETE` on the restored
+`check_in_events`:
+
+```
+ERROR:  check_in_events is append-only (attempted DELETE).
+        Write a reversal row instead.
+```
+
+So the guarantee survives the round trip, which is the actual question.
+
+**Expect exactly two ignored errors, and know which two.** Restoring a Neon
+dump anywhere that is not Neon ends with `errors ignored on restore: 2`.
+Both are Neon's own platform roles, which no other Postgres has:
+
+```
+role "neon_superuser" does not exist   (ALTER DEFAULT PRIVILEGES)
+role "cloud_admin" does not exist
+```
+
+Those are benign. Any *other* error in that count is not, and the five
+application roles failing is the one to watch for — see the warning above,
+because it is the failure that looks like success.
 
 ## 8. Error monitoring
 
