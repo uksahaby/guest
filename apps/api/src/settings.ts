@@ -20,6 +20,52 @@ const FORBIDDEN: Sendable = {
 
 const ADMITTING = ["admitted", "partial", "manual", "overflow_admitted", "re_entry"];
 
+/**
+ * What an event can be. Returned by GET rather than hard-coded in the web
+ * app, so the settings dropdown and the validation here can never drift
+ * apart into a select whose options the API rejects.
+ */
+export const EVENT_TYPES = [
+  "wedding",
+  "engagement",
+  "birthday",
+  "naming",
+  "funeral",
+  "conference",
+  "concert",
+  "other",
+] as const;
+
+/** The description under the event name. 250 is what the mockup counts to. */
+const DESCRIPTION_MAX = 250;
+const TAG_MAX = 24;
+const TAGS_MAX = 12;
+
+/**
+ * A custom link is typed by a person and read aloud over the phone, so it
+ * is lowercase, hyphenated, and has to survive being written on a napkin.
+ */
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])?$/;
+
+/**
+ * Reserved because the guest and app surfaces already own these paths — a
+ * slug of "login" would be a link that never reaches an event.
+ */
+const SLUG_RESERVED = new Set([
+  "i", "join", "scan", "login", "logout", "signup", "recover", "welcome",
+  "events", "dashboard", "api", "public", "admin", "settings", "profile",
+]);
+
+/** Does the runtime know this zone? Cheaper and truer than a list. */
+function knownTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function manages(db: Db, eventId: string): Promise<boolean> {
   const [row] = await db`select app_manages_event(${eventId}::uuid) as ok`;
   return row?.ok === true;
@@ -94,18 +140,24 @@ export async function settingsRoutes(app: FastifyInstance) {
         if (!(await manages(db, eventId))) return FORBIDDEN;
 
         const [event] = await db`
-          select id, name, event_type, status, allow_overflow, require_rsvp,
-                 allow_walkins, allow_usher_undo, rsvp_deadline, manager_phone, plan,
-                 people_limit, token_version
+          select id, name, event_type, description, status, allow_overflow,
+                 require_rsvp, allow_walkins, allow_usher_undo, rsvp_deadline,
+                 manager_phone, plan, people_limit, token_version,
+                 end_date, timezone, tags, slug, public_page, invitation_only
           from events where id = ${eventId}`;
         const legs = await db`
           select id, name, sequence, starts_at, doors_close_at, venue_name,
-                 address_line, city, tables_enabled
+                 address_line, city, tables_enabled, all_day
           from event_legs where event_id = ${eventId} order by sequence`;
 
         return {
           code: 200,
-          body: { ...event, legs, consequences: await consequences(db, eventId) },
+          body: {
+            ...event,
+            legs,
+            event_types: EVENT_TYPES,
+            consequences: await consequences(db, eventId),
+          },
         };
       });
       return reply.code(out.code).send(out.body);
@@ -123,6 +175,15 @@ export async function settingsRoutes(app: FastifyInstance) {
       allow_usher_undo?: boolean;
       rsvp_deadline?: string | null;
       manager_phone?: string | null;
+      // Added with the settings screen (db/migrations/017).
+      event_type?: string;
+      description?: string | null;
+      end_date?: string | null;
+      timezone?: string;
+      tags?: string[];
+      slug?: string | null;
+      public_page?: boolean;
+      invitation_only?: boolean;
     };
   }>(
     "/events/:eventId",
@@ -153,9 +214,78 @@ export async function settingsRoutes(app: FastifyInstance) {
         });
       }
 
+      if (b.event_type !== undefined && !EVENT_TYPES.includes(b.event_type as never)) {
+        return reply.code(400).send({
+          code: "bad_event_type",
+          message: `Event type must be one of ${EVENT_TYPES.join(", ")}.`,
+        });
+      }
+      if (typeof b.description === "string" && b.description.length > DESCRIPTION_MAX) {
+        return reply.code(400).send({
+          code: "bad_description",
+          message: `Keep the description to ${DESCRIPTION_MAX} characters — it sits under the event name on the invitation.`,
+        });
+      }
+      if (b.end_date) {
+        if (Number.isNaN(Date.parse(b.end_date))) {
+          return reply.code(400).send({
+            code: "bad_end_date",
+            message: "That end date didn't make sense.",
+          });
+        }
+      }
+      if (b.timezone !== undefined && !knownTimezone(b.timezone)) {
+        return reply.code(400).send({
+          code: "bad_timezone",
+          message: "That isn't a time zone this server knows, e.g. Africa/Lagos.",
+        });
+      }
+      if (b.tags !== undefined) {
+        const bad =
+          !Array.isArray(b.tags) ||
+          b.tags.length > TAGS_MAX ||
+          b.tags.some((t) => typeof t !== "string" || !t.trim() || t.length > TAG_MAX);
+        if (bad) {
+          return reply.code(400).send({
+            code: "bad_tags",
+            message: `Up to ${TAGS_MAX} tags, each under ${TAG_MAX} characters.`,
+          });
+        }
+      }
+      // Empty string clears the custom link; anything else has to be a
+      // link a person can say out loud.
+      const slug =
+        typeof b.slug === "string" ? b.slug.trim().toLowerCase() : b.slug;
+      if (slug) {
+        if (!SLUG_RE.test(slug) || SLUG_RESERVED.has(slug)) {
+          return reply.code(400).send({
+            code: "bad_slug",
+            message:
+              "Lowercase letters, numbers and hyphens, 2–60 characters, and not a word the site already uses.",
+          });
+        }
+      }
+
       const out = await asUser(sqlRw, uid(req), async (db): Promise<Sendable> => {
         const { eventId } = req.params;
         if (!(await manages(db, eventId))) return FORBIDDEN;
+
+        // Someone else's link. Checked here rather than left to the unique
+        // index so the organiser gets a sentence instead of a 500 — and
+        // checked inside the transaction so it means something.
+        if (slug) {
+          const [taken] = await db`
+            select 1 from events where slug = ${slug} and id <> ${eventId}`;
+          if (taken) {
+            return {
+              code: 409,
+              body: {
+                code: "slug_taken",
+                message: "That link is already in use. Try adding the year.",
+              },
+            };
+          }
+        }
 
         // coalesce keeps every omitted field untouched — a settings form
         // that posts three fields must not blank the other five.
@@ -163,10 +293,28 @@ export async function settingsRoutes(app: FastifyInstance) {
           update events set
             name             = coalesce(${b.name?.trim() ?? null}, name),
             status           = coalesce(${b.status ?? null}::event_status, status),
+            event_type       = coalesce(${b.event_type ?? null}, event_type),
+            timezone         = coalesce(${b.timezone ?? null}, timezone),
+            tags             = coalesce(${b.tags ? b.tags.map((t) => t.trim()) : null}, tags),
+            public_page      = coalesce(${b.public_page ?? null}, public_page),
+            invitation_only  = coalesce(${b.invitation_only ?? null}, invitation_only),
             allow_overflow   = coalesce(${b.allow_overflow ?? null}, allow_overflow),
             require_rsvp     = coalesce(${b.require_rsvp ?? null}, require_rsvp),
             allow_walkins    = coalesce(${b.allow_walkins ?? null}, allow_walkins),
             allow_usher_undo = coalesce(${b.allow_usher_undo ?? null}, allow_usher_undo),
+            -- These four are nullable and clearable, so an omitted field
+            -- and an explicit null have to mean different things.
+            description      = ${
+              Object.hasOwn(b, "description")
+                ? ((b.description ?? "").trim() || null)
+                : db`description`
+            },
+            end_date         = ${
+              Object.hasOwn(b, "end_date") ? (b.end_date || null) : db`end_date`
+            },
+            slug             = ${
+              Object.hasOwn(b, "slug") ? (slug || null) : db`slug`
+            },
             rsvp_deadline    = ${
               Object.hasOwn(b, "rsvp_deadline")
                 ? (b.rsvp_deadline || null)
@@ -179,9 +327,10 @@ export async function settingsRoutes(app: FastifyInstance) {
             },
             updated_at = now()
           where id = ${eventId}
-          returning id, name, status, allow_overflow, require_rsvp,
-                    allow_walkins, allow_usher_undo, rsvp_deadline,
-                    manager_phone`;
+          returning id, name, status, event_type, description, allow_overflow,
+                    require_rsvp, allow_walkins, allow_usher_undo, rsvp_deadline,
+                    manager_phone, end_date, timezone, tags, slug, public_page,
+                    invitation_only`;
         return { code: 200, body: event };
       });
       return reply.code(out.code).send(out.body);
@@ -202,6 +351,7 @@ export async function settingsRoutes(app: FastifyInstance) {
       venue_name?: string | null;
       address_line?: string | null;
       city?: string | null;
+      all_day?: boolean;
     };
   }>(
     "/legs/:legId",
@@ -226,9 +376,11 @@ export async function settingsRoutes(app: FastifyInstance) {
             doors_close_at = ${Object.hasOwn(b, "doors_close_at") ? (b.doors_close_at || null) : db`doors_close_at`},
             venue_name     = ${Object.hasOwn(b, "venue_name") ? (b.venue_name || null) : db`venue_name`},
             address_line   = ${Object.hasOwn(b, "address_line") ? (b.address_line || null) : db`address_line`},
-            city           = ${Object.hasOwn(b, "city") ? (b.city || null) : db`city`}
+            city           = ${Object.hasOwn(b, "city") ? (b.city || null) : db`city`},
+            all_day        = coalesce(${b.all_day ?? null}, all_day)
           where id = ${req.params.legId}
-          returning id, name, starts_at, doors_close_at, venue_name, address_line, city`;
+          returning id, name, starts_at, doors_close_at, venue_name,
+                    address_line, city, all_day`;
         return { code: 200, body: leg };
       });
       return reply.code(out.code).send(out.body);

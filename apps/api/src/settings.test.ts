@@ -377,3 +377,138 @@ test("a stranger can neither read nor change settings", async () => {
   assert.equal(s.token_version, 1);
   assert.equal(s.legs[0].venue_name, "Oriental Hotel");
 });
+
+// ---- the fields the settings screen added (db/migrations/017) ------------
+
+test("a fresh event reads with the defaults the schema promises", async () => {
+  const o = await organiser();
+  const event = await newEvent(o.token);
+  const s = (await call(o.token, "GET", `/events/${event.id}/settings`)).json();
+
+  assert.equal(s.timezone, "Africa/Lagos");
+  assert.deepEqual(s.tags, []);
+  assert.equal(s.end_date, null);
+  assert.equal(s.slug, null);
+  // The two that are policy: a pass is the only way in, and nothing is
+  // public until somebody says so.
+  assert.equal(s.invitation_only, true);
+  assert.equal(s.public_page, false);
+  assert.equal(s.legs[0].all_day, false);
+  assert.ok(s.event_types.includes("wedding"));
+});
+
+test("the details the mockup asks for all save and read back", async () => {
+  const o = await organiser();
+  const event = await newEvent(o.token);
+
+  const res = await call(o.token, "PATCH", `/events/${event.id}`, {
+    event_type: "engagement",
+    description: "Join us as we celebrate the union of Ahmed and Aisha.",
+    end_date: "2026-12-13",
+    timezone: "Africa/Lagos",
+    tags: ["Wedding", "Reception", "Family Event"],
+    public_page: true,
+    invitation_only: false,
+  });
+  assert.equal(res.statusCode, 200);
+
+  const s = (await call(o.token, "GET", `/events/${event.id}/settings`)).json();
+  assert.equal(s.event_type, "engagement");
+  assert.match(s.description, /^Join us as we celebrate/);
+  assert.equal(s.end_date.slice(0, 10), "2026-12-13");
+  assert.deepEqual(s.tags, ["Wedding", "Reception", "Family Event"]);
+  assert.equal(s.public_page, true);
+  assert.equal(s.invitation_only, false);
+});
+
+test("an omitted field is left alone; an empty one is cleared", async () => {
+  const o = await organiser();
+  const event = await newEvent(o.token);
+
+  await call(o.token, "PATCH", `/events/${event.id}`, {
+    description: "Aso-ebi is emerald and gold.",
+    end_date: "2026-12-13",
+  });
+  // A save from another tab that names neither must not blank them.
+  await call(o.token, "PATCH", `/events/${event.id}`, { require_rsvp: true });
+  let s = (await call(o.token, "GET", `/events/${event.id}/settings`)).json();
+  assert.equal(s.description, "Aso-ebi is emerald and gold.");
+  assert.ok(s.end_date);
+
+  // Explicitly empty is a real instruction, and a different one.
+  await call(o.token, "PATCH", `/events/${event.id}`, { description: "", end_date: "" });
+  s = (await call(o.token, "GET", `/events/${event.id}/settings`)).json();
+  assert.equal(s.description, null);
+  assert.equal(s.end_date, null);
+});
+
+test("a custom link is claimed once, and refused to the next event", async () => {
+  const o = await organiser();
+  const mine = await newEvent(o.token);
+  const other = await newEvent(o.token);
+
+  assert.equal(
+    (await call(o.token, "PATCH", `/events/${mine.id}`, { slug: "Ahmed-Aisha-2025" }))
+      .statusCode,
+    200,
+  );
+  // Lowercased on the way in — a link is read aloud, not typed exactly.
+  let s = (await call(o.token, "GET", `/events/${mine.id}/settings`)).json();
+  assert.equal(s.slug, "ahmed-aisha-2025");
+
+  const clash = await call(o.token, "PATCH", `/events/${other.id}`, {
+    slug: "ahmed-aisha-2025",
+  });
+  assert.equal(clash.statusCode, 409);
+  assert.equal(clash.json().code, "slug_taken");
+
+  // Re-saving your own link is not a clash with yourself.
+  assert.equal(
+    (await call(o.token, "PATCH", `/events/${mine.id}`, { slug: "ahmed-aisha-2025" }))
+      .statusCode,
+    200,
+  );
+
+  // And it can be given up.
+  await call(o.token, "PATCH", `/events/${mine.id}`, { slug: "" });
+  s = (await call(o.token, "GET", `/events/${mine.id}/settings`)).json();
+  assert.equal(s.slug, null);
+});
+
+test("nonsense is refused with a sentence, not a 500", async () => {
+  const o = await organiser();
+  const event = await newEvent(o.token);
+  const bad = async (body: unknown, code: string) => {
+    const res = await call(o.token, "PATCH", `/events/${event.id}`, body);
+    assert.equal(res.statusCode, 400, JSON.stringify(body));
+    assert.equal(res.json().code, code);
+  };
+
+  await bad({ event_type: "coronation" }, "bad_event_type");
+  await bad({ description: "x".repeat(251) }, "bad_description");
+  await bad({ end_date: "the twelfth" }, "bad_end_date");
+  await bad({ timezone: "Africa/Lagoon" }, "bad_timezone");
+  await bad({ tags: ["ok", "x".repeat(25)] }, "bad_tags");
+  await bad({ tags: Array.from({ length: 13 }, (_, i) => `t${i}`) }, "bad_tags");
+  // A path the site already owns would be a link that never arrives.
+  await bad({ slug: "login" }, "bad_slug");
+  await bad({ slug: "Not A Slug" }, "bad_slug");
+});
+
+test("a leg can run all day, and says so afterwards", async () => {
+  const o = await organiser();
+  const event = await newEvent(o.token);
+  const legId = event.legs[0].id;
+
+  const res = await call(o.token, "PATCH", `/legs/${legId}`, {
+    all_day: true,
+    doors_close_at: "2026-12-12T23:00:00+01:00",
+    address_line: "123 Celebration Avenue, Victoria Island, Lagos",
+  });
+  assert.equal(res.statusCode, 200);
+
+  const s = (await call(o.token, "GET", `/events/${event.id}/settings`)).json();
+  assert.equal(s.legs[0].all_day, true);
+  assert.ok(s.legs[0].doors_close_at);
+  assert.match(s.legs[0].address_line, /Celebration Avenue/);
+});
