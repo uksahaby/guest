@@ -98,6 +98,30 @@ export function buildServer(
   // would make one test's traffic another test's lockout.
   app.decorate("limits", createLimits());
 
+  /**
+   * Loud on purpose, in the same spirit as the SMS sender line below.
+   *
+   * A production box with no TRUST_PROXY still starts, still serves, still
+   * rate limits — and does it against the address of whatever spoke to us
+   * last, which in this architecture is one router or one web server for
+   * every request on the box. The limits then behave as a single shared
+   * bucket that any one caller can exhaust for everybody. There is no
+   * error, no failed request and nothing in the logs to find later; the
+   * first sign is a couple who cannot sign in on their wedding morning.
+   *
+   * A warning rather than a refusal to boot, because false is genuinely
+   * correct for an API exposed directly with nothing in front of it. That
+   * is a real deployment, just not this one — so this says what it sees
+   * and lets a human decide.
+   */
+  if (!env.isDev && env.trustProxy === false) {
+    app.log.warn(
+      { hint: "TRUST_PROXY=true, a hop count, or the router's CIDR — DEPLOY.md §6" },
+      "TRUST_PROXY is unset in production: every per-IP rate limit will " +
+        "share one bucket, because req.ip is the proxy and not the caller",
+    );
+  }
+
   app.decorate("authenticate", async (req: FastifyRequest, reply: FastifyReply) => {
     try {
       await req.jwtVerify();
