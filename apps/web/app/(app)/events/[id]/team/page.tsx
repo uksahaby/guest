@@ -3,71 +3,127 @@ import { notFound } from "next/navigation";
 import { api, type EventShape } from "@/lib/org-api";
 import {
   addGate,
+  addTeam,
   inviteUsher,
-  removeGate,
-  removeStaff,
-  updateGate,
-  updateStaff,
   makeInviteLink,
+  reportIncident,
+  resolveIncident,
 } from "./actions";
 
 /**
- * Gates and the team, per the Team tab in
- * mockups/organiser-plans-reports-team.html.
+ * Gates & Teams.
  *
- * Until this page existed there was no way to put an usher on a gate, so
- * the scanner — the actual product — could not be used by a real customer.
+ * Two tabs: the entry points, and the people on them. Counts come from
+ * check_in_events and membership from staff_assignments — nothing here is
+ * a stored total.
  *
- * An usher is invited by phone because that is how they sign in: no
- * account needed beforehand, no password ever, and their assignment is
- * waiting when they request their first code.
+ * "Active now" is evidence, not a roster. It counts people whose scanner
+ * has actually been used today, because a list of who was asked to come is
+ * not a list of who came, and at 4pm the difference is the whole question.
  */
 
 type Gate = {
   id: string;
   name: string;
+  location: string | null;
   is_active: boolean;
   admitted: number;
-  ushers: number;
+  last_seen_at: string | null;
+  staff: number;
+  team_name: string | null;
+  team_members: number;
+};
+
+type Team = {
+  id: string;
+  name: string;
+  description: string | null;
+  role: string;
+  is_active: boolean;
+  entrance_id: string | null;
+  entrance_name: string | null;
+  lead_id: string | null;
+  lead_name: string | null;
+  lead_email: string | null;
+  lead_phone: string | null;
+  members: number;
+  on_duty: number;
 };
 
 type Staff = {
   id: string;
-  user_id: string;
   full_name: string | null;
   phone: string;
-  role: string;
+  email: string | null;
   entrance_id: string | null;
   entrance_name: string | null;
-  can_walk_in: boolean;
-  can_manual: boolean;
-  can_override: boolean;
+  team_id: string | null;
+  team_name: string | null;
   last_tested_at: string | null;
-  has_tested: boolean;
-  scans: number;
+  last_scan_at: string | null;
 };
 
-const ERRORS: Record<string, string> = {
-  bad_name: "A gate needs a name.",
-  gate_exists: "There's already a gate with that name here.",
-  gate_has_history:
-    "People came through that gate, so it stays on the record. Close it instead — it disappears from the scanner either way.",
-  bad_phone: "Use the full number with country code, like +234 803 411 2098.",
-  wrong_leg_gate: "That gate belongs to a different part of the event.",
-  cannot_grant_owner: "An event has one owner, and it isn't handed out here.",
-  failed: "That didn't save — try again.",
+type Incident = {
+  id: string;
+  kind: string;
+  note: string;
+  created_at: string;
+  resolved_at: string | null;
+  entrance_name: string | null;
+  reported_by: string | null;
 };
 
-export default async function TeamPage({
+type Payload = {
+  gates: Gate[];
+  teams: Team[];
+  staff: Staff[];
+  incidents: Incident[];
+  totals: {
+    gates: number;
+    gates_active: number;
+    members: number;
+    on_duty: number;
+    today: number;
+    open_incidents: number;
+    all_incidents: number;
+  };
+};
+
+const ROLE: Record<string, string> = {
+  gate_staff: "Gate Staff",
+  support: "Support Staff",
+  security: "Security",
+};
+
+function initial(name: string | null): string {
+  const w = (name ?? "?").trim().split(/\s+/).filter((x) => /[A-Za-zÀ-ɏ]/.test(x));
+  return (w[w.length - 1] ?? "?").slice(0, 1).toUpperCase();
+}
+
+function ago(iso: string | null): string {
+  if (!iso) return "no activity yet";
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  return `${h} hour${h === 1 ? "" : "s"} ago`;
+}
+
+/** Live is evidence: a scan in the last quarter of an hour. */
+const live = (iso: string | null) =>
+  !!iso && Date.now() - new Date(iso).getTime() < 15 * 60_000;
+
+export default async function GatesTeamsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
-    leg?: string;
-    error?: string;
-    saved?: string;
+    tab?: string;
     invite?: string;
+    error?: string;
+    added?: string;
+    resolved?: string;
   }>;
 }) {
   const { id } = await params;
@@ -75,406 +131,575 @@ export default async function TeamPage({
 
   const { status, data: event } = await api<EventShape>(`/events/${id}`);
   if (status !== 200) notFound();
-  const leg = event.legs.find((l) => l.id === sp.leg) ?? event.legs[0];
-  if (!leg) notFound();
+  const leg = event.legs[0];
 
-  const [{ data: gates }, { data: staff }] = await Promise.all([
-    api<Gate[]>(`/legs/${leg.id}/entrances`),
-    api<Staff[]>(`/legs/${leg.id}/staff`),
-  ]);
+  const { status: gst, data } = await api<Payload>(`/events/${id}/gates`);
+  if (gst !== 200) notFound();
 
-  const untested = staff.filter((s) => !s.has_tested).length;
+  const t = data.totals;
+  const here = `/events/${id}/team`;
+  const tab = sp.tab === "teams" ? "teams" : "gates";
+  const totalAdmitted = data.gates.reduce((n, g) => n + g.admitted, 0);
+
+  const fmtT = new Intl.DateTimeFormat("en-NG", {
+    hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Africa/Lagos",
+  });
+
+  const cards = [
+    { label: "Total Gates", n: t.gates,
+      foot: `${t.gates_active} Active · ${t.gates - t.gates_active} Inactive`,
+      tone: "", d: "M4 20V8l8-4 8 4v12M9 20v-6h6v6" },
+    { label: "Team Members", n: t.members,
+      foot: `${data.teams.length} team${data.teams.length === 1 ? "" : "s"}`,
+      tone: "mute",
+      d: "M16 20v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6M21 20v-1a4 4 0 0 0-3-3.9" },
+    { label: "Active Now", n: t.on_duty, foot: "scanned today", tone: "ok",
+      d: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M12 8v4l3 2" },
+    { label: "Checked In Today", n: t.today, foot: "across all gates", tone: "ok",
+      d: "M20 6 9 17l-5-5" },
+    { label: "Incidents", n: t.all_incidents,
+      foot: t.open_incidents > 0 ? `${t.open_incidents} open` : "all resolved",
+      tone: t.open_incidents > 0 ? "warn" : "mute",
+      d: "M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" },
+  ];
 
   return (
     <>
-      <p className="eyebrow">
-        <Link href={`/events/${id}`} style={{ color: "inherit" }}>
-          {event.name}
-        </Link>
-      </p>
-      <h1 className="page">Gates &amp; team</h1>
-      <p className="sub">
-        Ushers only ever see the event and gate they&rsquo;re assigned to, and
-        they can&rsquo;t export anyone&rsquo;s contact details.
-      </p>
+      <nav className="crumbs">
+        <Link href="/events">My Events</Link>
+        <span aria-hidden="true">›</span>
+        <Link href={`/events/${id}`}>{event.name}</Link>
+        <span aria-hidden="true">›</span>
+        <b>Gates &amp; Teams</b>
+      </nav>
 
-      {event.legs.length > 1 && (
-        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-          {event.legs.map((l) => (
-            <Link
-              key={l.id}
-              className={l.id === leg.id ? "primary" : "ghost"}
-              href={`/events/${id}/team?leg=${l.id}`}
-            >
-              {l.name}
-            </Link>
-          ))}
+      <div className="page-head">
+        <div>
+          <h1 className="page">Gates &amp; Teams</h1>
+          <p className="sub">
+            Manage entry points (gates) and your event team assignments.
+          </p>
+        </div>
+        <div className="head-actions">
+          <a className="ghost" href="#roles">View Access Roles</a>
+          <a className="primary" href="#add">+ Add Gate or Team</a>
+        </div>
+      </div>
+
+      {sp.added && (
+        <div className="plan-line">
+          <b>
+            {sp.added === "team" ? "Team added." : "Incident recorded."}
+          </b>
         </div>
       )}
-
-      {sp.error && <p className="form-error">{ERRORS[sp.error] ?? ERRORS.failed}</p>}
-      {sp.saved && !sp.error && <div className="plan-line">Saved.</div>}
+      {sp.resolved && <div className="plan-line"><b>Marked resolved.</b></div>}
+      {sp.error && (
+        <p className="form-error">
+          {sp.error === "team_exists"
+            ? "A team with that name already exists."
+            : sp.error === "missing"
+              ? "Fill the name in first."
+              : "That didn't work — try again."}
+        </p>
+      )}
       {sp.invite && <InviteLink url={sp.invite} />}
 
-      {staff.length > 0 && untested > 0 && (
-        <div className="unassigned">
-          <div>
-            <div className="t">
-              {untested} of {staff.length}{" "}
-              {untested === 1 ? "usher hasn't" : "ushers haven't"} opened the
-              scanner yet
+      <div className="stats five">
+        {cards.map((c) => (
+          <div className="card stat" key={c.label}>
+            <span className={`stat-icon ${c.tone}`} aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d={c.d} />
+              </svg>
+            </span>
+            <div>
+              <p className="stat-label">{c.label}</p>
+              <p className="stat-value">{c.n.toLocaleString("en-NG")}</p>
+              <p className="stat-foot">{c.foot}</p>
             </div>
-            <div className="s">
-              Ask them to sign in and scan anything once before the day. A phone
-              that has never opened the app is the most common thing that goes
-              wrong at a gate.
+          </div>
+        ))}
+      </div>
+
+      <div className="grid-side">
+        <div>
+          <div className="card">
+            <div className="tabs">
+              <Link className={tab === "gates" ? "on" : ""} href={here}>
+                Gates Management
+              </Link>
+              <Link className={tab === "teams" ? "on" : ""} href={`${here}?tab=teams`}>
+                Teams Management
+              </Link>
+            </div>
+
+            {tab === "gates" ? (
+              <>
+                <div className="card-title">
+                  <span>
+                    <b>Event Entry Gates</b>
+                    <small className="sub"> Manage all entry points for your event.</small>
+                  </span>
+                  <a className="ghost sm" href="#add-gate">+ Add New Gate</a>
+                </div>
+
+                <div className="table-wrap">
+                  <table className="list guests">
+                    <thead>
+                      <tr>
+                        <th>Gate Name</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                        <th>Assigned Team</th>
+                        <th>Checked In</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.gates.map((g) => (
+                        <tr key={g.id}>
+                          <td>
+                            <div className="who">
+                              <span className="gate-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                  strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6" />
+                                </svg>
+                              </span>
+                              <div>
+                                <b>{g.name}</b>
+                                <small>{g.staff} on this gate</small>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{g.location ?? <span className="none">—</span>}</td>
+                          <td>
+                            <span className={`badge ${g.is_active ? "attending" : "d-not_sent"}`}>
+                              {g.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td>
+                            {g.team_name ? (
+                              <div className="who">
+                                <span className="avatar sm" aria-hidden="true">
+                                  {initial(g.team_name)}
+                                </span>
+                                <div>
+                                  <b>{g.team_name}</b>
+                                  <small>{g.team_members} members</small>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="none">—</span>
+                            )}
+                          </td>
+                          <td>
+                            {g.is_active ? (
+                              <>
+                                <b>{g.admitted.toLocaleString("en-NG")}</b>
+                                <small className="stack">
+                                  {totalAdmitted > 0
+                                    ? `${((g.admitted / totalAdmitted) * 100).toFixed(1)}%`
+                                    : "0.0%"}
+                                </small>
+                              </>
+                            ) : (
+                              <span className="none">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="perf-strip">
+                  <span className="stat-icon ok" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 20V10m7 10V4m7 16v-7" />
+                    </svg>
+                  </span>
+                  <div>
+                    <strong>Gate Performance Overview</strong>
+                    <small>Track real-time check-ins across all gates.</small>
+                  </div>
+                  <Link className="ghost sm" href={`/events/${id}/live`}>
+                    View Analytics
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="card-title">
+                  <span>
+                    <b>Teams Overview</b>
+                    <small className="sub"> Manage your event teams and their assignments.</small>
+                  </span>
+                  <a className="ghost sm" href="#add-team">+ Add Team</a>
+                </div>
+
+                {data.teams.length === 0 ? (
+                  <p className="sub">
+                    No teams yet. A single-gate wedding does not need them —
+                    ushers work without one.
+                  </p>
+                ) : (
+                  <div className="table-wrap">
+                    <table className="list guests">
+                      <thead>
+                        <tr>
+                          <th>Team Name</th>
+                          <th>Team Lead</th>
+                          <th>Members</th>
+                          <th>Role</th>
+                          <th>Status</th>
+                          <th>On Duty</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.teams.map((tm) => (
+                          <tr key={tm.id}>
+                            <td>
+                              <div className="who">
+                                <span className="gate-icon" aria-hidden="true">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M16 20v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6" />
+                                  </svg>
+                                </span>
+                                <div>
+                                  <b>{tm.name}</b>
+                                  <small>{tm.description ?? tm.entrance_name ?? "—"}</small>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              {tm.lead_name ? (
+                                <div className="who">
+                                  <span className="avatar sm" aria-hidden="true">
+                                    {initial(tm.lead_name)}
+                                  </span>
+                                  <div>
+                                    <b>{tm.lead_name}</b>
+                                    <small>{tm.lead_email ?? tm.lead_phone}</small>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="none">No lead</span>
+                              )}
+                            </td>
+                            <td className="num">{tm.members}</td>
+                            <td>
+                              <span className={`chip type-${tm.role}`}>
+                                {ROLE[tm.role] ?? tm.role}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`badge ${tm.is_active ? "attending" : "d-not_sent"}`}>
+                                {tm.is_active ? "Active" : "Inactive"}
+                              </span>
+                            </td>
+                            <td className="num">{tm.on_duty}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <p className="foot">
+                  Showing {data.teams.length} of {data.teams.length} teams
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* ------------------------------------------- the roster */}
+          <div className="card" id="roles">
+            <h2 className="card-title">
+              Who is on a gate
+              <span className="muted-count">{data.staff.length} people</span>
+            </h2>
+            {data.staff.length === 0 ? (
+              <p className="sub">Nobody yet. Add someone below.</p>
+            ) : (
+              <div className="table-wrap">
+                <table className="list guests">
+                  <thead>
+                    <tr>
+                      <th>Person</th>
+                      <th>Gate</th>
+                      <th>Team</th>
+                      <th>Ready</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.staff.map((s) => (
+                      <tr key={s.id}>
+                        <td>
+                          <div className="who">
+                            <span className="avatar" aria-hidden="true">
+                              {initial(s.full_name)}
+                            </span>
+                            <div>
+                              <b>{s.full_name ?? "Unnamed"}</b>
+                              <small>{s.email ?? s.phone}</small>
+                            </div>
+                          </div>
+                        </td>
+                        <td>{s.entrance_name ?? <span className="none">Any gate</span>}</td>
+                        <td>{s.team_name ?? <span className="none">—</span>}</td>
+                        <td>
+                          {s.last_tested_at || s.last_scan_at ? (
+                            <span className="badge attending">Tested</span>
+                          ) : (
+                            <span className="badge pending">Never opened</span>
+                          )}
+                        </td>
+                        <td className="right">
+                          <form action={makeInviteLink}>
+                            <input type="hidden" name="event_id" value={id} />
+                            <input type="hidden" name="leg_id" value={leg?.id ?? ""} />
+                            <input type="hidden" name="staff_id" value={s.id} />
+                            <button className="ghost sm" type="submit">
+                              Get sign-in link
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ------------------------------------------------ add */}
+          <div className="grid-2" id="add">
+            <div className="card" id="add-gate">
+              <h2 className="card-title">Add a gate</h2>
+              <form action={addGate}>
+                <input type="hidden" name="event_id" value={id} />
+                <input type="hidden" name="leg_id" value={leg?.id ?? ""} />
+                <div className="form-row">
+                  <input className="field" name="name" placeholder="Main Gate"
+                    required aria-label="Gate name" />
+                  <button className="primary" type="submit">Add</button>
+                </div>
+              </form>
+
+              <h2 className="card-title" style={{ marginTop: 18 }} id="add-team">
+                Add a team
+              </h2>
+              <form action={addTeam}>
+                <input type="hidden" name="event_id" value={id} />
+                <div className="form-row">
+                  <input className="field" name="name" placeholder="Team Alpha"
+                    required aria-label="Team name" />
+                  <input className="field" name="description"
+                    placeholder="Main Entrance Team" aria-label="Description" />
+                </div>
+                <div className="form-row" style={{ marginTop: 8 }}>
+                  <select className="field" name="role" aria-label="Role">
+                    <option value="gate_staff">Gate Staff</option>
+                    <option value="support">Support Staff</option>
+                    <option value="security">Security</option>
+                  </select>
+                  <select className="field" name="entrance_id" aria-label="Gate">
+                    <option value="">No gate yet</option>
+                    {data.gates.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                  <button className="primary" type="submit">Add team</button>
+                </div>
+              </form>
+            </div>
+
+            <div className="card">
+              <h2 className="card-title">Add someone to a gate</h2>
+              <form action={inviteUsher}>
+                <input type="hidden" name="event_id" value={id} />
+                <input type="hidden" name="leg_id" value={leg?.id ?? ""} />
+                <div className="form-row">
+                  <input className="field" name="full_name" placeholder="Musa"
+                    aria-label="Their name" />
+                  <input className="field" name="phone" required
+                    placeholder="+234 803 411 2098" aria-label="Their phone number" />
+                </div>
+                <div className="form-row" style={{ marginTop: 8 }}>
+                  <select className="field" name="entrance_id" aria-label="Gate">
+                    <option value="">Any gate</option>
+                    {data.gates.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                  <select className="field" name="role" aria-label="Role">
+                    <option value="usher">Usher</option>
+                    <option value="event_manager">Event manager</option>
+                  </select>
+                  <button className="primary" type="submit">Add</button>
+                </div>
+              </form>
+              <p className="sub sm" style={{ marginTop: 10 }}>
+                Adding them tells them nothing. Use <b>Get sign-in link</b> on
+                their row and send it over WhatsApp — that link is how they
+                sign in, on the scanner app or in their browser.
+              </p>
             </div>
           </div>
         </div>
-      )}
 
-      {/* ------------------------------------------------------------ gates */}
-      <div className="card">
-        <h2>Gates</h2>
-        {gates.length === 0 ? (
-          <div className="empty">
-            No gates yet. Add at least one — an usher is assigned to a gate, and
-            the report tells you which door people came through.
-          </div>
-        ) : (
-          <table className="list">
-            <thead>
-              <tr>
-                <th>Gate</th>
-                <th>Ushers</th>
-                <th>Admitted</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {gates.map((g) => (
-                <tr key={g.id}>
-                  <td>
-                    <div className="t-name">{g.name}</div>
-                    {!g.is_active && <div className="t-sub">Closed</div>}
-                  </td>
-                  <td>{g.ushers}</td>
-                  <td>{g.admitted}</td>
-                  <td>
-                    <details className="tedit">
-                      <summary>Edit</summary>
-                      <form action={updateGate} style={{ marginTop: 10 }}>
-                        <input type="hidden" name="event_id" value={id} />
-                        <input type="hidden" name="leg_id" value={leg.id} />
-                        <input type="hidden" name="entrance_id" value={g.id} />
-                        <div className="form-row">
-                          <input
-                            className="field"
-                            name="name"
-                            defaultValue={g.name}
-                            aria-label="Gate name"
-                          />
-                          <label className="switch" title="Open">
-                            <input
-                              type="checkbox"
-                              name="is_active"
-                              defaultChecked={g.is_active}
-                            />
-                            <span />
-                          </label>
-                          <button className="ghost" type="submit">
-                            Save
-                          </button>
-                        </div>
-                      </form>
-                      <form action={removeGate} style={{ marginTop: 8 }}>
-                        <input type="hidden" name="event_id" value={id} />
-                        <input type="hidden" name="leg_id" value={leg.id} />
-                        <input type="hidden" name="entrance_id" value={g.id} />
-                        <button className="ghost" type="submit">
-                          Remove gate
-                        </button>
-                      </form>
-                      {g.admitted > 0 && (
-                        <p className="t-sub" style={{ marginTop: 8 }}>
-                          People came through here, so it can only be closed,
-                          not removed — the report has to keep naming it.
-                        </p>
-                      )}
-                    </details>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        <form action={addGate} style={{ marginTop: 16 }}>
-          <input type="hidden" name="event_id" value={id} />
-          <input type="hidden" name="leg_id" value={leg.id} />
-          <div className="form-row">
-            <input className="field" name="name" placeholder="Main Gate" required />
-            <button className="primary" type="submit">
-              Add gate
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* ------------------------------------------------------------- team */}
-      <div className="card">
-        <h2>Who&rsquo;s working</h2>
-        {staff.length === 0 ? (
-          <div className="empty">
-            Nobody yet. Add an usher by phone number below — they don&rsquo;t
-            need an account first.
-          </div>
-        ) : (
-          <table className="list">
-            <thead>
-              <tr>
-                <th>Person</th>
-                <th>Gate</th>
-                <th>Ready</th>
-                <th>Can</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {staff.map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    <div className="t-name">{s.full_name || "Not named yet"}</div>
-                    <div className="t-sub">
-                      {s.phone}
-                      {s.role !== "usher" ? ` · ${s.role.replace("_", " ")}` : ""}
-                    </div>
-                  </td>
-                  <td>{s.entrance_name ?? "Any gate"}</td>
-                  <td>
-                    <span className={`badge ${s.has_tested ? "attending" : "not_sent"}`}>
-                      {s.has_tested
-                        ? s.scans > 0
-                          ? `${s.scans} scans`
-                          : "Tested"
-                        : "Not opened"}
+        {/* ------------------------------------------------ right rail */}
+        <aside className="rail">
+          <section className="card">
+            <h2 className="card-title">
+              Live Gate Status
+              <span className="live-dot">LIVE</span>
+            </h2>
+            <ul className="gate-list">
+              {data.gates.map((g) => (
+                <li key={g.id}>
+                  <span className="gate-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6" />
+                    </svg>
+                  </span>
+                  <div>
+                    <strong>{g.name}</strong>
+                    <small>{g.location ?? "No location set"}</small>
+                  </div>
+                  <div className="gate-right">
+                    <b>{g.is_active ? g.admitted : "—"}</b>
+                    <span className={`pill-live ${live(g.last_seen_at) ? "on" : ""}`}>
+                      {!g.is_active ? "Closed" : live(g.last_seen_at) ? "Online" : "Idle"}
                     </span>
-                  </td>
-                  <td className="t-sub">
-                    {[
-                      s.can_manual ? "search by name" : null,
-                      s.can_walk_in ? "add walk-ins" : null,
-                      s.can_override ? "override RSVP" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(", ") || "scan only"}
-                  </td>
-                  <td>
-                    <details className="tedit">
-                      <summary>Edit</summary>
-                      <form action={updateStaff} style={{ marginTop: 10 }}>
-                        <input type="hidden" name="event_id" value={id} />
-                        <input type="hidden" name="leg_id" value={leg.id} />
-                        <input type="hidden" name="assignment_id" value={s.id} />
-                        <div className="form-row">
-                          <select
-                            className="field"
-                            name="entrance_id"
-                            defaultValue={s.entrance_id ?? ""}
-                            aria-label="Gate"
-                          >
-                            <option value="">Any gate</option>
-                            {gates.map((g) => (
-                              <option key={g.id} value={g.id}>
-                                {g.name}
-                              </option>
-                            ))}
-                          </select>
-                          <button className="ghost" type="submit">
-                            Save
-                          </button>
-                        </div>
-                        <div className="setrow" style={{ borderBottom: 0 }}>
-                          <div className="setmain">
-                            <div className="setlabel">Add walk-ins</div>
-                            <div className="setdetail">
-                              Let them put someone on the list at the door.
-                            </div>
-                          </div>
-                          <label className="switch">
-                            <input
-                              type="checkbox"
-                              name="can_walk_in"
-                              defaultChecked={s.can_walk_in}
-                            />
-                            <span />
-                          </label>
-                        </div>
-                        <div className="setrow" style={{ borderBottom: 0 }}>
-                          <div className="setmain">
-                            <div className="setlabel">Override an RSVP block</div>
-                            <div className="setdetail">
-                              Off by default. With it off, a blocked guest
-                              fetches a manager instead.
-                            </div>
-                          </div>
-                          <label className="switch">
-                            <input
-                              type="checkbox"
-                              name="can_override"
-                              defaultChecked={s.can_override}
-                            />
-                            <span />
-                          </label>
-                        </div>
-                      </form>
-                      <form action={makeInviteLink} style={{ marginTop: 8 }}>
-                        <input type="hidden" name="event_id" value={id} />
-                        <input type="hidden" name="leg_id" value={leg.id} />
-                        <input type="hidden" name="assignment_id" value={s.id} />
-                        <button className="ghost" type="submit">
-                          Get sign-in link
-                        </button>
-                      </form>
-                      <form action={removeStaff} style={{ marginTop: 8 }}>
-                        <input type="hidden" name="event_id" value={id} />
-                        <input type="hidden" name="leg_id" value={leg.id} />
-                        <input type="hidden" name="assignment_id" value={s.id} />
-                        <button className="ghost" type="submit">
-                          Remove from this event
-                        </button>
-                      </form>
-                      {s.scans > 0 && (
-                        <p className="t-sub" style={{ marginTop: 8 }}>
-                          Their {s.scans} {s.scans === 1 ? "scan" : "scans"} stay
-                          in the report — removing them takes away access, not
-                          history.
-                        </p>
-                      )}
-                    </details>
-                  </td>
-                </tr>
+                  </div>
+                </li>
               ))}
-            </tbody>
-          </table>
-        )}
+            </ul>
+            <Link className="ghost wide" href={`/events/${id}/live`}>
+              View All Gate Activity
+            </Link>
+          </section>
 
-        <form action={inviteUsher} style={{ marginTop: 16 }}>
-          <input type="hidden" name="event_id" value={id} />
-          <input type="hidden" name="leg_id" value={leg.id} />
-          <div className="form-row">
-            <input
-              className="field"
-              name="full_name"
-              placeholder="Musa"
-              aria-label="Their name"
-            />
-            <input
-              className="field"
-              name="phone"
-              placeholder="+234 803 411 2098"
-              required
-              aria-label="Their phone number"
-            />
-            <select className="field" name="entrance_id" aria-label="Gate">
-              <option value="">Any gate</option>
-              {gates.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-            <select className="field" name="role" aria-label="Role">
-              <option value="usher">Usher</option>
-              <option value="event_manager">Event manager</option>
-            </select>
-            <button className="primary" type="submit">
-              Add
-            </button>
-          </div>
-        </form>
-        <p className="sub">
-          Adding them here does not tell them anything. Once they appear in
-          the list, use <strong>Get sign-in link</strong> on their row and
-          send it over WhatsApp — that link is how they sign in, on the
-          scanner app or straight in their browser. No password, no code to
-          wait for.
-        </p>
-      </div>
+          <section className="card">
+            <h2 className="card-title">Quick Actions</h2>
+            <ul className="actions">
+              <li>
+                <a href="#add-gate">
+                  <strong>Add New Gate</strong>
+                  <small>Create a new entry point</small>
+                </a>
+              </li>
+              <li>
+                <a href="#add-team">
+                  <strong>Add New Team</strong>
+                  <small>Create a new team</small>
+                </a>
+              </li>
+              <li>
+                <a href="#roles">
+                  <strong>Assign Team to Gate</strong>
+                  <small>Manage gate assignments</small>
+                </a>
+              </li>
+              <li>
+                <Link href={`/events/${id}/live`}>
+                  <strong>Gate activity</strong>
+                  <small>What each gate is doing now</small>
+                </Link>
+              </li>
+            </ul>
+          </section>
 
-      {/* --------------------------------------------------- what each role does */}
-      <div className="card">
-        <h2>What each role can do</h2>
-        <table className="list">
-          <thead>
-            <tr>
-              <th>&nbsp;</th>
-              <th>Owner</th>
-              <th>Event manager</th>
-              <th>Usher</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              ["See the guest list", "✓", "✓", "Own gate only"],
-              ["Add and edit households", "✓", "✓", "—"],
-              ["Send invitations", "✓", "✓", "—"],
-              ["Assign tables", "✓", "✓", "—"],
-              ["Check guests in", "✓", "✓", "✓"],
-              ["See reports", "✓", "✓", "Own gate only"],
-              ["Export the guest list", "✓", "✓", "—"],
-              ["Billing and plans", "✓", "✓", "—"],
-              ["Manage gates and team", "✓", "✓", "—"],
-              ["Delete the event", "✓", "✓", "—"],
-            ].map(([what, owner, manager, usher]) => (
-              <tr key={what}>
-                <td className="t-name">{what}</td>
-                <td>{owner}</td>
-                <td>{manager}</td>
-                <td>{usher}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="sub">
-          An usher&rsquo;s phone never downloads a guest&rsquo;s phone number —
-          only the last four digits, so they can confirm one read aloud to them.
-        </p>
+          <section className="card">
+            <h2 className="card-title">
+              Recent Incidents
+              <span className="muted-count">
+                {t.open_incidents > 0 ? `${t.open_incidents} open` : "all clear"}
+              </span>
+            </h2>
+
+            {data.incidents.length === 0 ? (
+              <p className="sub">
+                Nothing recorded. A guest argument or a code that will not
+                scan is worth noting — otherwise it lives on somebody&rsquo;s
+                hand until it is forgotten.
+              </p>
+            ) : (
+              <ul className="incidents">
+                {data.incidents.slice(0, 5).map((i) => (
+                  <li key={i.id}>
+                    <span className={`inc-dot ${i.resolved_at ? "done" : "open"}`}
+                      aria-hidden="true" />
+                    <div>
+                      <strong>{i.note}</strong>
+                      <small>
+                        {i.entrance_name ? `${i.entrance_name} · ` : ""}
+                        {fmtT.format(new Date(i.created_at))}
+                        {i.resolved_at ? " · Resolved" : ""}
+                      </small>
+                    </div>
+                    {!i.resolved_at && (
+                      <form action={resolveIncident}>
+                        <input type="hidden" name="event_id" value={id} />
+                        <input type="hidden" name="incident_id" value={i.id} />
+                        <button className="ghost sm" type="submit">Resolve</button>
+                      </form>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <form action={reportIncident} style={{ marginTop: 12 }}>
+              <input type="hidden" name="event_id" value={id} />
+              <div className="form-row">
+                <input className="field" name="note" required
+                  placeholder="What happened?" aria-label="What happened" />
+                <select className="field" name="entrance_id" aria-label="Gate">
+                  <option value="">No gate</option>
+                  {data.gates.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+                <button className="ghost" type="submit">Record</button>
+              </div>
+            </form>
+          </section>
+        </aside>
       </div>
     </>
   );
 }
 
 /**
- * Shown once, straight after issuing. Only the hash is stored, so if the
- * organiser navigates away without sending it they must issue another —
- * which is the same thing as revoking the one they lost.
+ * The one-time sign-in link, shown once.
+ *
+ * A POST behind a button rather than a plain link: WhatsApp fetches URLs
+ * to build previews, and a single-use link consumed on GET would be spent
+ * by the preview bot before the usher ever tapped it.
  */
 function InviteLink({ url }: { url: string }) {
-  const message = `You're on the gate for this event. Tap to start checking guests in: ${url}`;
+  const message =
+    `You're on the gate for this event. Tap to start checking guests in: ${url}`;
   return (
-    <div className="unassigned">
-      <div>
-        <div className="t">Sign-in link ready — send it now</div>
-        <div className="s">
-          It works once, expires in 14 days, and is the only copy. Sending it
-          on WhatsApp costs nothing. They can tap it to scan in their browser,
-          or paste the whole message into the scanner app — whichever they
-          open first spends it.
-        </div>
-        <div className="s" style={{ marginTop: 10, wordBreak: "break-all" }}>
-          <code>{url}</code>
-        </div>
-        <a
-          className="ghost"
-          style={{ display: "inline-block", marginTop: 12 }}
-          href={`https://wa.me/?text=${encodeURIComponent(message)}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Send on WhatsApp
-        </a>
-      </div>
+    <div className="card invite-ready">
+      <b>Sign-in link ready — send it now</b>
+      <p className="sub">
+        It works once, expires in 14 days, and is the only copy. They can tap
+        it to scan in their browser, or paste the whole message into the
+        scanner app — whichever they open first spends it.
+      </p>
+      <code>{url}</code>
+      <a className="ghost" target="_blank" rel="noreferrer"
+        href={`https://wa.me/?text=${encodeURIComponent(message)}`}>
+        Send on WhatsApp
+      </a>
     </div>
   );
 }

@@ -148,14 +148,14 @@ export async function teamRoutes(app: FastifyInstance) {
 
   app.patch<{
     Params: { entranceId: string };
-    Body: { name?: string; is_active?: boolean };
+    Body: { name?: string; location?: string; is_active?: boolean };
   }>(
     "/entrances/:entranceId",
     { preHandler: [app.authenticate] },
     async (req, reply) => {
       const b = req.body ?? {};
       const name = b.name?.trim();
-      if (!name && b.is_active === undefined) {
+      if (!name && b.is_active === undefined && b.location === undefined) {
         return reply.code(400).send({ code: "bad_request", message: "Nothing to change." });
       }
 
@@ -167,9 +167,12 @@ export async function teamRoutes(app: FastifyInstance) {
         const rows = await db`
           update entrances set
             name = coalesce(${name ?? null}, name),
+            -- Where in the venue: "Front of Venue", "Left Side". It is
+            -- what an organiser says to an usher on the phone.
+            location = coalesce(${b.location?.trim() ?? null}, location),
             is_active = coalesce(${b.is_active ?? null}, is_active)
           where id = ${req.params.entranceId}
-          returning id, leg_id, name, is_active`;
+          returning id, leg_id, name, location, is_active`;
         return { code: 200, body: rows[0] };
       });
       return reply.code(out.code).send(out.body);

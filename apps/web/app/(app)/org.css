@@ -2900,3 +2900,85 @@ input[type="file"].field {
 .chip.type-checkin { background: #f3ecfa; color: #7a52c7; border-color: #e7dcf6; }
 .chip.type-seating { background: #fdf0dc; color: var(--warn); border-color: #f6e2c4; }
 .chip.type-perf { background: #fbe6e6; color: var(--err); border-color: #f5d5d5; }
+
+/* ---------- gates & teams ---------- */
+.avatar.sm { width: 26px; height: 26px; font-size: 11px; }
+
+.perf-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--p50);
+}
+.perf-strip > div { flex: 1; min-width: 0; }
+.perf-strip strong { display: block; font-size: 13.5px; }
+.perf-strip small { display: block; font-size: 11.5px; color: var(--ink-3); }
+
+.gate-list { list-style: none; }
+.gate-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.gate-list li:first-child { border-top: none; }
+.gate-list li > div { flex: 1; min-width: 0; }
+.gate-list strong {
+  display: block;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gate-list small { display: block; font-size: 11px; color: var(--ink-3); }
+.gate-right {
+  flex: 0 0 auto;
+  text-align: right;
+}
+.gate-right b {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.incidents { list-style: none; }
+.incidents li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.incidents li:first-child { border-top: none; }
+.incidents li > div { flex: 1; min-width: 0; }
+.incidents strong { display: block; font-size: 13px; font-weight: 500; }
+.incidents small { display: block; font-size: 11px; color: var(--ink-3); }
+.inc-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+.inc-dot.open { background: var(--warn); }
+.inc-dot.done { background: var(--ok); }
+
+.chip.type-gate_staff { background: var(--p100); color: var(--p600); }
+.chip.type-support { background: #e6eefc; color: #2f5fbf; border-color: #d5e2f8; }
+.chip.type-security { background: #fbe6e6; color: var(--err); border-color: #f5d5d5; }
+
+.invite-ready code {
+  display: block;
+  margin: 10px 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--p50);
+  font-size: 12px;
+  word-break: break-all;
+}
+.card-title small.sub { font-weight: 400; }

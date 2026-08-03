@@ -21,6 +21,7 @@ import { rsvpRoutes } from "./rsvps.ts";
 import { imageRoutes } from "./images.ts";
 import { seatingRoutes } from "./seating.ts";
 import { passRoutes } from "./passes.ts";
+import { gateRoutes } from "./gates.ts";
 import multipart from "@fastify/multipart";
 import { makeProvider, type PaymentProvider } from "./paystack.ts";
 import { makeSender, type SmsSender } from "./sms.ts";
@@ -133,6 +134,7 @@ export function buildServer(
   app.register(imageRoutes);
   app.register(seatingRoutes);
   app.register(passRoutes);
+  app.register(gateRoutes);
 
   // Smoke route proving the whole vertical slice works: issue-side data in
   // Postgres, verify-side logic from checkin-core. Dev only.

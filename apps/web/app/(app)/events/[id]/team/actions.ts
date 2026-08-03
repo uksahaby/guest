@@ -120,3 +120,73 @@ export async function makeInviteLink(formData: FormData): Promise<void> {
     `/events/${eventId}/team?leg=${legId}&invite=${encodeURIComponent(data.url!)}`,
   );
 }
+
+/**
+ * A named group with a lead and a role.
+ *
+ * Ushers are already staff_assignments; a team is the grouping an
+ * organiser actually thinks and briefs in — "Team Bravo is on the VIP
+ * gate" — and it is what they shout across a car park.
+ */
+export async function addTeam(formData: FormData): Promise<void> {
+  const eventId = String(formData.get("event_id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const role = String(formData.get("role") ?? "gate_staff");
+  const entranceId = String(formData.get("entrance_id") ?? "");
+
+  if (!eventId) redirect("/events");
+  if (!name) redirect(`/events/${eventId}/team?error=missing`);
+
+  const { status, data } = await api<{ code?: string }>(
+    `/events/${eventId}/teams`,
+    {
+      method: "POST",
+      body: {
+        name,
+        description: description || undefined,
+        role,
+        entrance_id: entranceId || undefined,
+      },
+    },
+  );
+
+  revalidatePath(`/events/${eventId}/team`);
+  redirect(
+    status === 201
+      ? `/events/${eventId}/team?added=team`
+      : `/events/${eventId}/team?error=${encodeURIComponent(data?.code ?? "failed")}`,
+  );
+}
+
+/** Note something that happened at a gate, so it is not on someone's hand. */
+export async function reportIncident(formData: FormData): Promise<void> {
+  const eventId = String(formData.get("event_id") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  const entranceId = String(formData.get("entrance_id") ?? "");
+
+  if (!eventId) redirect("/events");
+  if (!note) redirect(`/events/${eventId}/team?error=missing`);
+
+  const { status } = await api(`/events/${eventId}/incidents`, {
+    method: "POST",
+    body: { note, entrance_id: entranceId || undefined },
+  });
+
+  revalidatePath(`/events/${eventId}/team`);
+  redirect(
+    status === 201
+      ? `/events/${eventId}/team?added=incident`
+      : `/events/${eventId}/team?error=failed`,
+  );
+}
+
+export async function resolveIncident(formData: FormData): Promise<void> {
+  const eventId = String(formData.get("event_id") ?? "");
+  const incidentId = String(formData.get("incident_id") ?? "");
+  if (!eventId || !incidentId) redirect("/events");
+
+  await api(`/incidents/${incidentId}/resolve`, { method: "POST" });
+  revalidatePath(`/events/${eventId}/team`);
+  redirect(`/events/${eventId}/team?resolved=1`);
+}
