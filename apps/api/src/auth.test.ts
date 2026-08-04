@@ -29,10 +29,51 @@ test("requesting a code returns 202 with the resend interval and a dev code", as
   assert.match(body.dev_code, /^\d{6}$/);
 });
 
-test("mangled phone numbers are rejected; spaced ones are normalised", async () => {
-  assert.equal((await request("08034112098")).statusCode, 400); // no +country
+test("a phone number is read the way it is written", async () => {
+  // Used to demand E.164 and reject the local form outright. The guest
+  // importer has always accepted these — and it turns them into WhatsApp
+  // messages to real people — so refusing them at the door was the odd
+  // one out, and it surfaced as "wrong password" (phone.ts).
+  assert.equal((await request("08034112098")).statusCode, 202);
+  assert.equal((await request("+234 803 411 2099")).statusCode, 202);
+  assert.equal((await request("2348034112097")).statusCode, 202);
+
+  // Still not a phone number.
   assert.equal((await request("not a phone")).statusCode, 400);
-  assert.equal((await request("+234 803 411 2098")).statusCode, 202);
+  assert.equal((await request("0803")).statusCode, 400);
+});
+
+test("the local and international forms are one account, not two", async () => {
+  // The whole point: 0803… and +234803… must resolve to the same row, or
+  // an organiser signs up one way and cannot sign in the other.
+  const local = "08039990001";
+  const e164 = "+2348039990001";
+
+  const signup = await app.inject({
+    method: "POST",
+    url: "/auth/signup",
+    payload: { phone: local, password: "correct horse battery", full_name: "Ada" },
+  });
+  assert.equal(signup.statusCode, 201);
+  assert.equal(signup.json().user.phone, e164, "stored in E.164 whatever was typed");
+
+  // The same number in international form is now taken, not free.
+  const again = await app.inject({
+    method: "POST",
+    url: "/auth/signup",
+    payload: { phone: e164, password: "another good one", full_name: "Ada" },
+  });
+  assert.equal(again.statusCode, 409);
+
+  // And signing in works from either form.
+  for (const p of [local, e164, "234 803 999 0001"]) {
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/password/login",
+      payload: { phone: p, password: "correct horse battery" },
+    });
+    assert.equal(res.statusCode, 200, `could not sign in with ${p}`);
+  }
 });
 
 test("an immediate resend is rate limited", async () => {

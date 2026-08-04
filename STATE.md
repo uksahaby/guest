@@ -75,7 +75,7 @@ re-triggers the "Allow USB debugging?" prompt on the handset.
 ### Tests
 
 ```bash
-npm test --workspace api            # 347
+npm test --workspace api            # 348
 npm test --workspace checkin-core   # 40
 npm test --workspace web            # 3  (the QR decoder, pinned)
 cd apps/scanner && flutter test     # 89
@@ -138,6 +138,21 @@ the web scanner
 ---
 
 ## 3. Decisions already made — don't re-litigate
+
+- **A phone number is read the way it is written, everywhere.** `0803…`,
+  `803…`, `234803…` and `+234…` all reach the same E.164 row, through one
+  implementation in `src/phone.ts` used by sign-in, usher invites and the
+  guest importer alike. This **reverses** an earlier decision that demanded
+  E.164 at the door (`auth.test.ts`, `team.test.ts` asserted it, commented
+  "it's how they sign in, so it must be exact"). The reversal is deliberate:
+  the importer already assumed Nigeria for these same formats *and turned
+  them into WhatsApp messages to real people*, so refusing them at login was
+  the inconsistent half — and it surfaced as "that phone number and password
+  don't match", a wrong-password error for a formatting difference, on the
+  first screen anybody sees. The known cost is that a non-Nigerian local
+  number (`07911…`) becomes a Nigerian one; an international number must be
+  written with its `+` and country code, which is the only unambiguous form
+  anyway.
 
 - **The billing mockup does not describe this product, and the product
   won.** The Billing & Plans design was drawn around yearly subscriptions

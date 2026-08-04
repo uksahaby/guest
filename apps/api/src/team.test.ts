@@ -343,10 +343,18 @@ test("a mangled phone number is refused, and owner cannot be granted", async () 
   const event = await newEvent(o.token);
   const legId = event.legs[0].id;
 
+  // The local form is now accepted and stored in E.164: an organiser adds
+  // an usher from whatever is written on the card (phone.ts).
+  const local = await call(o.token, "POST", `/legs/${legId}/staff`, {
+    phone: "08034112098",
+  });
+  assert.equal(local.statusCode, 201);
+  assert.equal(local.json().user.phone, "+2348034112098");
+
   assert.equal(
-    (await call(o.token, "POST", `/legs/${legId}/staff`, { phone: "08034112098" })).json().code,
+    (await call(o.token, "POST", `/legs/${legId}/staff`, { phone: "0803" })).json().code,
     "bad_phone",
-    "local format has no country code — it's how they sign in, so it must be exact",
+    "still has to be a whole number",
   );
   assert.equal(
     (await call(o.token, "POST", `/legs/${legId}/staff`, { phone: phone(), role: "owner" }))

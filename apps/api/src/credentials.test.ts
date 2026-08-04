@@ -342,7 +342,9 @@ test("signup never takes over an account that already exists", async () => {
 });
 
 test("signup insists on a name, a real number and a long password", async () => {
-  assert.equal((await signup({ phone: "08034112098", password: "a-long-enough-one", full_name: "A" })).statusCode, 400);
+  // "0803…" is a real number now, not a rejected one (phone.ts) — so the
+  // thing that must still fail is something that is not a number at all.
+  assert.equal((await signup({ phone: "0803", password: "a-long-enough-one", full_name: "A" })).statusCode, 400);
   assert.equal((await signup({ phone: phone(), password: "short", full_name: "A" })).statusCode, 400);
   assert.equal((await signup({ phone: phone(), password: "a-long-enough-one", full_name: "  " })).statusCode, 400);
 });

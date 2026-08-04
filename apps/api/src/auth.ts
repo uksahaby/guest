@@ -13,6 +13,7 @@ import {
   verifyPassword,
 } from "./credentials.ts";
 import { tooMany } from "./ratelimit.ts";
+import { toE164 } from "./phone.ts";
 
 /**
  * Three ways in, all keyed on the phone number (architecture decision #7:
@@ -47,13 +48,13 @@ const CODE_TTL_MS = 10 * 60 * 1000;
 const RESEND_SECONDS = 30;
 const MAX_ATTEMPTS = 5;
 const ACCESS_TTL_S = 30 * 24 * 3600; // scanners stay signed in through event day
-const PHONE_RE = /^\+\d{8,15}$/;
-
-function normalisePhone(raw: unknown): string | null {
-  if (typeof raw !== "string") return null;
-  const p = raw.replace(/[\s\-().]/g, "");
-  return PHONE_RE.test(p) ? p : null;
-}
+/**
+ * Every sign-in path reads a phone number the way it is actually written
+ * (phone.ts). This used to demand E.164 and answer "that phone number and
+ * password don't match" to anyone who typed 0803… — their own number, in
+ * the ordinary form, reported as a wrong password.
+ */
+const normalisePhone = toE164;
 
 function hashCode(phone: string, code: string): string {
   return createHash("sha256").update(`${phone}:${code}:${env.jwtSecret}`).digest("hex");
@@ -75,7 +76,7 @@ export async function authRoutes(
   app.post<{ Body: { phone?: string } }>("/auth/otp/request", async (req, reply) => {
     const phone = normalisePhone(req.body?.phone);
     if (!phone) {
-      return reply.code(400).send({ code: "bad_phone", message: "Phone must be E.164, like +2348034112098." });
+      return reply.code(400).send({ code: "bad_phone", message: "That doesn't look like a phone number. 0803 411 2098 or +2348034112098 both work." });
     }
 
     // Per phone this is already 30 seconds apart. That does nothing about
@@ -161,7 +162,7 @@ export async function authRoutes(
       if (!phone) {
         return reply.code(400).send({
           code: "bad_phone",
-          message: "Phone must be E.164, like +2348034112098.",
+          message: "That doesn't look like a phone number. 0803 411 2098 or +2348034112098 both work.",
         });
       }
       const problem = passwordProblem(req.body?.password);

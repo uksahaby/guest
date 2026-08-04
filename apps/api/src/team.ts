@@ -6,6 +6,7 @@ import {
   newInviteToken,
   INVITE_TTL_DAYS,
 } from "./credentials.ts";
+import { toE164 } from "./phone.ts";
 
 /**
  * Gates and the people on them.
@@ -36,15 +37,16 @@ const FORBIDDEN: Sendable = {
   body: { code: "forbidden", message: "Not your event." },
 };
 
-const PHONE_RE = /^\+\d{8,15}$/;
 const ROLES = ["usher", "event_manager", "owner"] as const;
 type Role = (typeof ROLES)[number];
 
-function normalisePhone(raw: unknown): string | null {
-  if (typeof raw !== "string") return null;
-  const p = raw.replace(/[\s\-().]/g, "");
-  return PHONE_RE.test(p) ? p : null;
-}
+/**
+ * An organiser adding an usher is typing somebody else's number, in
+ * whatever form it was given to them — usually 0803…, off a card or a
+ * WhatsApp message. Demanding E.164 here refused the commonest input on
+ * the screen where a real gate team gets built. See phone.ts.
+ */
+const normalisePhone = toE164;
 
 async function managesLeg(db: Db, legId: string): Promise<boolean> {
   const [row] = await db`select app_manages_leg(${legId}::uuid) as ok`;
@@ -251,7 +253,8 @@ export async function teamRoutes(app: FastifyInstance) {
       if (!phone) {
         return reply.code(400).send({
           code: "bad_phone",
-          message: "A phone number like +2348034112098 — it's how they sign in.",
+          message:
+            "A phone number like 0803 411 2098 or +2348034112098 — it's how they sign in.",
         });
       }
       const role: Role = ROLES.includes(b.role as Role) ? (b.role as Role) : "usher";

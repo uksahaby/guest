@@ -144,24 +144,12 @@ export function detectColumns(headers: string[]): Mapping {
 }
 
 /**
- * Nigerian numbers arrive as 0803…, 803…, 234803… or +234 803 411 2098.
- * E.164 is what wa.me needs, so normalise; return null when it is too
- * short to be a phone number at all, and let the caller warn.
+ * Re-exported so the importer's callers and its tests keep their import,
+ * while the rule itself lives in one place — auth and team invitations
+ * need the same reading (see phone.ts).
  */
-export function normalisePhone(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const digits = trimmed.replace(/\D/g, "");
-  if (digits.length < 7) return null;
-
-  if (trimmed.startsWith("+")) return `+${digits}`;
-  if (digits.startsWith("234")) return `+${digits}`;
-  // Local trunk prefix: 0803… → +234803…
-  if (digits.startsWith("0")) return `+234${digits.slice(1)}`;
-  // Bare subscriber number, 10 digits: 803…
-  if (digits.length === 10) return `+234${digits}`;
-  return `+${digits}`;
-}
+import { normalisePhone } from "./phone.ts";
+export { normalisePhone };
 
 // ---------------------------------------------------------------- rows
 
