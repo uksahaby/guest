@@ -28,7 +28,11 @@ npm run dev   --workspace web                 # :3000
 
 - **Organisers** create an account at `/signup` with a phone number and a
   password, and get a recovery code shown once. Forgotten password →
-  `/recover`. Lost both → `npx tsx scripts/reset-password.ts +234…`, which
+  `/recover`. An account that arrived any other way — seeded, or created by
+  an organiser, or signed in by OTP — has no recovery code; **Your profile**
+  now mints one on demand (`POST /auth/recovery-code`, which existed from
+  the start with nothing calling it). Generating replaces any previous
+  code, because two live codes are two live keys. Lost both → `npx tsx scripts/reset-password.ts +234…`, which
   is deliberately not an API endpoint.
 - **Ushers** never type anything: the organiser hits *Get sign-in link* on
   the Team page and sends it over WhatsApp. One tap lands them on the gate

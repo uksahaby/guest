@@ -1,5 +1,5 @@
 import { api } from "@/lib/org-api";
-import { uploadAvatar, removeAvatar, saveProfile } from "./actions";
+import { uploadAvatar, removeAvatar, saveProfile, mintRecoveryCode } from "./actions";
 
 /**
  * The organiser's own account: photo, name, contact.
@@ -39,6 +39,7 @@ export default async function ProfilePage({
     too_large: "That image is over 2 MB. Try a smaller one.",
     not_an_image: "That file is not a JPEG, PNG or WebP image.",
     save: "That didn't save — try again.",
+    recovery: "Couldn't generate a recovery code just now. Nothing changed — your old one still works.",
     failed: "The upload failed. Try again.",
   };
 
@@ -118,6 +119,27 @@ export default async function ProfilePage({
           </form>
         </section>
       </div>
+
+      <section className="card">
+        <h2 className="card-title">Recovery code</h2>
+        <p className="sub" style={{ marginTop: 0, maxWidth: "62ch" }}>
+          If you forget your password, this code is the only self-service way
+          back into your account — there is no SMS to fall back on and no
+          email channel yet. It is shown once and stored as a hash, so nobody
+          can look it up for you afterwards, including us.
+        </p>
+        <p className="sub sm" style={{ maxWidth: "62ch" }}>
+          Generating one <b>replaces any code you already have</b>. That is
+          deliberate: two live codes would be two live keys to the same
+          account. If you have one written down somewhere safe, it stops
+          working the moment you press this.
+        </p>
+        <form action={mintRecoveryCode} style={{ marginTop: 14 }}>
+          <button className="ghost" type="submit">
+            Generate a recovery code
+          </button>
+        </form>
+      </section>
     </>
   );
 }

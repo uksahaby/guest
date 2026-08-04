@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, getToken, API_URL } from "@/lib/org-api";
@@ -49,6 +50,43 @@ export async function removeAvatar(): Promise<void> {
   revalidatePath("/profile");
   revalidatePath("/dashboard");
   redirect("/profile?saved=1");
+}
+
+/**
+ * Mint a recovery code and show it once.
+ *
+ * The endpoint has existed since recovery was built; nothing ever called
+ * it. A code was only ever created by signing up or by completing a reset,
+ * so anyone whose account arrived another way — seeded, or created by an
+ * organiser, or signed in by OTP and given a password later — had no
+ * recovery code at all and no way to get one. With SMS optional and no
+ * email channel, that left a human with database access as the only way
+ * back in. This closes that.
+ *
+ * Replacing any existing code is the point rather than a side effect: two
+ * live codes would be two live keys to the same account.
+ */
+export async function mintRecoveryCode(): Promise<void> {
+  const { status, data } = await api<{ recovery_code?: string }>(
+    "/auth/recovery-code",
+    { method: "POST" },
+  );
+  if (status !== 200 || !data?.recovery_code) {
+    redirect("/profile?error=recovery");
+  }
+
+  // Same route the signup flow uses: a short-lived httpOnly cookie rather
+  // than the URL, so the code stays out of browser history and out of any
+  // log that records query strings. /welcome/recovery shows it once and
+  // deletes the cookie.
+  (await cookies()).set("recovery_code", data.recovery_code, {
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 600,
+    path: "/",
+  });
+
+  redirect("/welcome/recovery");
 }
 
 /** Name and email, the two things an organiser can correct about herself. */
