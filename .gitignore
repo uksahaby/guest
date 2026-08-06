@@ -13,3 +13,6 @@ dist/
 # belong on a disk you control, never in a repository.
 backups/
 *.dump
+# The handoff documents are build output: tool/make-handoff.js is the source,
+# and a .docx is a zip that no diff can read. Regenerate rather than track.
+*.docx
