@@ -1,0 +1,406 @@
+/* Sign in and sign up — the split screen from the mockups.
+   Scoped under .auth-root; org.css loads alongside and supplies the
+   tokens, .card, .field, .primary and .flash. */
+
+.auth-root {
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+.auth-split {
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+/* The headings, as the mockups set them: a serif for the things you read
+   once and slowly — the brand, the welcome, the title of the card — and
+   Inter for everything you read quickly. Cormorant runs small for its
+   size, so these are set larger than a sans equivalent would be. */
+.auth-root h1,
+.auth-brand h2,
+.auth-logo strong {
+  font-family: var(--font-serif), Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* ---------- the branded panel ---------- */
+
+.auth-brand {
+  position: relative;
+  background:
+    radial-gradient(120% 80% at 20% 0%, #1d4b12 0%, transparent 60%),
+    linear-gradient(170deg, #17400c 0%, var(--p900) 55%, #0f2807 100%);
+  color: #eaf3e4;
+  padding: 40px 38px;
+  display: flex;
+  overflow: hidden;
+}
+
+/* The reception photograph, filling the lower half of the panel as the
+   mockup has it, fading up into the green so the welcome stays legible
+   over it rather than fighting it.
+ 
+   A background rather than an <img>, and only on the panel that carries
+   .with-photo: below 900px .auth-brand is display:none, and a browser does
+   not fetch a background image for an element it is not rendering. So the
+   phone — the device most likely to be on metered data, on the one page
+   that loads before anybody has decided to trust us — pays nothing for
+   it. Sign-up has no photograph at all, matching its own mockup. */
+.auth-brand.with-photo::before {
+  content: "";
+  position: absolute;
+  inset: 34% 0 0 0;
+  background: url("/auth-reception.webp") center 60% / cover no-repeat;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 26%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 26%);
+  pointer-events: none;
+}
+
+/* Warmth spilling up out of the candles, so the join reads as one picture
+   rather than a photo pasted onto a colour. */
+.auth-brand.with-photo::after {
+  content: "";
+  position: absolute;
+  inset: 30% 0 0 0;
+  background: radial-gradient(80% 50% at 50% 70%, rgba(224, 178, 96, 0.20), transparent 70%);
+  pointer-events: none;
+}
+
+.auth-brand-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+  width: 100%;
+}
+
+/* With a photograph below, the words live in the top third and stop. */
+.auth-brand.with-photo .auth-brand-inner { justify-content: flex-start; }
+.auth-brand.with-photo .auth-pitch { text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35); }
+
+.auth-logo { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+
+.auth-mark {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: #f2e2a8;
+  border: 1.5px solid rgba(242, 226, 168, 0.55);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.auth-logo strong { font-size: 27px; line-height: 1.1; }
+
+.auth-logo small {
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(234, 243, 228, 0.55);
+}
+
+.auth-pitch h2 {
+  font-size: 42px;
+  line-height: 1.08;
+  margin-bottom: 14px;
+}
+
+.auth-pitch p {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: rgba(234, 243, 228, 0.78);
+  max-width: 34ch;
+}
+
+.perks { margin-top: 34px; display: flex; flex-direction: column; gap: 20px; }
+
+.perk { display: flex; gap: 13px; align-items: flex-start; }
+
+.perk > span {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cfe8bf;
+}
+
+.perk svg { width: 17px; height: 17px; }
+.perk strong { display: block; font-size: 13.5px; font-weight: 600; }
+
+.perk small {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(234, 243, 228, 0.62);
+  margin-top: 3px;
+}
+
+/* ---------- the form side ---------- */
+
+.auth-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.auth-col { width: 100%; max-width: 470px; }
+
+.card.authcard { margin-top: 0; padding: 30px 30px 26px; }
+
+.card.authcard h1 {
+  font-size: 33px;
+  line-height: 1.15;
+  margin-bottom: 5px;
+}
+
+.card.authcard .sub { margin-top: 0; margin-bottom: 20px; }
+
+/* ---------- organiser / admin ---------- */
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f2f2ee;
+  margin-bottom: 22px;
+}
+
+.auth-tabs a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 8px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.auth-tabs svg { width: 15px; height: 15px; }
+.auth-tabs a:hover { color: var(--ink); }
+
+.auth-tabs a.on {
+  background: var(--surface);
+  color: var(--p900);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* ---------- fields ---------- */
+
+.auth-root .flabel { margin-top: 14px; }
+.auth-root .flabel:first-of-type { margin-top: 0; }
+
+.labelrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.labelrow .flabel { margin-top: 0; }
+
+.minor { font-size: 12.5px; color: var(--p600); text-decoration: none; }
+.minor:hover { text-decoration: underline; }
+
+.inputwrap { position: relative; display: block; }
+
+.inputwrap .lead {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 17px;
+  height: 17px;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+
+.inputwrap .lead svg { width: 100%; height: 100%; display: block; }
+.inputwrap .field { padding-left: 40px; }
+.inputwrap.bad .field { border-color: var(--err); }
+
+.inputwrap .reveal {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-3);
+  border-radius: 8px;
+}
+
+.inputwrap .reveal:hover { color: var(--ink); background: var(--p50); }
+.inputwrap .reveal svg { width: 17px; height: 17px; }
+.inputwrap .field:has(~ .reveal) { padding-right: 44px; }
+
+/* The flag sits where the mockup's country selector does. It labels the
+   default rather than forcing it — the server reads 0803…, +234… and any
+   number written with its own country code. */
+.inputwrap.phone .lead.flag { width: 20px; height: 14px; }
+
+.inputwrap.phone .lead.flag svg {
+  width: 20px;
+  height: 14px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.inputwrap.phone .field { padding-left: 44px; }
+
+.phint {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+/* ---------- the live password rule ---------- */
+
+.prules { margin-top: 9px; }
+
+.prule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 6px;
+}
+
+.prule svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.prule.ok { color: var(--ok); font-weight: 500; }
+.prule.bad-text { color: var(--err); }
+
+/* ---------- buttons and the tail of the card ---------- */
+
+.auth-root .primary.wide {
+  width: 100%;
+  justify-content: center;
+  display: flex;
+  margin-top: 20px;
+  padding: 13px 20px;
+  font-size: 14.5px;
+}
+
+.auth-alt { text-align: center; margin-top: 14px; font-size: 13px; }
+.auth-alt a { color: var(--p600); text-decoration: none; }
+.auth-alt a:hover { text-decoration: underline; }
+
+.auth-swap {
+  text-align: center;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+.auth-swap a { color: var(--p600); font-weight: 600; text-decoration: none; }
+.auth-swap a:hover { text-decoration: underline; }
+
+.auth-root .flash { margin-bottom: 16px; }
+.auth-root .flash a { color: inherit; font-weight: 600; }
+.flash.warn { background: #fdf4e3; border: 1px solid #f6e2c4; color: #8a5a12; }
+
+/* ---------- the admin-access panel under the card ---------- */
+
+.adminbox {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: #f2f6f1;
+  border: 1px solid var(--p100);
+}
+
+.adminbox-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: var(--p100);
+  color: var(--p600);
+}
+
+.adminbox-icon svg { width: 18px; height: 18px; }
+.adminbox > div { flex: 1; min-width: 0; }
+.adminbox strong { display: block; font-size: 13.5px; font-weight: 600; }
+
+.adminbox small {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-2);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+.adminbox .ghost { flex: 0 0 auto; white-space: nowrap; }
+
+.auth-secure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.auth-secure svg { width: 14px; height: 14px; }
+
+.auth-root .code-field {
+  text-align: center;
+  letter-spacing: 0.5em;
+  font-size: 22px;
+  padding-left: 14px;
+}
+
+.auth-root .dev-hint {
+  margin-top: 10px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--warn);
+}
+
+/* The panel is the part that goes when there is no room for it: the form
+   is the page, and on a phone it should have the whole screen. */
+@media (max-width: 900px) {
+  .auth-split { grid-template-columns: minmax(0, 1fr); }
+  .auth-brand { display: none; }
+  .auth-main { padding: 28px 16px; align-items: flex-start; }
+}
+
+@media (max-width: 520px) {
+  .card.authcard { padding: 22px 18px 20px; }
+  .adminbox { flex-wrap: wrap; }
+  .adminbox .ghost { width: 100%; justify-content: center; display: flex; }
+}

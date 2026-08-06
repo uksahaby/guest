@@ -83,13 +83,24 @@ export async function signOut(): Promise<void> {
 export async function signInWithPassword(formData: FormData): Promise<void> {
   const phone = String(formData.get("phone") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  // The Admin tab is the same credentials through the same endpoint. What
+  // it changes is where you land and what you are told when the account is
+  // not an administrator — signing somebody in and dropping them on the
+  // organiser dashboard, when they asked for the platform, looks like a
+  // bug rather than an answer.
+  const wantsAdmin = formData.get("as") === "admin";
+  const back = wantsAdmin ? "/login?as=admin" : "/login";
 
   const res = await fetch(`${API_URL}/auth/password/login`, {
     method: "POST",
     headers: { "content-type": "application/json", ...(await callerHeaders()) },
     body: JSON.stringify({ phone, password }),
   });
-  if (!res.ok) redirect("/login?mode=password&error=password");
+  if (!res.ok) {
+    // 429 is its own answer: "wrong password" would send someone hunting
+    // for a password that is fine.
+    redirect(`${back}&error=${res.status === 429 ? "throttled" : "password"}`);
+  }
 
   const session = await res.json();
   const jar = await cookies();
@@ -99,6 +110,13 @@ export async function signInWithPassword(formData: FormData): Promise<void> {
     maxAge: 30 * 24 * 3600,
     path: "/",
   });
+
+  if (wantsAdmin && !session.user?.is_platform_admin) {
+    // Signed in, but through the wrong door. The session stands — they are
+    // a real organiser — and the page says so.
+    redirect("/login?as=admin&error=not_admin&signed_in=1");
+  }
+
   if (!String(session.user?.full_name ?? "").trim()) redirect("/welcome");
-  redirect("/dashboard");
+  redirect(wantsAdmin ? "/admin" : "/dashboard");
 }
