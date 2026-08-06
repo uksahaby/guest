@@ -90,7 +90,7 @@ test("app_admin cannot read a guest list, at the database", async () => {
     "invitations", "invitation_legs", "passes", "check_in_events", "seating_tables",
   ]) {
     await assert.rejects(
-      () => sqlPlatform.unsafe(`select count(*) from ${table}`),
+      () => sqlPlatform().unsafe(`select count(*) from ${table}`),
       (err: Error) => /permission denied/i.test(err.message),
       `app_admin could read ${table}`,
     );
@@ -99,14 +99,14 @@ test("app_admin cannot read a guest list, at the database", async () => {
 
 test("app_admin cannot read a signing key", async () => {
   await assert.rejects(
-    () => sqlPlatform`select signing_key from events limit 1`,
+    () => sqlPlatform()`select signing_key from events limit 1`,
     (err: Error) => /permission denied/i.test(err.message),
   );
 });
 
 test("app_admin cannot write anything at all", async () => {
   await assert.rejects(
-    () => sqlPlatform`update events set name = 'mine' where true`,
+    () => sqlPlatform()`update events set name = 'mine' where true`,
     (err: Error) => /permission denied/i.test(err.message),
   );
 });
@@ -123,14 +123,14 @@ test("guests are counted without being read", async () => {
     payload: { display_name: "Mr & Mrs Adeyemi", legs: [{ leg_id: legId, allowance: 4 }] },
   });
 
-  const [row] = await sqlPlatform`
+  const [row] = await sqlPlatform()`
     select households, people from admin_event_size(${event.id}::uuid)`;
   assert.equal(row!.households, 1);
   assert.equal(row!.people, 4);
 
   // The count came back; the name behind it is still out of reach.
   await assert.rejects(
-    () => sqlPlatform`select display_name from invitations limit 1`,
+    () => sqlPlatform()`select display_name from invitations limit 1`,
     (err: Error) => /permission denied/i.test(err.message),
   );
 });

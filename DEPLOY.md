@@ -112,6 +112,7 @@ DATABASE_URL="$SUPERUSER_URL" npm run migrate --workspace api
 | `DATABASE_URL_APP_PUBLIC` | yes | Guest pages. |
 | `DATABASE_URL_APP_VERIFY` | yes | Signing keys, nothing else. |
 | `DATABASE_URL_APP_BILLING` | yes | Webhook path. |
+| `DATABASE_URL_APP_ADMIN` | no | The super admin dashboard (migration 019). **Unset, the API still boots and serves everything else** — only `/admin` answers 503. It was briefly required, which broke a deploy: a dashboard must never be able to stop the gate. |
 | `JWT_SECRET` | yes | Strong and unique. Rotating it signs everyone out. |
 | `TERMII_API_KEY` | no | Only for OTP login, which is now one option among three. Without it the API refuses to boot *unless* `ALLOW_SMS_LOG_SENDER=true` — that guard predates password sign-in and still catches a deploy that meant to have SMS. |
 | `PAYSTACK_SECRET_KEY` | yes | `sk_test_…` for staging. Without it checkout tries the offline stub, which refuses to exist in production. |
@@ -187,6 +188,28 @@ puts a transatlantic write in front of every request.
 
 Nothing at the gate is throttled. An usher scanning fast is the system
 working, and the check-in path never refuses over volume.
+
+### The sixth role
+
+`app_admin` arrived with the platform dashboard and is the one role that
+is **optional**. It reads organisers, events and payments and holds no
+permission on any guest data at all.
+
+To turn the dashboard on:
+
+```bash
+# 1. Migration 019 creates the role.
+DATABASE_URL="<superuser url>" npm run migrate --workspace api
+
+# 2. Give it a real password, like the other five (§2).
+psql "$SUPERUSER_URL" -c "alter role app_admin password '<strong>'"
+
+# 3. Set DATABASE_URL_APP_ADMIN on the API host, then redeploy.
+# 4. Grant somebody access. A script, never an endpoint.
+npx tsx apps/api/scripts/platform-admin.ts +234…  "Their Name"
+```
+
+Skip all of it and nothing breaks except that one page.
 
 ## 7. Backups
 

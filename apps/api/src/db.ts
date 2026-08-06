@@ -71,8 +71,38 @@ export const sqlBilling = postgres(roleUrl("app_billing", "app_billing_dev_only"
  * invitations, passes, check_in_events or seating_tables, so a query that
  * reaches for a guest list fails rather than returning one. Sizes come
  * back through admin_event_size(), which counts without reading.
+ *
+ * Connected LAZILY, and that is the important part. Every other pool is
+ * built when this module loads, so a missing URL stops the process — which
+ * is right for them, because without app_rw there is no product. It was
+ * badly wrong for this one: adding a sixth role made every deployment
+ * refuse to boot until a sixth connection string existed, and the thing it
+ * took down was the gate. A dashboard we look at must never be able to
+ * stop a wedding checking people in.
+ *
+ * So the pool is created on first use. With no DATABASE_URL_APP_ADMIN the
+ * API serves everything else exactly as before, and /admin alone answers
+ * that it is not configured.
  */
-export const sqlPlatform = postgres(roleUrl("app_admin", "app_admin_dev_only"), opts);
+let platformPool: ReturnType<typeof postgres> | null = null;
+
+export class PlatformNotConfigured extends Error {
+  constructor(cause: string) {
+    super(cause);
+    this.name = 'PlatformNotConfigured';
+  }
+}
+
+export function sqlPlatform(): ReturnType<typeof postgres> {
+  if (!platformPool) {
+    try {
+      platformPool = postgres(roleUrl('app_admin', 'app_admin_dev_only'), opts);
+    } catch (err) {
+      throw new PlatformNotConfigured((err as Error).message);
+    }
+  }
+  return platformPool;
+}
 
 /**
  * No context to set — this role sees every row by policy. It is a
@@ -80,7 +110,7 @@ export const sqlPlatform = postgres(roleUrl("app_admin", "app_admin_dev_only"), 
  * scoping.
  */
 export async function asPlatform<T>(fn: (db: Db) => Promise<T>): Promise<T> {
-  return sqlPlatform.begin(async (tx) => fn(tx as Db)) as Promise<T>;
+  return sqlPlatform().begin(async (tx) => fn(tx as Db)) as Promise<T>;
 }
 
 /** The handle a route works with: a transaction carrying request context. */
@@ -156,6 +186,7 @@ export async function closeDb(): Promise<void> {
     sqlPublic.end(),
     sqlVerify.end(),
     sqlBilling.end(),
-    sqlPlatform.end(),
+    // Only if anything ever asked for it.
+    ...(platformPool ? [platformPool.end()] : []),
   ]);
 }
