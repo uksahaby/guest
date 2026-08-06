@@ -249,14 +249,25 @@ the web scanner
    `NODE_ENV=production`, binds `0.0.0.0`, logs JSON with phone numbers
    redacted, and refuses to start on a missing RLS role URL.
    - **Done:** the repo is on GitHub (`uksahaby/guest`). Neon holds the
-     schema, ten migrations and five roles with rotated passwords. The web
+     schema, **all 18 migrations** and **six** roles with rotated
+     passwords — 019 and `app_admin` went on 6 August, after a backup,
+     and `+2348069293636` is the platform administrator there. The web
      app builds and serves on Vercel, root directory `apps/web`. A
      Paystack `sk_test_` key is in hand.
+   - The `app_admin` boundary was checked from outside on Neon itself,
+     not only in `admin.test.ts`: workspaces/events/payments read,
+     `invitations` and `check_in_events` "permission denied",
+     `event_legs.signing_key` reported as not existing at all (Postgres
+     hides an ungranted column rather than refusing it), and any write
+     to `events` denied.
    - **Outstanding:** the API on Render — a plain Node service, no
      container, root directory the repo root so the `checkin-core`
-     workspace resolves. Then `API_URL` and `WEB_URL` point the two hosts
-     at each other, the Paystack test webhook gets its URL, and the first
-     organiser account gets created at `/signup`.
+     workspace resolves. Redeploy from `29a0a0b` (the last deploy failed
+     on a missing `DATABASE_URL_APP_ADMIN`; that pool is lazy now), set
+     `DATABASE_URL_APP_ADMIN` and `TRUST_PROXY`. Then `API_URL` and
+     `WEB_URL` point the two hosts at each other, the Paystack test
+     webhook gets its URL, and the first organiser account gets created
+     at `/signup`.
    - No SMS provider is needed for any of it.
    - Rate limiting is now **done** (see §5 and `DEPLOY.md` §6) — but it
      needs `TRUST_PROXY` set on the box or it collapses into one shared
