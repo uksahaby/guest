@@ -110,8 +110,7 @@ class LegMeta extends Table {
   /// because the gate has to refuse with no network too — the settings
   /// page promises the guest that passes stop working, not that they stop
   /// working when the scanner happens to have signal.
-  BoolColumn get cancelled =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get cancelled => boolean().withDefault(const Constant(false))();
 
   /// Who "Call manager" dials. Carried offline for the same reason as
   /// everything else here: the moment an usher needs it is the moment the
@@ -123,14 +122,16 @@ class LegMeta extends Table {
   Set<Column> get primaryKey => {legId};
 }
 
-@DriftDatabase(tables: [
-  Invitations,
-  RevokedPasses,
-  PendingScans,
-  LegMeta,
-  SigningKeys,
-  CachedAssignments,
-])
+@DriftDatabase(
+  tables: [
+    Invitations,
+    RevokedPasses,
+    PendingScans,
+    LegMeta,
+    SigningKeys,
+    CachedAssignments,
+  ],
+)
 class ScannerDb extends _$ScannerDb {
   ScannerDb() : super(driftDatabase(name: 'scanner'));
 
@@ -142,42 +143,49 @@ class ScannerDb extends _$ScannerDb {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) => m.createAll(),
-        onUpgrade: (m, from, to) async {
-          // Phones already in the field carry an unsynced queue, so every
-          // step here adds and never recreates.
-          //
-          // v2 persists signing keys; v3 caches the assignments list, so a
-          // gate is reachable offline and not merely openable once reached.
-          if (from < 2) await m.createTable(signingKeys);
-          if (from < 3) await m.createTable(cachedAssignments);
-          // v4 carries event cancellation to the gate.
-          if (from < 4) await m.addColumn(legMeta, legMeta.cancelled);
-          // v5 lets a walk-in be created with no signal.
-          if (from < 5) {
-            await m.addColumn(pendingScans, pendingScans.walkInName);
-          }
-          // v6 carries the number an usher escalates to.
-          if (from < 6) await m.addColumn(legMeta, legMeta.managerPhone);
-        },
-      );
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      // Phones already in the field carry an unsynced queue, so every
+      // step here adds and never recreates.
+      //
+      // v2 persists signing keys; v3 caches the assignments list, so a
+      // gate is reachable offline and not merely openable once reached.
+      if (from < 2) await m.createTable(signingKeys);
+      if (from < 3) await m.createTable(cachedAssignments);
+      // v4 carries event cancellation to the gate.
+      if (from < 4) await m.addColumn(legMeta, legMeta.cancelled);
+      // v5 lets a walk-in be created with no signal.
+      if (from < 5) {
+        await m.addColumn(pendingScans, pendingScans.walkInName);
+      }
+      // v6 carries the number an usher escalates to.
+      if (from < 6) await m.addColumn(legMeta, legMeta.managerPhone);
+    },
+  );
 
   /// Local view of how many of this household are in at this leg:
   /// server truth + everything queued on this phone (reversals included —
   /// they carry negative counts, exactly like the server's log).
   Future<int> admittedLocally(String passId, String legId) async {
-    final inv = await (select(invitations)
-          ..where((i) => i.passId.equals(passId) & i.legId.equals(legId)))
-        .getSingleOrNull();
+    final inv =
+        await (select(invitations)
+              ..where((i) => i.passId.equals(passId) & i.legId.equals(legId)))
+            .getSingleOrNull();
     final base = inv?.admittedSynced ?? 0;
 
     final q = selectOnly(pendingScans)
       ..addColumns([pendingScans.admittedCount.sum()])
-      ..where(pendingScans.passId.equals(passId) &
-          pendingScans.legId.equals(legId) &
-          pendingScans.result.isIn(const [
-            'admitted', 'partial', 'manual', 'overflow_admitted', 'reversal',
-          ]));
+      ..where(
+        pendingScans.passId.equals(passId) &
+            pendingScans.legId.equals(legId) &
+            pendingScans.result.isIn(const [
+              'admitted',
+              'partial',
+              'manual',
+              'overflow_admitted',
+              'reversal',
+            ]),
+      );
     final row = await q.getSingle();
     final local = row.read(pendingScans.admittedCount.sum()) ?? 0;
     return base + local;

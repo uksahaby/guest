@@ -49,20 +49,19 @@ LocalInvitation household({
   int admitted = 0,
   Rsvp rsvp = Rsvp.attending,
   bool revoked = false,
-}) =>
-    LocalInvitation(
-      passId: passId ?? randomUuid(),
-      invitationId: randomUuid(),
-      eventId: wedding,
-      legId: lagosLeg,
-      displayName: displayName ?? 'Mr & Mrs Adeyemi',
-      category: "Groom's Family",
-      tableName: tableName ?? 'Table 12',
-      allowance: allowance,
-      admitted: admitted,
-      rsvp: rsvp,
-      revoked: revoked,
-    );
+}) => LocalInvitation(
+  passId: passId ?? randomUuid(),
+  invitationId: randomUuid(),
+  eventId: wedding,
+  legId: lagosLeg,
+  displayName: displayName ?? 'Mr & Mrs Adeyemi',
+  category: "Groom's Family",
+  tableName: tableName ?? 'Table 12',
+  allowance: allowance,
+  admitted: admitted,
+  rsvp: rsvp,
+  revoked: revoked,
+);
 
 Context ctx(
   List<LocalInvitation> list, {
@@ -136,7 +135,10 @@ void main() {
     test('identifies which held event a foreign pass belongs to', () {
       final t = issueToken(
         TokenPayload(
-            passId: randomUuid(), eventId: otherWedding, tokenVersion: 1),
+          passId: randomUuid(),
+          eventId: otherWedding,
+          tokenVersion: 1,
+        ),
         otherKey.key,
       );
       final v = verifyToken(t, [weddingKey, otherKey]);
@@ -177,15 +179,17 @@ void main() {
   group('admitting', () {
     test('a single guest goes straight through with no prompt', () {
       final inv = household(
-          allowance: 1, displayName: 'Chidinma Okafor', tableName: 'Table 7');
+        allowance: 1,
+        displayName: 'Chidinma Okafor',
+        tableName: 'Table 7',
+      );
       final d = decide(ctx([inv]), ScanRaw(tokenFor(inv)));
 
       expect(d.outcome, Outcome.admitted);
       expect(d.tone, Tone.admit);
       expect(d.admittedCount, 1);
       expect(d.remaining, 0);
-      expect(d.autoReturnMs, 1500,
-          reason: 'must return to camera on its own');
+      expect(d.autoReturnMs, 1500, reason: 'must return to camera on its own');
       expect(d.log, isTrue);
     });
 
@@ -209,22 +213,27 @@ void main() {
       expect(d.tone, Tone.admit);
       expect(d.admittedCount, 3);
       expect(d.remaining, 1);
-      expect(d.autoReturnMs, 2500,
-          reason: 'longer dwell — there is a number to read');
+      expect(
+        d.autoReturnMs,
+        2500,
+        reason: 'longer dwell — there is a number to read',
+      );
     });
 
-    test('the fourth arriving later is admitted, not treated as a duplicate',
-        () {
-      final inv = household(admitted: 3);
-      final first = decide(ctx([inv]), ScanRaw(tokenFor(inv)));
+    test(
+      'the fourth arriving later is admitted, not treated as a duplicate',
+      () {
+        final inv = household(admitted: 3);
+        final first = decide(ctx([inv]), ScanRaw(tokenFor(inv)));
 
-      expect(first.outcome, Outcome.needsCount);
-      expect(first.choices, [1], reason: 'only one left to offer');
+        expect(first.outcome, Outcome.needsCount);
+        expect(first.choices, [1], reason: 'only one left to offer');
 
-      final d = decide(ctx([inv]), ScanRaw(tokenFor(inv), requestedCount: 1));
-      expect(d.outcome, Outcome.admitted);
-      expect(d.remaining, 0);
-    });
+        final d = decide(ctx([inv]), ScanRaw(tokenFor(inv), requestedCount: 1));
+        expect(d.outcome, Outcome.admitted);
+        expect(d.remaining, 0);
+      },
+    );
 
     test('taking all four at once completes the party', () {
       final inv = household();
@@ -240,16 +249,20 @@ void main() {
     test('with overflow off, a fully admitted party is held', () {
       final inv = household(admitted: 4);
       final d = decide(
-        ctx([inv],
-            policy: const Policy(allowOverflow: false, requireRsvp: false)),
+        ctx([
+          inv,
+        ], policy: const Policy(allowOverflow: false, requireRsvp: false)),
         ScanRaw(tokenFor(inv)),
       );
 
       expect(d.outcome, Outcome.allowanceExhausted);
       expect(d.tone, Tone.hold);
       expect(d.admittedCount, 0);
-      expect(d.autoReturnMs, isNull,
-          reason: 'someone is talking at the gate — do not reset');
+      expect(
+        d.autoReturnMs,
+        isNull,
+        reason: 'someone is talking at the gate — do not reset',
+      );
       expect(d.detail, contains('4 of 4'));
     });
 
@@ -271,18 +284,21 @@ void main() {
       final d = decide(ctx([inv]), ScanRaw(tokenFor(inv), requestedCount: 5));
 
       expect(d.outcome, Outcome.overflowAdmitted);
-      expect(d.tone, Tone.hold,
-          reason: 'amber, not green — it is a decision, not a routine admit');
-      expect(d.admittedCount, 5,
-          reason: 'everyone standing there gets in');
+      expect(
+        d.tone,
+        Tone.hold,
+        reason: 'amber, not green — it is a decision, not a routine admit',
+      );
+      expect(d.admittedCount, 5, reason: 'everyone standing there gets in');
       expect(d.detail, contains('organiser has been notified'));
     });
 
     test('blocked when the organiser turned overflow off', () {
       final inv = household();
       final d = decide(
-        ctx([inv],
-            policy: const Policy(allowOverflow: false, requireRsvp: false)),
+        ctx([
+          inv,
+        ], policy: const Policy(allowOverflow: false, requireRsvp: false)),
         ScanRaw(tokenFor(inv), requestedCount: 5),
       );
 
@@ -308,46 +324,60 @@ void main() {
     test('a pass from another wedding says which one', () {
       final foreign = issueToken(
         TokenPayload(
-            passId: randomUuid(), eventId: otherWedding, tokenVersion: 1),
+          passId: randomUuid(),
+          eventId: otherWedding,
+          tokenVersion: 1,
+        ),
         otherKey.key,
       );
       final d = decide(ctx([]), ScanRaw(foreign));
 
       expect(d.outcome, Outcome.wrongEvent);
-      expect(d.detail, contains('Yusuf & Maryam'),
-          reason: 'this is the whole point of multi-key loading');
+      expect(
+        d.detail,
+        contains('Yusuf & Maryam'),
+        reason: 'this is the whole point of multi-key loading',
+      );
     });
 
-    test('a genuine pass for the other leg is distinguished from a forgery',
-        () {
-      final abujaOnly = household();
-      // Signed for this event, but absent from the Lagos leg's list.
-      final d = decide(ctx([]), ScanRaw(tokenFor(abujaOnly)));
+    test(
+      'a genuine pass for the other leg is distinguished from a forgery',
+      () {
+        final abujaOnly = household();
+        // Signed for this event, but absent from the Lagos leg's list.
+        final d = decide(ctx([]), ScanRaw(tokenFor(abujaOnly)));
 
-      expect(d.outcome, Outcome.wrongLeg);
-      expect(d.outcome, isNot(Outcome.invalid));
-    });
+        expect(d.outcome, Outcome.wrongLeg);
+        expect(d.outcome, isNot(Outcome.invalid));
+      },
+    );
 
     test('an unreadable code offers name search rather than dead-ending', () {
       final d = decide(ctx([]), const ScanRaw('not-a-token'));
 
       expect(d.outcome, Outcome.invalid);
-      expect(d.actions, contains('Search by name'),
-          reason: 'usually a real guest with a broken screen');
+      expect(
+        d.actions,
+        contains('Search by name'),
+        reason: 'usually a real guest with a broken screen',
+      );
     });
 
     test('a reissued pass reads as revoked, not invalid', () {
       final inv = household();
       final old = tokenFor(inv, version: 1);
       final d = decide(
-        ctx([inv], keys: [
-          EventKey(
-            eventId: weddingKey.eventId,
-            eventName: weddingKey.eventName,
-            tokenVersion: 2,
-            key: weddingKey.key,
-          ),
-        ]),
+        ctx(
+          [inv],
+          keys: [
+            EventKey(
+              eventId: weddingKey.eventId,
+              eventName: weddingKey.eventName,
+              tokenVersion: 2,
+              key: weddingKey.key,
+            ),
+          ],
+        ),
         ScanRaw(old),
       );
 
@@ -368,11 +398,14 @@ void main() {
 
     for (final (rsvp, requireRsvp, expected) in cases) {
       test('rsvp=${rsvp.name}, required=$requireRsvp → ${expected.wire}', () {
-        final inv =
-            household(rsvp: rsvp, allowance: rsvp == Rsvp.pending ? 1 : 4);
+        final inv = household(
+          rsvp: rsvp,
+          allowance: rsvp == Rsvp.pending ? 1 : 4,
+        );
         final d = decide(
-          ctx([inv],
-              policy: Policy(allowOverflow: true, requireRsvp: requireRsvp)),
+          ctx([
+            inv,
+          ], policy: Policy(allowOverflow: true, requireRsvp: requireRsvp)),
           ScanRaw(tokenFor(inv)),
         );
         expect(d.outcome, expected);
@@ -382,8 +415,9 @@ void main() {
     test('declining is refused whatever the policy says', () {
       final inv = household(rsvp: Rsvp.declined);
       final d = decide(
-        ctx([inv],
-            policy: const Policy(allowOverflow: true, requireRsvp: false)),
+        ctx([
+          inv,
+        ], policy: const Policy(allowOverflow: true, requireRsvp: false)),
         ScanRaw(tokenFor(inv)),
       );
       expect(d.outcome, Outcome.rsvpDeclined);
@@ -439,8 +473,9 @@ void main() {
         decide(ctx([good]), ScanRaw(tokenFor(good), requestedCount: 2)),
         decide(ctx([good]), ScanRaw(tokenFor(good), requestedCount: 9)),
         decide(
-          ctx([done],
-              policy: const Policy(allowOverflow: false, requireRsvp: false)),
+          ctx([
+            done,
+          ], policy: const Policy(allowOverflow: false, requireRsvp: false)),
           ScanRaw(tokenFor(done)),
         ),
         decide(ctx([gone]), ScanRaw(tokenFor(gone))),
@@ -498,7 +533,10 @@ void main() {
     test("no refusal leaks another household's identity", () {
       final foreign = issueToken(
         TokenPayload(
-            passId: randomUuid(), eventId: otherWedding, tokenVersion: 1),
+          passId: randomUuid(),
+          eventId: otherWedding,
+          tokenVersion: 1,
+        ),
         otherKey.key,
       );
       final d = decide(ctx([]), ScanRaw(foreign));
@@ -542,8 +580,11 @@ void main() {
     // Mirrors the TypeScript suite exactly — decide() exists twice and the
     // two must not drift. The gate has to refuse with no network, which is
     // why this is policy carried in the offline payload.
-    const cancelled =
-        Policy(allowOverflow: true, requireRsvp: false, eventCancelled: true);
+    const cancelled = Policy(
+      allowOverflow: true,
+      requireRsvp: false,
+      eventCancelled: true,
+    );
 
     test('refuses a perfectly good pass', () {
       final inv = household();
@@ -557,8 +598,7 @@ void main() {
 
     test('refuses check-in by hand too', () {
       final inv = household();
-      final d =
-          decide(ctx([inv], policy: cancelled), ManualInput(inv.passId));
+      final d = decide(ctx([inv], policy: cancelled), ManualInput(inv.passId));
       expect(d.outcome, Outcome.eventCancelled);
       expect(d.admittedCount, 0);
     });
@@ -573,7 +613,10 @@ void main() {
     test('outranks every other refusal', () {
       final full = household(allowance: 4, admitted: 4);
       expect(
-        decide(ctx([full], policy: cancelled), ManualInput(full.passId)).outcome,
+        decide(
+          ctx([full], policy: cancelled),
+          ManualInput(full.passId),
+        ).outcome,
         Outcome.eventCancelled,
       );
 

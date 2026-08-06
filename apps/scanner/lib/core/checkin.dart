@@ -178,17 +178,16 @@ Decision _deny(
   String headline,
   String? detail,
   List<String> actions,
-) =>
-    Decision(
-      outcome: outcome,
-      tone: Tone.deny,
-      admittedCount: 0,
-      headline: headline,
-      detail: detail,
-      log: true,
-      autoReturnMs: null,
-      actions: actions,
-    );
+) => Decision(
+  outcome: outcome,
+  tone: Tone.deny,
+  admittedCount: 0,
+  headline: headline,
+  detail: detail,
+  log: true,
+  autoReturnMs: null,
+  actions: actions,
+);
 
 Decision _hold(
   Outcome outcome,
@@ -196,18 +195,17 @@ Decision _hold(
   String? detail,
   List<String> actions, [
   LocalInvitation? invitation,
-]) =>
-    Decision(
-      outcome: outcome,
-      tone: Tone.hold,
-      admittedCount: 0,
-      headline: headline,
-      detail: detail,
-      invitation: invitation,
-      log: true,
-      autoReturnMs: null,
-      actions: actions,
-    );
+]) => Decision(
+  outcome: outcome,
+  tone: Tone.hold,
+  admittedCount: 0,
+  headline: headline,
+  detail: detail,
+  invitation: invitation,
+  log: true,
+  autoReturnMs: null,
+  actions: actions,
+);
 
 Decision decide(Context ctx, ScanInput input) {
   LocalInvitation? inv;
@@ -321,8 +319,9 @@ Decision decide(Context ctx, ScanInput input) {
   }
 
   // ---- 6. allowance ------------------------------------------------------
-  final remaining =
-      (inv.allowance - inv.admitted) < 0 ? 0 : inv.allowance - inv.admitted;
+  final remaining = (inv.allowance - inv.admitted) < 0
+      ? 0
+      : inv.allowance - inv.admitted;
 
   if (remaining == 0 && !ctx.policy.allowOverflow) {
     return _hold(
@@ -431,8 +430,8 @@ Decision _applyAdmission(
   final outcome = isManual
       ? Outcome.manual
       : count < remaining
-          ? Outcome.partial
-          : Outcome.admitted;
+      ? Outcome.partial
+      : Outcome.admitted;
 
   final partial = after > 0;
 
@@ -443,8 +442,8 @@ Decision _applyAdmission(
     headline: partial
         ? '$count of ${inv.allowance} admitted'
         : isManual
-            ? 'Checked in by hand'
-            : 'Admitted',
+        ? 'Checked in by hand'
+        : 'Admitted',
     detail: [inv.displayName, inv.tableName].whereType<String>().join(' · '),
     invitation: inv,
     remaining: after,

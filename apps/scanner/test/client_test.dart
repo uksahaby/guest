@@ -22,11 +22,12 @@ class _HangingClient extends http.BaseClient {
 /// timeout would miss.
 class _StallingBodyClient extends http.BaseClient {
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
-      http.StreamedResponse(
-        StreamController<List<int>>().stream, // opens, never emits, never closes
-        200,
-      );
+  Future<http.StreamedResponse> send(
+    http.BaseRequest request,
+  ) async => http.StreamedResponse(
+    StreamController<List<int>>().stream, // opens, never emits, never closes
+    200,
+  );
 }
 
 class _RefusingClient extends http.BaseClient {
@@ -47,11 +48,11 @@ class _ErroringClient extends http.BaseClient {
 
 void main() {
   ApiClient clientWith(http.Client inner) => ApiClient(
-        baseUrl: 'http://test',
-        httpClient: inner,
-        requestTimeout: const Duration(milliseconds: 50),
-        syncTimeout: const Duration(milliseconds: 50),
-      );
+    baseUrl: 'http://test',
+    httpClient: inner,
+    requestTimeout: const Duration(milliseconds: 50),
+    syncTimeout: const Duration(milliseconds: 50),
+  );
 
   test('a request that never answers fails instead of hanging', () async {
     final api = clientWith(_HangingClient());
@@ -99,12 +100,15 @@ void main() {
 
   test('a server error keeps its status and message', () async {
     final api = clientWith(
-        _ErroringClient(403, '{"code":"forbidden","message":"Not your gate."}'));
+      _ErroringClient(403, '{"code":"forbidden","message":"Not your gate."}'),
+    );
     await expectLater(
       () => api.bootstrap('leg-1'),
-      throwsA(isA<ApiException>()
-          .having((e) => e.status, 'status', 403)
-          .having((e) => e.message, 'message', 'Not your gate.')),
+      throwsA(
+        isA<ApiException>()
+            .having((e) => e.status, 'status', 403)
+            .having((e) => e.message, 'message', 'Not your gate.'),
+      ),
     );
   });
 

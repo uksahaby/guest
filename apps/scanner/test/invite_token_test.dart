@@ -17,10 +17,7 @@ void main() {
   });
 
   test('a plain link gives up its last segment', () {
-    expect(
-      extractInviteToken('https://guest.vercel.app/join/$_token'),
-      _token,
-    );
+    expect(extractInviteToken('https://guest.vercel.app/join/$_token'), _token);
   });
 
   test('the whole WhatsApp message works', () {

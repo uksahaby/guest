@@ -169,11 +169,13 @@ class _ScanScreenState extends State<ScanScreen> {
 
     final number = m?.managerPhone;
     if (number == null || number.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-          'No number set for this event. The organiser adds one in Settings.',
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No number set for this event. The organiser adds one in Settings.',
+          ),
         ),
-      ));
+      );
       return;
     }
 
@@ -192,12 +194,16 @@ class _ScanScreenState extends State<ScanScreen> {
     await GateSounds.instance.setMuted(!GateSounds.instance.muted);
     if (!mounted) return;
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      duration: const Duration(seconds: 2),
-      content: Text(GateSounds.instance.muted
-          ? 'Sound off — the phone still buzzes.'
-          : 'Sound on.'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 2),
+        content: Text(
+          GateSounds.instance.muted
+              ? 'Sound off — the phone still buzzes.'
+              : 'Sound on.',
+        ),
+      ),
+    );
   }
 
   /// What this phone has done here, and the only way to take back an
@@ -215,9 +221,9 @@ class _ScanScreenState extends State<ScanScreen> {
     final m = await widget.repo.meta(widget.legId);
     if (!mounted) return;
     if (m != null && !m.allowWalkins) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('This event does not admit walk-ins.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This event does not admit walk-ins.')),
+      );
       return;
     }
 
@@ -239,8 +245,9 @@ class _ScanScreenState extends State<ScanScreen> {
       });
     } on StateError catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -266,178 +273,205 @@ class _ScanScreenState extends State<ScanScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Stack(children: [
-          Column(children: [
-            _topBar(),
-            if (_pending > 0) _offlineStrip(),
-            Expanded(child: _cameraView()),
-            _bottomBar(),
-          ]),
-          if (_current != null)
-            Positioned.fill(
-              child: ResultOverlay(
-                decision: _current!.decision,
-                onClose: _close,
-                onAdmitCount: _admitCount,
-                onUndo: _current!.clientUuid != null
-                    ? () => widget.repo.undo(_current!.clientUuid!)
-                    : null,
-                onAction: (a) {
-                  if (a == 'Search by name') {
-                    _close();
-                    _openSearch();
-                  } else if (a == 'Add walk-in') {
-                    _close();
-                    _openWalkIn();
-                  } else if (a == 'Call manager') {
-                    _close();
-                    _callManager();
-                  } else {
-                    _close();
-                  }
-                },
-              ),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                _topBar(),
+                if (_pending > 0) _offlineStrip(),
+                Expanded(child: _cameraView()),
+                _bottomBar(),
+              ],
             ),
-        ]),
+            if (_current != null)
+              Positioned.fill(
+                child: ResultOverlay(
+                  decision: _current!.decision,
+                  onClose: _close,
+                  onAdmitCount: _admitCount,
+                  onUndo: _current!.clientUuid != null
+                      ? () => widget.repo.undo(_current!.clientUuid!)
+                      : null,
+                  onAction: (a) {
+                    if (a == 'Search by name') {
+                      _close();
+                      _openSearch();
+                    } else if (a == 'Add walk-in') {
+                      _close();
+                      _openWalkIn();
+                    } else if (a == 'Call manager') {
+                      _close();
+                      _callManager();
+                    } else {
+                      _close();
+                    }
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _topBar() => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(widget.eventName,
-                        style: const TextStyle(
-                            fontSize: 14.5, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(widget.gateName,
-                        style:
-                            const TextStyle(fontSize: 12, color: Palette.muted)),
-                  ]),
-            ),
-            // A ceremony is the case this exists for: a chime during vows
-            // is worse than an usher glancing at the screen. Icon only, and
-            // deliberately not next to anything destructive.
-            IconButton(
-              onPressed: _toggleMute,
-              visualDensity: VisualDensity.compact,
-              tooltip: GateSounds.instance.muted ? 'Sound off' : 'Sound on',
-              icon: Icon(
-                GateSounds.instance.muted
-                    ? Icons.volume_off_outlined
-                    : Icons.volume_up_outlined,
-                size: 19,
-                color: GateSounds.instance.muted ? Palette.hold : Palette.muted,
-              ),
-            ),
-            // Next to the sync badge rather than in the bottom bar: it is
-            // reached after something has gone wrong, not during a queue.
-            TextButton(
-              onPressed: _openRecent,
-              style: TextButton.styleFrom(
-                minimumSize: const Size(0, 32),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                foregroundColor: Palette.muted,
-              ),
-              child: const Text('Recent', style: TextStyle(fontSize: 12.5)),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(
-                    color: _pending > 0 ? const Color(0xFF5A4718) : Palette.line),
-                color: _pending > 0 ? Palette.holdWash : null,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                _pending > 0 ? 'OFFLINE' : 'SYNCED',
-                style: TextStyle(
-                  fontSize: 10.5,
+    padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.eventName,
+                style: const TextStyle(
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: .6,
-                  color: _pending > 0 ? Palette.hold : Palette.muted,
                 ),
               ),
-            ),
-          ],
-        ),
-      );
-
-  Widget _offlineStrip() => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-        decoration: const BoxDecoration(
-          color: Palette.holdWash,
-          border: Border.symmetric(
-              horizontal: BorderSide(color: Color(0xFF5A4718))),
-        ),
-        child: Text(
-          '$_pending ${_pending == 1 ? 'scan' : 'scans'} waiting to sync',
-          style: const TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w500, color: Palette.hold),
-        ),
-      );
-
-  Widget _cameraView() => Stack(alignment: Alignment.center, children: [
-        MobileScanner(controller: _camera, onDetect: _onDetect),
-        IgnorePointer(
-          child: SizedBox(
-            width: 198,
-            height: 198,
-            child: CustomPaint(painter: _ReticlePainter()),
+              const SizedBox(height: 2),
+              Text(
+                widget.gateName,
+                style: const TextStyle(fontSize: 12, color: Palette.muted),
+              ),
+            ],
           ),
         ),
-        const Positioned(
-          bottom: 24,
-          child: Text("Point at the guest's pass",
-              style: TextStyle(fontSize: 13, color: Palette.muted)),
+        // A ceremony is the case this exists for: a chime during vows
+        // is worse than an usher glancing at the screen. Icon only, and
+        // deliberately not next to anything destructive.
+        IconButton(
+          onPressed: _toggleMute,
+          visualDensity: VisualDensity.compact,
+          tooltip: GateSounds.instance.muted ? 'Sound off' : 'Sound on',
+          icon: Icon(
+            GateSounds.instance.muted
+                ? Icons.volume_off_outlined
+                : Icons.volume_up_outlined,
+            size: 19,
+            color: GateSounds.instance.muted ? Palette.hold : Palette.muted,
+          ),
         ),
-      ]);
+        // Next to the sync badge rather than in the bottom bar: it is
+        // reached after something has gone wrong, not during a queue.
+        TextButton(
+          onPressed: _openRecent,
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, 32),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            foregroundColor: Palette.muted,
+          ),
+          child: const Text('Recent', style: TextStyle(fontSize: 12.5)),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: _pending > 0 ? const Color(0xFF5A4718) : Palette.line,
+            ),
+            color: _pending > 0 ? Palette.holdWash : null,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            _pending > 0 ? 'OFFLINE' : 'SYNCED',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: .6,
+              color: _pending > 0 ? Palette.hold : Palette.muted,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _offlineStrip() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+    decoration: const BoxDecoration(
+      color: Palette.holdWash,
+      border: Border.symmetric(
+        horizontal: BorderSide(color: Color(0xFF5A4718)),
+      ),
+    ),
+    child: Text(
+      '$_pending ${_pending == 1 ? 'scan' : 'scans'} waiting to sync',
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: Palette.hold,
+      ),
+    ),
+  );
+
+  Widget _cameraView() => Stack(
+    alignment: Alignment.center,
+    children: [
+      MobileScanner(controller: _camera, onDetect: _onDetect),
+      IgnorePointer(
+        child: SizedBox(
+          width: 198,
+          height: 198,
+          child: CustomPaint(painter: _ReticlePainter()),
+        ),
+      ),
+      const Positioned(
+        bottom: 24,
+        child: Text(
+          "Point at the guest's pass",
+          style: TextStyle(fontSize: 13, color: Palette.muted),
+        ),
+      ),
+    ],
+  );
 
   Widget _bottomBar() => Container(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
-        decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: Palette.line))),
-        child: Column(children: [
-          Row(children: [
+    padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
+    decoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: Palette.line)),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
             Expanded(child: _barButton('Search by name', _openSearch)),
             const SizedBox(width: 10),
             Expanded(child: _barButton('Sync now', _sync)),
-          ]),
-          const SizedBox(height: 10),
-          // Full width: at a Nigerian gate this is reached for constantly,
-          // and it is the button an usher hits one-handed in the dark.
-          SizedBox(
-            width: double.infinity,
-            child: _barButton('Add walk-in', _openWalkIn),
-          ),
-        ]),
-      );
+          ],
+        ),
+        const SizedBox(height: 10),
+        // Full width: at a Nigerian gate this is reached for constantly,
+        // and it is the button an usher hits one-handed in the dark.
+        SizedBox(
+          width: double.infinity,
+          child: _barButton('Add walk-in', _openWalkIn),
+        ),
+      ],
+    ),
+  );
 
   Widget _barButton(String label, VoidCallback onTap) => Material(
-        color: Palette.surface,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
+    color: Palette.surface,
+    borderRadius: BorderRadius.circular(12),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(color: Palette.line),
           borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Container(
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              border: Border.all(color: Palette.line),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w500)),
-          ),
         ),
-      );
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+      ),
+    ),
+  );
 }
 
 /// The four corner brackets of the scan reticle.
@@ -453,33 +487,37 @@ class _ReticlePainter extends CustomPainter {
     final w = size.width, h = size.height;
 
     canvas.drawPath(
-        Path()
-          ..moveTo(0, len)
-          ..lineTo(0, r)
-          ..quadraticBezierTo(0, 0, r, 0)
-          ..lineTo(len, 0),
-        p);
+      Path()
+        ..moveTo(0, len)
+        ..lineTo(0, r)
+        ..quadraticBezierTo(0, 0, r, 0)
+        ..lineTo(len, 0),
+      p,
+    );
     canvas.drawPath(
-        Path()
-          ..moveTo(w - len, 0)
-          ..lineTo(w - r, 0)
-          ..quadraticBezierTo(w, 0, w, r)
-          ..lineTo(w, len),
-        p);
+      Path()
+        ..moveTo(w - len, 0)
+        ..lineTo(w - r, 0)
+        ..quadraticBezierTo(w, 0, w, r)
+        ..lineTo(w, len),
+      p,
+    );
     canvas.drawPath(
-        Path()
-          ..moveTo(0, h - len)
-          ..lineTo(0, h - r)
-          ..quadraticBezierTo(0, h, r, h)
-          ..lineTo(len, h),
-        p);
+      Path()
+        ..moveTo(0, h - len)
+        ..lineTo(0, h - r)
+        ..quadraticBezierTo(0, h, r, h)
+        ..lineTo(len, h),
+      p,
+    );
     canvas.drawPath(
-        Path()
-          ..moveTo(w - len, h)
-          ..lineTo(w - r, h)
-          ..quadraticBezierTo(w, h, w, h - r)
-          ..lineTo(w, h - len),
-        p);
+      Path()
+        ..moveTo(w - len, h)
+        ..lineTo(w - r, h)
+        ..quadraticBezierTo(w, h, w, h - r)
+        ..lineTo(w, h - len),
+      p,
+    );
   }
 
   @override

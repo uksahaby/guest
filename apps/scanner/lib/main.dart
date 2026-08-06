@@ -73,11 +73,11 @@ class _ScannerAppState extends State<ScannerApp> {
       home: !_ready
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : !_signedIn
-              ? LoginScreen(
-                  api: _api,
-                  onSignedIn: () => setState(() => _signedIn = true),
-                )
-              : _Home(api: _api, repo: _repo!, onSignOut: _signOut),
+          ? LoginScreen(
+              api: _api,
+              onSignedIn: () => setState(() => _signedIn = true),
+            )
+          : _Home(api: _api, repo: _repo!, onSignOut: _signOut),
     );
   }
 }
@@ -86,11 +86,7 @@ class _Home extends StatelessWidget {
   final ApiClient api;
   final Repository repo;
   final Future<void> Function() onSignOut;
-  const _Home({
-    required this.api,
-    required this.repo,
-    required this.onSignOut,
-  });
+  const _Home({required this.api, required this.repo, required this.onSignOut});
 
   @override
   Widget build(BuildContext context) {
@@ -99,15 +95,17 @@ class _Home extends StatelessWidget {
       repo: repo,
       onSignOut: onSignOut,
       onOpenLeg: (legId, entranceId, eventName, gateName) {
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => ScanScreen(
-            repo: repo,
-            legId: legId,
-            entranceId: entranceId,
-            eventName: eventName,
-            gateName: gateName,
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ScanScreen(
+              repo: repo,
+              legId: legId,
+              entranceId: entranceId,
+              eventName: eventName,
+              gateName: gateName,
+            ),
           ),
-        ));
+        );
       },
     );
   }

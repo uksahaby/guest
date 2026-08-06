@@ -61,11 +61,9 @@ final _uuidRe = RegExp(
   caseSensitive: false,
 );
 
-String _b64url(List<int> bytes) =>
-    base64Url.encode(bytes).replaceAll('=', '');
+String _b64url(List<int> bytes) => base64Url.encode(bytes).replaceAll('=', '');
 
-Uint8List _unb64url(String s) =>
-    base64Url.decode(base64Url.normalize(s));
+Uint8List _unb64url(String s) => base64Url.decode(base64Url.normalize(s));
 
 String packUuid(String uuid) {
   if (!_uuidRe.hasMatch(uuid)) {

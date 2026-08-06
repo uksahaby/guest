@@ -20,36 +20,36 @@ abstract final class Palette {
 }
 
 ThemeData scannerTheme() => ThemeData(
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: Palette.ground,
-      colorScheme: const ColorScheme.dark(
-        surface: Palette.surface,
-        primary: Palette.admit,
-        error: Palette.deny,
-        onSurface: Palette.text,
-      ),
-      fontFamily: 'Inter',
-      dividerColor: Palette.line,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Palette.ground,
-        foregroundColor: Palette.text,
-        elevation: 0,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: .06),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: .13)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: .13)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Palette.admit),
-        ),
-        hintStyle: const TextStyle(color: Palette.muted),
-      ),
-    );
+  brightness: Brightness.dark,
+  scaffoldBackgroundColor: Palette.ground,
+  colorScheme: const ColorScheme.dark(
+    surface: Palette.surface,
+    primary: Palette.admit,
+    error: Palette.deny,
+    onSurface: Palette.text,
+  ),
+  fontFamily: 'Inter',
+  dividerColor: Palette.line,
+  appBarTheme: const AppBarTheme(
+    backgroundColor: Palette.ground,
+    foregroundColor: Palette.text,
+    elevation: 0,
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: Colors.white.withValues(alpha: .06),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: Colors.white.withValues(alpha: .13)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: Colors.white.withValues(alpha: .13)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Palette.admit),
+    ),
+    hintStyle: const TextStyle(color: Palette.muted),
+  ),
+);

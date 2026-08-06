@@ -54,9 +54,9 @@ class ApiClient {
   }) : _http = httpClient ?? http.Client();
 
   Map<String, String> get _headers => {
-        'content-type': 'application/json',
-        if (token != null) 'authorization': 'Bearer $token',
-      };
+    'content-type': 'application/json',
+    if (token != null) 'authorization': 'Bearer $token',
+  };
 
   Future<dynamic> _send(
     String method,
@@ -101,8 +101,13 @@ class ApiClient {
 
   /// Returns the Session map and remembers its access_token.
   Future<Map<String, dynamic>> verifyOtp(String phone, String code) async {
-    final session = (await _send('POST', '/auth/otp/verify',
-        body: {'phone': phone, 'code': code})) as Map<String, dynamic>;
+    final session =
+        (await _send(
+              'POST',
+              '/auth/otp/verify',
+              body: {'phone': phone, 'code': code},
+            ))
+            as Map<String, dynamic>;
     token = session['access_token'] as String;
     return session;
   }
@@ -114,10 +119,12 @@ class ApiClient {
   /// point: no SMS provider, no password, nothing to forget. Single use, so
   /// signing in here spends the link the browser would have used.
   Future<Map<String, dynamic>> acceptInvite(String inviteToken) async {
-    final session = (await _send(
-      'POST',
-      '/public/staff-invites/${Uri.encodeComponent(inviteToken)}/accept',
-    )) as Map<String, dynamic>;
+    final session =
+        (await _send(
+              'POST',
+              '/public/staff-invites/${Uri.encodeComponent(inviteToken)}/accept',
+            ))
+            as Map<String, dynamic>;
     token = session['access_token'] as String;
     return session;
   }
@@ -131,10 +138,15 @@ class ApiClient {
       (await _send('GET', '/scanner/legs/$legId/bootstrap'))
           as Map<String, dynamic>;
 
-  Future<List<dynamic>> submitCheckIns(
-      List<Map<String, dynamic>> items) async {
-    final res = (await _send('POST', '/scanner/check-ins',
-        body: {'items': items}, timeout: syncTimeout)) as Map<String, dynamic>;
+  Future<List<dynamic>> submitCheckIns(List<Map<String, dynamic>> items) async {
+    final res =
+        (await _send(
+              'POST',
+              '/scanner/check-ins',
+              body: {'items': items},
+              timeout: syncTimeout,
+            ))
+            as Map<String, dynamic>;
     return res['results'] as List<dynamic>;
   }
 
@@ -148,13 +160,18 @@ class ApiClient {
     String? entranceId,
     String? passId,
   }) async =>
-      (await _send('POST', '/scanner/legs/$legId/walk-ins', body: {
-        'client_uuid': clientUuid,
-        'display_name': displayName,
-        'count': count,
-        'entrance_id': ?entranceId,
-        'pass_id': ?passId,
-      })) as Map<String, dynamic>;
+      (await _send(
+            'POST',
+            '/scanner/legs/$legId/walk-ins',
+            body: {
+              'client_uuid': clientUuid,
+              'display_name': displayName,
+              'count': count,
+              'entrance_id': ?entranceId,
+              'pass_id': ?passId,
+            },
+          ))
+          as Map<String, dynamic>;
 
   Future<void> testPing(String legId) =>
       _send('POST', '/scanner/legs/$legId/test');

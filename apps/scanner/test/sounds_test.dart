@@ -31,14 +31,14 @@ class FakeSounds implements GateSounds {
 }
 
 Decision _decision(Outcome outcome, Tone tone, {int? autoReturnMs}) => Decision(
-      outcome: outcome,
-      tone: tone,
-      admittedCount: 0,
-      headline: 'Mr & Mrs Adeyemi',
-      log: true,
-      autoReturnMs: autoReturnMs,
-      actions: const ['Dismiss'],
-    );
+  outcome: outcome,
+  tone: tone,
+  admittedCount: 0,
+  headline: 'Mr & Mrs Adeyemi',
+  log: true,
+  autoReturnMs: autoReturnMs,
+  actions: const ['Dismiss'],
+);
 
 const _needsCount = Decision(
   outcome: Outcome.needsCount,
@@ -74,14 +74,14 @@ class _HarnessState extends State<_Harness> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        home: Scaffold(
-          body: ResultOverlay(
-            decision: _current,
-            onClose: () {},
-            onAdmitCount: (_) => setState(() => _current = _admitted),
-          ),
-        ),
-      );
+    home: Scaffold(
+      body: ResultOverlay(
+        decision: _current,
+        onClose: () {},
+        onAdmitCount: (_) => setState(() => _current = _admitted),
+      ),
+    ),
+  );
 }
 
 void main() {
@@ -97,11 +97,18 @@ void main() {
   tearDown(() => GateSounds.instance = real);
 
   Future<void> show(WidgetTester tester, Decision d) => tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: ResultOverlay(decision: d, onClose: () {}))),
-      );
+    MaterialApp(
+      home: Scaffold(
+        body: ResultOverlay(decision: d, onClose: () {}),
+      ),
+    ),
+  );
 
   testWidgets('each verdict has its own cue', (tester) async {
-    await show(tester, _decision(Outcome.admitted, Tone.admit, autoReturnMs: 1500));
+    await show(
+      tester,
+      _decision(Outcome.admitted, Tone.admit, autoReturnMs: 1500),
+    );
     expect(sounds.played, [Tone.admit]);
   });
 
@@ -121,8 +128,9 @@ void main() {
   // The count picker is the case that matters most: two cues in one visit,
   // and the second one only happens because didUpdateWidget re-arms. Before
   // that fix the usher heard the question and never the answer.
-  testWidgets('the count picker sounds twice — question, then answer',
-      (tester) async {
+  testWidgets('the count picker sounds twice — question, then answer', (
+    tester,
+  ) async {
     // A phone-shaped surface. The default 800x600 puts the confirm button
     // past the bottom edge, where a tap lands on whatever is behind it.
     tester.view.physicalSize = const Size(1080, 2400);
@@ -135,8 +143,11 @@ void main() {
     await tester.tap(find.text('Admit 2'));
     await tester.pump();
 
-    expect(sounds.played, [Tone.ask, Tone.admit],
-        reason: 'admitting from the picker must be heard, not just seen');
+    expect(
+      sounds.played,
+      [Tone.ask, Tone.admit],
+      reason: 'admitting from the picker must be heard, not just seen',
+    );
 
     await tester.pump(const Duration(milliseconds: 1600));
   });
@@ -144,7 +155,10 @@ void main() {
   testWidgets('muted means silent, and stays that way', (tester) async {
     await sounds.setMuted(true);
 
-    await show(tester, _decision(Outcome.admitted, Tone.admit, autoReturnMs: 1500));
+    await show(
+      tester,
+      _decision(Outcome.admitted, Tone.admit, autoReturnMs: 1500),
+    );
     expect(sounds.played, isEmpty);
 
     await sounds.setMuted(false);

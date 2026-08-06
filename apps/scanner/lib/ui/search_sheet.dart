@@ -44,57 +44,64 @@ class _SearchSheetState extends State<_SearchSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SizedBox(
         height: MediaQuery.of(context).size.height * .72,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('SEARCH GUESTS',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.5,
-                        color: Palette.muted)),
-                const SizedBox(height: 14),
-                TextField(
-                  autofocus: true,
-                  onChanged: _search,
-                  style: const TextStyle(fontSize: 16),
-                  decoration:
-                      const InputDecoration(hintText: 'Name or phone number'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'SEARCH GUESTS',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                  color: Palette.muted,
                 ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _results.length,
-                    itemBuilder: (context, i) {
-                      final e = _results[i];
-                      final full = e.admitted >= e.row.allowance;
-                      return InkWell(
-                        onTap: () =>
-                            Navigator.of(context).pop(e.row.passId),
-                        child: Container(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 15),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(
-                                  color:
-                                      Colors.white.withValues(alpha: .07)),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                autofocus: true,
+                onChanged: _search,
+                style: const TextStyle(fontSize: 16),
+                decoration: const InputDecoration(
+                  hintText: 'Name or phone number',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _results.length,
+                  itemBuilder: (context, i) {
+                    final e = _results[i];
+                    final full = e.admitted >= e.row.allowance;
+                    return InkWell(
+                      onTap: () => Navigator.of(context).pop(e.row.passId),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.white.withValues(alpha: .07),
                             ),
                           ),
-                          child: Row(children: [
+                        ),
+                        child: Row(
+                          children: [
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(e.row.displayName,
-                                      style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500)),
+                                  Text(
+                                    e.row.displayName,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                   const SizedBox(height: 3),
                                   Text(
                                     [
@@ -103,7 +110,9 @@ class _SearchSheetState extends State<_SearchSheet> {
                                       'Party of ${e.row.allowance}',
                                     ].join(' · '),
                                     style: const TextStyle(
-                                        fontSize: 12.5, color: Palette.muted),
+                                      fontSize: 12.5,
+                                      color: Palette.muted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -112,23 +121,26 @@ class _SearchSheetState extends State<_SearchSheet> {
                               e.admitted == 0
                                   ? 'NOT ARRIVED'
                                   : full
-                                      ? '${e.admitted} IN'
-                                      : '${e.admitted} OF ${e.row.allowance}',
+                                  ? '${e.admitted} IN'
+                                  : '${e.admitted} OF ${e.row.allowance}',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: .5,
-                                color:
-                                    e.admitted > 0 ? Palette.admit : Palette.muted,
+                                color: e.admitted > 0
+                                    ? Palette.admit
+                                    : Palette.muted,
                               ),
                             ),
-                          ]),
+                          ],
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
-              ]),
+              ),
+            ],
+          ),
         ),
       ),
     );

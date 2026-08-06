@@ -14,7 +14,8 @@ class WalkIn {
   const WalkIn(this.name, this.count);
 }
 
-Future<WalkIn?> showWalkInSheet(BuildContext context) => showModalBottomSheet<WalkIn>(
+Future<WalkIn?> showWalkInSheet(BuildContext context) =>
+    showModalBottomSheet<WalkIn>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Palette.surface,
@@ -57,62 +58,70 @@ class _WalkInSheetState extends State<_WalkInSheet> {
         top: 18,
         bottom: MediaQuery.of(context).viewInsets.bottom + 18,
       ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text('WALK-IN',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'WALK-IN',
               style: TextStyle(
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w600,
-                  color: Palette.muted)),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _name,
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          maxLength: 200,
-          onSubmitted: (_) => _submit(),
-          decoration: const InputDecoration(
-            hintText: 'Name, as you would read it off a card',
-            counterText: '',
-          ),
-          style: const TextStyle(fontSize: 16),
-        ),
-        const SizedBox(height: 18),
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text('How many?',
-              style: TextStyle(fontSize: 14, color: Palette.muted)),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final n in const [1, 2, 3, 4, 5, 6])
-              _CountChip(
-                n: n,
-                selected: _count == n,
-                onTap: () => setState(() => _count = n),
+                fontSize: 12,
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w600,
+                color: Palette.muted,
               ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _submit,
-            style: FilledButton.styleFrom(
-              backgroundColor: Palette.admit,
-              foregroundColor: Palette.ground,
-              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
-            child: Text('Admit $_count'),
           ),
-        ),
-      ]),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _name,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            maxLength: 200,
+            onSubmitted: (_) => _submit(),
+            decoration: const InputDecoration(
+              hintText: 'Name, as you would read it off a card',
+              counterText: '',
+            ),
+            style: const TextStyle(fontSize: 16),
+          ),
+          const SizedBox(height: 18),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'How many?',
+              style: TextStyle(fontSize: 14, color: Palette.muted),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final n in const [1, 2, 3, 4, 5, 6])
+                _CountChip(
+                  n: n,
+                  selected: _count == n,
+                  onTap: () => setState(() => _count = n),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: Palette.admit,
+                foregroundColor: Palette.ground,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Text('Admit $_count'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -121,29 +130,36 @@ class _CountChip extends StatelessWidget {
   final int n;
   final bool selected;
   final VoidCallback onTap;
-  const _CountChip({required this.n, required this.selected, required this.onTap});
+  const _CountChip({
+    required this.n,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => Material(
-        color: selected ? Palette.admit : Palette.ground,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
+    color: selected ? Palette.admit : Palette.ground,
+    borderRadius: BorderRadius.circular(14),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        width: 68,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          border: Border.all(color: selected ? Palette.admit : Palette.line),
           borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Container(
-            width: 68,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              border: Border.all(color: selected ? Palette.admit : Palette.line),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text('$n',
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: selected ? Palette.ground : Palette.text)),
+        ),
+        child: Text(
+          '$n',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: selected ? Palette.ground : Palette.text,
           ),
         ),
-      );
+      ),
+    ),
+  );
 }

@@ -8,8 +8,13 @@ import 'theme.dart';
 class AssignmentsScreen extends StatefulWidget {
   final ApiClient api;
   final Repository repo;
-  final void Function(String legId, String? entranceId, String eventName,
-      String gateName) onOpenLeg;
+  final void Function(
+    String legId,
+    String? entranceId,
+    String eventName,
+    String gateName,
+  )
+  onOpenLeg;
   final Future<void> Function() onSignOut;
 
   const AssignmentsScreen({
@@ -74,7 +79,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
       setState(() {
         _error = e is ApiException && e.isTransport
             ? "No signal, and this gate hasn't been downloaded yet. "
-                "Get online once, then it works offline."
+                  "Get online once, then it works offline."
             : "Couldn't download the guest list.";
         _openingLeg = null;
       });
@@ -119,8 +124,10 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Delete and sign out',
-                  style: TextStyle(color: Palette.deny)),
+              child: const Text(
+                'Delete and sign out',
+                style: TextStyle(color: Palette.deny),
+              ),
             ),
           ],
         ),
@@ -149,85 +156,106 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
       ),
       body: _error != null
           ? Center(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text(_error!, style: const TextStyle(color: Palette.deny)),
-              TextButton(onPressed: _load, child: const Text('Retry')),
-            ]))
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_error!, style: const TextStyle(color: Palette.deny)),
+                  TextButton(onPressed: _load, child: const Text('Retry')),
+                ],
+              ),
+            )
           : _assignments == null
-              ? const Center(child: CircularProgressIndicator())
-              : _assignments!.isEmpty
-                  ? const Center(
-                      child: Text('No events assigned to you yet.',
-                          style: TextStyle(color: Palette.muted)))
-                  : Column(children: [
-                      if (_offline)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          color: Palette.hold.withValues(alpha: .15),
-                          child: const Text(
-                            'Offline — showing gates already downloaded.',
-                            style: TextStyle(
-                                fontSize: 12.5, color: Palette.hold),
-                          ),
-                        ),
-                      Expanded(
-                        child: ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _assignments!.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, i) {
-                        final a = _assignments![i] as Map<String, dynamic>;
-                        final opening = _openingLeg == a['leg_id'];
-                        return Material(
-                          color: Palette.surface,
+          ? const Center(child: CircularProgressIndicator())
+          : _assignments!.isEmpty
+          ? const Center(
+              child: Text(
+                'No events assigned to you yet.',
+                style: TextStyle(color: Palette.muted),
+              ),
+            )
+          : Column(
+              children: [
+                if (_offline)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    color: Palette.hold.withValues(alpha: .15),
+                    child: const Text(
+                      'Offline — showing gates already downloaded.',
+                      style: TextStyle(fontSize: 12.5, color: Palette.hold),
+                    ),
+                  ),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _assignments!.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, i) {
+                      final a = _assignments![i] as Map<String, dynamic>;
+                      final opening = _openingLeg == a['leg_id'];
+                      return Material(
+                        color: Palette.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
                           borderRadius: BorderRadius.circular(16),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: opening ? null : () => _open(a),
-                            child: Container(
-                              padding: const EdgeInsets.all(18),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Palette.line),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Row(children: [
+                          onTap: opening ? null : () => _open(a),
+                          child: Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Palette.line),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(a['event_name'] as String,
-                                          style: const TextStyle(
-                                              fontSize: 16.5,
-                                              fontWeight: FontWeight.w600)),
+                                      Text(
+                                        a['event_name'] as String,
+                                        style: const TextStyle(
+                                          fontSize: 16.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                                       const SizedBox(height: 4),
                                       Text(
                                         '${a['leg_name']} · ${a['guest_count']} households',
                                         style: const TextStyle(
-                                            fontSize: 13, color: Palette.muted),
+                                          fontSize: 13,
+                                          color: Palette.muted,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
                                 if (opening)
                                   const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2))
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
                                 else
-                                  const Icon(Icons.chevron_right,
-                                      color: Palette.muted),
-                              ]),
+                                  const Icon(
+                                    Icons.chevron_right,
+                                    color: Palette.muted,
+                                  ),
+                              ],
                             ),
                           ),
-                        );
-                      },
                         ),
-                      ),
-                    ]),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

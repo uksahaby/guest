@@ -25,7 +25,7 @@ class Repository {
   List<EventKey> keys = [];
 
   Repository({required this.db, required this.api, String? deviceId})
-      : deviceId = deviceId ?? randomUuid();
+    : deviceId = deviceId ?? randomUuid();
 
   // ---- bootstrap ----------------------------------------------------------
 
@@ -43,21 +43,22 @@ class Repository {
         await db.delete(db.cachedAssignments).go();
         for (var i = 0; i < rows.length; i++) {
           final a = rows[i] as Map<String, dynamic>;
-          await db.cachedAssignments
-              .insertOne(CachedAssignmentsCompanion.insert(
-            legId: a['leg_id'] as String,
-            payload: jsonEncode(a),
-            position: i,
-            fetchedAt: DateTime.now(),
-          ));
+          await db.cachedAssignments.insertOne(
+            CachedAssignmentsCompanion.insert(
+              legId: a['leg_id'] as String,
+              payload: jsonEncode(a),
+              position: i,
+              fetchedAt: DateTime.now(),
+            ),
+          );
         }
       });
       return (rows: rows, fromCache: false);
     } on ApiException catch (e) {
       if (!e.isTransport) rethrow;
-      final cached = await (db.select(db.cachedAssignments)
-            ..orderBy([(c) => OrderingTerm.asc(c.position)]))
-          .get();
+      final cached = await (db.select(
+        db.cachedAssignments,
+      )..orderBy([(c) => OrderingTerm.asc(c.position)])).get();
       if (cached.isEmpty) rethrow;
       return (
         rows: [for (final c in cached) jsonDecode(c.payload)],
@@ -89,9 +90,9 @@ class Repository {
   /// True when a previously downloaded copy of this leg was loaded.
   Future<bool> _openFromCache(String legId) async {
     if (await meta(legId) == null) return false;
-    final rows = await (db.select(db.signingKeys)
-          ..where((k) => k.legId.equals(legId)))
-        .get();
+    final rows = await (db.select(
+      db.signingKeys,
+    )..where((k) => k.legId.equals(legId))).get();
     // No keys means no pass can be verified, which is worse than saying so.
     if (rows.isEmpty) return false;
 
@@ -125,74 +126,84 @@ class Repository {
     keys = fetched;
 
     await db.transaction(() async {
-      await (db.delete(db.signingKeys)..where((k) => k.legId.equals(legId)))
-          .go();
+      await (db.delete(
+        db.signingKeys,
+      )..where((k) => k.legId.equals(legId))).go();
       for (final k in fetched) {
-        await db.signingKeys.insertOne(SigningKeysCompanion.insert(
-          legId: legId,
-          eventId: k.eventId,
-          eventName: k.eventName,
-          tokenVersion: k.tokenVersion,
-          keyB64: base64Encode(k.key),
-        ));
+        await db.signingKeys.insertOne(
+          SigningKeysCompanion.insert(
+            legId: legId,
+            eventId: k.eventId,
+            eventName: k.eventName,
+            tokenVersion: k.tokenVersion,
+            keyB64: base64Encode(k.key),
+          ),
+        );
       }
 
-      await db.legMeta.insertOnConflictUpdate(LegMetaCompanion.insert(
-        legId: legId,
-        eventId: event['id'] as String,
-        eventName: event['name'] as String,
-        allowOverflow: event['allow_overflow'] as bool,
-        requireRsvp: event['require_rsvp'] as bool,
-        allowWalkins: event['allow_walkins'] as bool,
-        // Older API builds omit it; absent means not cancelled.
-        cancelled: Value(event['cancelled'] as bool? ?? false),
-        managerPhone: Value(event['manager_phone'] as String?),
-        syncedAt: DateTime.now(),
-      ));
+      await db.legMeta.insertOnConflictUpdate(
+        LegMetaCompanion.insert(
+          legId: legId,
+          eventId: event['id'] as String,
+          eventName: event['name'] as String,
+          allowOverflow: event['allow_overflow'] as bool,
+          requireRsvp: event['require_rsvp'] as bool,
+          allowWalkins: event['allow_walkins'] as bool,
+          // Older API builds omit it; absent means not cancelled.
+          cancelled: Value(event['cancelled'] as bool? ?? false),
+          managerPhone: Value(event['manager_phone'] as String?),
+          syncedAt: DateTime.now(),
+        ),
+      );
 
-      await (db.delete(db.invitations)..where((i) => i.legId.equals(legId)))
-          .go();
+      await (db.delete(
+        db.invitations,
+      )..where((i) => i.legId.equals(legId))).go();
       for (final inv in b['invitations'] as List<dynamic>) {
-        await db.invitations.insertOne(InvitationsCompanion.insert(
-          passId: inv['pass_id'] as String,
-          legId: legId,
-          displayName: inv['display_name'] as String,
-          category: Value(inv['category'] as String?),
-          tableLabel: Value(inv['table_name'] as String?),
-          allowance: inv['allowance'] as int,
-          admittedSynced: (inv['admitted'] as num).toInt(),
-          rsvp: inv['rsvp'] as String,
-          searchTerms: (inv['search_terms'] as String).toLowerCase(),
-        ));
+        await db.invitations.insertOne(
+          InvitationsCompanion.insert(
+            passId: inv['pass_id'] as String,
+            legId: legId,
+            displayName: inv['display_name'] as String,
+            category: Value(inv['category'] as String?),
+            tableLabel: Value(inv['table_name'] as String?),
+            allowance: inv['allowance'] as int,
+            admittedSynced: (inv['admitted'] as num).toInt(),
+            rsvp: inv['rsvp'] as String,
+            searchTerms: (inv['search_terms'] as String).toLowerCase(),
+          ),
+        );
       }
 
-      await (db.delete(db.revokedPasses)..where((r) => r.legId.equals(legId)))
-          .go();
+      await (db.delete(
+        db.revokedPasses,
+      )..where((r) => r.legId.equals(legId))).go();
       for (final id in b['revoked_pass_ids'] as List<dynamic>) {
-        await db.revokedPasses.insertOne(RevokedPassesCompanion.insert(
-          passId: id as String,
-          legId: legId,
-        ));
+        await db.revokedPasses.insertOne(
+          RevokedPassesCompanion.insert(passId: id as String, legId: legId),
+        );
       }
     });
   }
 
   // ---- local state --------------------------------------------------------
 
-  Future<LegMetaData?> meta(String legId) =>
-      (db.select(db.legMeta)..where((m) => m.legId.equals(legId)))
-          .getSingleOrNull();
+  Future<LegMetaData?> meta(String legId) => (db.select(
+    db.legMeta,
+  )..where((m) => m.legId.equals(legId))).getSingleOrNull();
 
   Future<LocalInvitation?> find(String passId, String legId) async {
-    final row = await (db.select(db.invitations)
-          ..where((i) => i.passId.equals(passId) & i.legId.equals(legId)))
-        .getSingleOrNull();
+    final row =
+        await (db.select(db.invitations)
+              ..where((i) => i.passId.equals(passId) & i.legId.equals(legId)))
+            .getSingleOrNull();
     if (row == null) return null;
 
     final m = await meta(legId);
-    final revoked = await (db.select(db.revokedPasses)
-          ..where((r) => r.passId.equals(passId) & r.legId.equals(legId)))
-        .getSingleOrNull();
+    final revoked =
+        await (db.select(db.revokedPasses)
+              ..where((r) => r.passId.equals(passId) & r.legId.equals(legId)))
+            .getSingleOrNull();
     final admitted = await db.admittedLocally(passId, legId);
 
     return LocalInvitation(
@@ -216,10 +227,11 @@ class Repository {
   Future<List<InvitationEntry>> search(String legId, String query) async {
     final q = query.trim().toLowerCase();
     if (q.length < 3) return const [];
-    final rows = await (db.select(db.invitations)
-          ..where((i) => i.legId.equals(legId) & i.searchTerms.contains(q))
-          ..limit(20))
-        .get();
+    final rows =
+        await (db.select(db.invitations)
+              ..where((i) => i.legId.equals(legId) & i.searchTerms.contains(q))
+              ..limit(20))
+            .get();
     return [
       for (final r in rows)
         InvitationEntry(
@@ -274,16 +286,20 @@ class Repository {
     String? clientUuid;
     if (decision.log) {
       clientUuid = randomUuid();
-      await db.pendingScans.insertOne(PendingScansCompanion.insert(
-        clientUuid: clientUuid,
-        legId: legId,
-        entranceId: Value(entranceId),
-        passId: Value(decision.invitation?.passId ??
-            (decision.outcome == Outcome.wrongLeg ? null : passIdGuess)),
-        result: decision.outcome.wire,
-        admittedCount: decision.admittedCount,
-        scannedAt: DateTime.now(),
-      ));
+      await db.pendingScans.insertOne(
+        PendingScansCompanion.insert(
+          clientUuid: clientUuid,
+          legId: legId,
+          entranceId: Value(entranceId),
+          passId: Value(
+            decision.invitation?.passId ??
+                (decision.outcome == Outcome.wrongLeg ? null : passIdGuess),
+          ),
+          result: decision.outcome.wire,
+          admittedCount: decision.admittedCount,
+          scannedAt: DateTime.now(),
+        ),
+      );
     }
 
     return ScanRecord(decision: decision, clientUuid: clientUuid);
@@ -313,27 +329,31 @@ class Repository {
     final clientUuid = randomUuid();
 
     await db.transaction(() async {
-      await db.invitations.insertOne(InvitationsCompanion.insert(
-        passId: passId,
-        legId: legId,
-        displayName: name,
-        allowance: count,
-        // Nothing is admitted yet by the count below — the queued row is
-        // what admits them, exactly as for an invited household.
-        admittedSynced: 0,
-        rsvp: 'attending',
-        searchTerms: name.toLowerCase(),
-      ));
-      await db.pendingScans.insertOne(PendingScansCompanion.insert(
-        clientUuid: clientUuid,
-        legId: legId,
-        entranceId: Value(entranceId),
-        passId: Value(passId),
-        result: 'manual',
-        admittedCount: count,
-        scannedAt: DateTime.now(),
-        walkInName: Value(name),
-      ));
+      await db.invitations.insertOne(
+        InvitationsCompanion.insert(
+          passId: passId,
+          legId: legId,
+          displayName: name,
+          allowance: count,
+          // Nothing is admitted yet by the count below — the queued row is
+          // what admits them, exactly as for an invited household.
+          admittedSynced: 0,
+          rsvp: 'attending',
+          searchTerms: name.toLowerCase(),
+        ),
+      );
+      await db.pendingScans.insertOne(
+        PendingScansCompanion.insert(
+          clientUuid: clientUuid,
+          legId: legId,
+          entranceId: Value(entranceId),
+          passId: Value(passId),
+          result: 'manual',
+          admittedCount: count,
+          scannedAt: DateTime.now(),
+          walkInName: Value(name),
+        ),
+      );
     });
 
     final inv = await find(passId, legId);
@@ -364,18 +384,19 @@ class Repository {
   /// Only this device's own rows: the queue is what it has, and a scan
   /// from the other gate is not something it can reverse.
   Future<List<RecentEntry>> recent(String legId, {int limit = 50}) async {
-    final rows = await (db.select(db.pendingScans)
-          ..where((p) => p.legId.equals(legId))
-          // rowid breaks the tie: two scans can land in the same
-          // millisecond — a double-tap, or a walk-in added straight after
-          // an admission — and a list that reorders itself between reads is
-          // no use to someone trying to undo the last thing they did.
-          ..orderBy([
-            (p) => OrderingTerm.desc(p.scannedAt),
-            (p) => OrderingTerm.desc(p.rowId),
-          ])
-          ..limit(limit))
-        .get();
+    final rows =
+        await (db.select(db.pendingScans)
+              ..where((p) => p.legId.equals(legId))
+              // rowid breaks the tie: two scans can land in the same
+              // millisecond — a double-tap, or a walk-in added straight after
+              // an admission — and a list that reorders itself between reads is
+              // no use to someone trying to undo the last thing they did.
+              ..orderBy([
+                (p) => OrderingTerm.desc(p.scannedAt),
+                (p) => OrderingTerm.desc(p.rowId),
+              ])
+              ..limit(limit))
+            .get();
 
     // Which admissions already have a reversal pointing at them.
     final reversed = {
@@ -390,24 +411,27 @@ class Repository {
 
       String? name;
       if (r.passId != null) {
-        final inv = await (db.select(db.invitations)
-              ..where((i) =>
-                  i.passId.equals(r.passId!) & i.legId.equals(legId)))
-            .getSingleOrNull();
+        final inv =
+            await (db.select(db.invitations)..where(
+                  (i) => i.passId.equals(r.passId!) & i.legId.equals(legId),
+                ))
+                .getSingleOrNull();
         name = inv?.displayName;
       }
 
-      out.add(RecentEntry(
-        clientUuid: r.clientUuid,
-        displayName: name ?? r.walkInName ?? 'Not on the list',
-        result: r.result,
-        admittedCount: r.admittedCount,
-        scannedAt: r.scannedAt,
-        synced: r.synced,
-        contested: r.contested,
-        reversed: reversed.contains(r.clientUuid),
-        isWalkIn: r.walkInName != null,
-      ));
+      out.add(
+        RecentEntry(
+          clientUuid: r.clientUuid,
+          displayName: name ?? r.walkInName ?? 'Not on the list',
+          result: r.result,
+          admittedCount: r.admittedCount,
+          scannedAt: r.scannedAt,
+          synced: r.synced,
+          contested: r.contested,
+          reversed: reversed.contains(r.clientUuid),
+          isWalkIn: r.walkInName != null,
+        ),
+      );
     }
     return out;
   }
@@ -415,26 +439,28 @@ class Repository {
   /// Undo the admission written by [clientUuid]: a reversal row, never a
   /// delete. Works offline; the server validates the pairing on sync.
   Future<void> undo(String clientUuid) async {
-    final orig = await (db.select(db.pendingScans)
-          ..where((p) => p.clientUuid.equals(clientUuid)))
-        .getSingleOrNull();
+    final orig = await (db.select(
+      db.pendingScans,
+    )..where((p) => p.clientUuid.equals(clientUuid))).getSingleOrNull();
     if (orig == null || orig.admittedCount <= 0) return;
 
-    final already = await (db.select(db.pendingScans)
-          ..where((p) => p.reversesClientUuid.equals(clientUuid)))
-        .getSingleOrNull();
+    final already = await (db.select(
+      db.pendingScans,
+    )..where((p) => p.reversesClientUuid.equals(clientUuid))).getSingleOrNull();
     if (already != null) return;
 
-    await db.pendingScans.insertOne(PendingScansCompanion.insert(
-      clientUuid: randomUuid(),
-      legId: orig.legId,
-      entranceId: Value(orig.entranceId),
-      passId: Value(orig.passId),
-      result: 'reversal',
-      admittedCount: -orig.admittedCount,
-      reversesClientUuid: Value(clientUuid),
-      scannedAt: DateTime.now(),
-    ));
+    await db.pendingScans.insertOne(
+      PendingScansCompanion.insert(
+        clientUuid: randomUuid(),
+        legId: orig.legId,
+        entranceId: Value(orig.entranceId),
+        passId: Value(orig.passId),
+        result: 'reversal',
+        admittedCount: -orig.admittedCount,
+        reversesClientUuid: Value(clientUuid),
+        scannedAt: DateTime.now(),
+      ),
+    );
   }
 
   // ---- sign out -----------------------------------------------------------
@@ -478,11 +504,12 @@ class Repository {
   /// Replays the queue. Batches of 500, oldest first — reversals always
   /// follow the row they undo. Returns how many rows were accepted.
   Future<int> sync() async {
-    final pending = await (db.select(db.pendingScans)
-          ..where((p) => p.synced.equals(false))
-          ..orderBy([(p) => OrderingTerm.asc(p.scannedAt)])
-          ..limit(500))
-        .get();
+    final pending =
+        await (db.select(db.pendingScans)
+              ..where((p) => p.synced.equals(false))
+              ..orderBy([(p) => OrderingTerm.asc(p.scannedAt)])
+              ..limit(500))
+            .get();
     if (pending.isEmpty) return 0;
 
     // Walk-ins first, and one at a time. Each one has to create a household
@@ -510,13 +537,15 @@ class Repository {
         // usher lost the permission. Settle it rather than retrying every
         // twelve seconds for the rest of the evening.
         if (!e.isTransport) {
-          await (db.update(db.pendingScans)
-                ..where((q) => q.clientUuid.equals(p.clientUuid)))
-              .write(PendingScansCompanion(
-            synced: const Value(true),
-            contested: const Value(true),
-            note: Value('refused: ${e.message}'),
-          ));
+          await (db.update(
+            db.pendingScans,
+          )..where((q) => q.clientUuid.equals(p.clientUuid))).write(
+            PendingScansCompanion(
+              synced: const Value(true),
+              contested: const Value(true),
+              note: Value('refused: ${e.message}'),
+            ),
+          );
         }
       }
     }
@@ -546,12 +575,14 @@ class Repository {
       if (ok) accepted++;
       // Accepted (including duplicates) and structurally-rejected rows are
       // both settled — retrying a rejected row will never succeed.
-      await (db.update(db.pendingScans)
-            ..where((p) => p.clientUuid.equals(map['client_uuid'] as String)))
-          .write(PendingScansCompanion(
-        synced: const Value(true),
-        contested: Value(map['contested'] == true),
-      ));
+      await (db.update(
+        db.pendingScans,
+      )..where((p) => p.clientUuid.equals(map['client_uuid'] as String))).write(
+        PendingScansCompanion(
+          synced: const Value(true),
+          contested: Value(map['contested'] == true),
+        ),
+      );
     }
     return accepted;
   }

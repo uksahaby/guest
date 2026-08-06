@@ -63,8 +63,7 @@ class FakeApi extends ApiClient {
   }
 
   @override
-  Future<List<dynamic>> submitCheckIns(
-      List<Map<String, dynamic>> items) async {
+  Future<List<dynamic>> submitCheckIns(List<Map<String, dynamic>> items) async {
     submitted.add(items);
     return [
       for (final i in items)
@@ -107,47 +106,48 @@ class FakeApi extends ApiClient {
   Future<void> testPing(String legId) async {}
 }
 
-Map<String, dynamic> bootstrapFor(List<Map<String, dynamic>> invitations,
-        {List<String> revoked = const []}) =>
+Map<String, dynamic> bootstrapFor(
+  List<Map<String, dynamic>> invitations, {
+  List<String> revoked = const [],
+}) => {
+  'synced_at': DateTime.now().toIso8601String(),
+  'event': {
+    'id': eventId,
+    'name': 'Test Wedding',
+    'allow_overflow': true,
+    'require_rsvp': false,
+    'allow_walkins': true,
+  },
+  'keys': [
     {
-      'synced_at': DateTime.now().toIso8601String(),
-      'event': {
-        'id': eventId,
-        'name': 'Test Wedding',
-        'allow_overflow': true,
-        'require_rsvp': false,
-        'allow_walkins': true,
-      },
-      'keys': [
-        {
-          'event_id': eventId,
-          'event_name': 'Test Wedding',
-          'token_version': 1,
-          'key': base64Encode(signingKey),
-        },
-      ],
-      'entrances': const [],
-      'invitations': invitations,
-      'revoked_pass_ids': revoked,
-    };
+      'event_id': eventId,
+      'event_name': 'Test Wedding',
+      'token_version': 1,
+      'key': base64Encode(signingKey),
+    },
+  ],
+  'entrances': const [],
+  'invitations': invitations,
+  'revoked_pass_ids': revoked,
+};
 
 Map<String, dynamic> adeyemi(String passId) => {
-      'pass_id': passId,
-      'display_name': 'Mr & Mrs Adeyemi',
-      'category': "Groom's Family",
-      'table_name': 'Table 12',
-      'allowance': 4,
-      'admitted': 0,
-      'rsvp': 'attending',
-      // The server ships only the last four digits — see usher_guest_list in
-      // db/migrations/003_rls.sql. A lost device is not a leaked guest list.
-      'search_terms': 'mr & mrs adeyemi 2098',
-    };
+  'pass_id': passId,
+  'display_name': 'Mr & Mrs Adeyemi',
+  'category': "Groom's Family",
+  'table_name': 'Table 12',
+  'allowance': 4,
+  'admitted': 0,
+  'rsvp': 'attending',
+  // The server ships only the last four digits — see usher_guest_list in
+  // db/migrations/003_rls.sql. A lost device is not a leaked guest list.
+  'search_terms': 'mr & mrs adeyemi 2098',
+};
 
 String tokenFor(String passId) => issueToken(
-      TokenPayload(passId: passId, eventId: eventId, tokenVersion: 1),
-      signingKey,
-    );
+  TokenPayload(passId: passId, eventId: eventId, tokenVersion: 1),
+  signingKey,
+);
 
 void main() {
   // One test opens a second in-memory database on its own executor; the
@@ -184,8 +184,11 @@ void main() {
     expect(ask.clientUuid, isNull, reason: 'the prompt is not a log row');
     expect(await repo.pendingCount(), 0);
 
-    final admit =
-        await repo.handle(legId, raw: tokenFor(passId), requestedCount: 3);
+    final admit = await repo.handle(
+      legId,
+      raw: tokenFor(passId),
+      requestedCount: 3,
+    );
     expect(admit.decision.outcome, Outcome.partial);
     expect(admit.clientUuid, isNotNull);
     expect(await repo.pendingCount(), 1);
@@ -211,8 +214,7 @@ void main() {
   });
 
   test('a revoked pass on the synced list is refused offline', () async {
-    api.bootstrapPayload =
-        bootstrapFor([adeyemi(passId)], revoked: [passId]);
+    api.bootstrapPayload = bootstrapFor([adeyemi(passId)], revoked: [passId]);
     await repo.openLeg(legId);
 
     final d = await repo.handle(legId, raw: tokenFor(passId));
@@ -220,8 +222,11 @@ void main() {
   });
 
   test('undo writes a reversal row, never deletes', () async {
-    final admit =
-        await repo.handle(legId, raw: tokenFor(passId), requestedCount: 4);
+    final admit = await repo.handle(
+      legId,
+      raw: tokenFor(passId),
+      requestedCount: 4,
+    );
     expect((await repo.find(passId, legId))!.admitted, 4);
 
     await repo.undo(admit.clientUuid!);
@@ -249,8 +254,11 @@ void main() {
   });
 
   test('a replayed batch is free — duplicates are not errors', () async {
-    final admit =
-        await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+    final admit = await repo.handle(
+      legId,
+      raw: tokenFor(passId),
+      requestedCount: 2,
+    );
     api.seen.add(admit.clientUuid!); // server saw it before "the network died"
 
     final accepted = await repo.sync();
@@ -293,8 +301,7 @@ void main() {
     await repo.openLeg(legId);
 
     final foreign = issueToken(
-      TokenPayload(
-          passId: randomUuid(), eventId: otherEvent, tokenVersion: 1),
+      TokenPayload(passId: randomUuid(), eventId: otherEvent, tokenVersion: 1),
       otherKey,
     );
     final d = await repo.handle(legId, raw: foreign);
@@ -317,8 +324,11 @@ void main() {
     api.bootstrapError = ApiException(0, 'unreachable', 'no route to host');
     await restarted.openLeg(legId);
 
-    expect(restarted.keys, hasLength(1),
-        reason: 'signing keys must survive the process');
+    expect(
+      restarted.keys,
+      hasLength(1),
+      reason: 'signing keys must survive the process',
+    );
 
     // And the pass still verifies, which is the only thing that matters.
     final d = await restarted.handle(legId, raw: tokenFor(passId));
@@ -328,8 +338,11 @@ void main() {
 
   test('a timeout reopens from cache just like an unreachable host', () async {
     final restarted = Repository(db: db, api: api, deviceId: 'test-device');
-    api.bootstrapError =
-        ApiException(408, 'timeout', "The network didn't answer.");
+    api.bootstrapError = ApiException(
+      408,
+      'timeout',
+      "The network didn't answer.",
+    );
     await restarted.openLeg(legId);
     expect(restarted.keys, hasLength(1));
   });
@@ -357,13 +370,15 @@ void main() {
     expect(restarted.keys, isEmpty);
   });
 
-  test('re-bootstrapping replaces the stored keys rather than piling up',
-      () async {
-    await repo.openLeg(legId);
-    await repo.openLeg(legId);
-    final rows = await db.select(db.signingKeys).get();
-    expect(rows, hasLength(1));
-  });
+  test(
+    're-bootstrapping replaces the stored keys rather than piling up',
+    () async {
+      await repo.openLeg(legId);
+      await repo.openLeg(legId);
+      final rows = await db.select(db.signingKeys).get();
+      expect(rows, hasLength(1));
+    },
+  );
 
   // ---- the list that gets you to the gate --------------------------------
   //
@@ -378,11 +393,17 @@ void main() {
 
     api.assignmentsError = ApiException(0, 'unreachable', 'no route to host');
     final second = await repo.assignments();
-    expect(second.fromCache, isTrue,
-        reason: 'the screen must be able to say it is showing a copy');
+    expect(
+      second.fromCache,
+      isTrue,
+      reason: 'the screen must be able to say it is showing a copy',
+    );
     expect((second.rows.single as Map)['leg_name'], 'Reception');
-    expect((second.rows.single as Map)['guest_count'], 9,
-        reason: 'every field the screen renders survives the round trip');
+    expect(
+      (second.rows.single as Map)['guest_count'],
+      9,
+      reason: 'every field the screen renders survives the round trip',
+    );
   });
 
   test('an usher who has never been online sees the failure', () async {
@@ -391,8 +412,7 @@ void main() {
     final cold = Repository(db: fresh, api: api, deviceId: 'test-device');
     api.assignmentsError = ApiException(408, 'timeout', 'no answer');
 
-    await expectLater(
-        () => cold.assignments(), throwsA(isA<ApiException>()));
+    await expectLater(() => cold.assignments(), throwsA(isA<ApiException>()));
   });
 
   test('a refused assignments call is not served from cache', () async {
@@ -424,8 +444,7 @@ void main() {
     expect((offline.rows.single as Map)['leg_id'], 'other-leg');
   });
 
-  test('the whole offline journey: list, then gate, after a restart',
-      () async {
+  test('the whole offline journey: list, then gate, after a restart', () async {
     // Online once.
     await repo.assignments();
 
@@ -470,23 +489,30 @@ void main() {
     await restarted.openLeg(legId);
 
     final d = await restarted.handle(legId, raw: tokenFor(passId));
-    expect(d.decision.outcome, Outcome.eventCancelled,
-        reason: 'a cached leg must not forget the event was called off');
+    expect(
+      d.decision.outcome,
+      Outcome.eventCancelled,
+      reason: 'a cached leg must not forget the event was called off',
+    );
   });
 
   test('reinstating the event lets the gate work again', () async {
     api.bootstrapPayload = bootstrapFor([adeyemi(passId)])
       ..['event']['cancelled'] = true;
     await repo.openLeg(legId);
-    expect((await repo.handle(legId, raw: tokenFor(passId))).decision.outcome,
-        Outcome.eventCancelled);
+    expect(
+      (await repo.handle(legId, raw: tokenFor(passId))).decision.outcome,
+      Outcome.eventCancelled,
+    );
 
     // Nothing was reissued, so the same token works the moment the
     // organiser sets the event back to active and the phone re-bootstraps.
     api.bootstrapPayload = bootstrapFor([adeyemi(passId)]);
     await repo.openLeg(legId);
-    expect((await repo.handle(legId, raw: tokenFor(passId))).decision.outcome,
-        isNot(Outcome.eventCancelled));
+    expect(
+      (await repo.handle(legId, raw: tokenFor(passId))).decision.outcome,
+      isNot(Outcome.eventCancelled),
+    );
   });
 
   test('a payload without the flag is treated as not cancelled', () async {
@@ -504,8 +530,12 @@ void main() {
 
   test('a walk-in is admitted, queued, and findable offline', () async {
     api.bootstrapError = ApiException(0, 'unreachable', 'no signal');
-    final rec = await repo.addWalkIn(legId,
-        displayName: 'Aunty Nkechi', count: 3, entranceId: 'e1');
+    final rec = await repo.addWalkIn(
+      legId,
+      displayName: 'Aunty Nkechi',
+      count: 3,
+      entranceId: 'e1',
+    );
 
     expect(rec.decision.admittedCount, 3);
     expect(rec.clientUuid, isNotNull);
@@ -524,7 +554,11 @@ void main() {
 
   test('a walk-in can be scanned back in after stepping out', () async {
     // The reason they get a local pass rather than a bare queue row.
-    final rec = await repo.addWalkIn(legId, displayName: 'Late Cousin', count: 2);
+    final rec = await repo.addWalkIn(
+      legId,
+      displayName: 'Late Cousin',
+      count: 2,
+    );
     final passId = rec.decision.invitation!.passId;
 
     final again = await repo.handle(legId, manualPassId: passId);
@@ -575,9 +609,9 @@ void main() {
     // The walk-in went up its own route, so the batch carried only the scan.
     expect(api.submitted.single, hasLength(1));
 
-    final left = await (db.select(db.pendingScans)
-          ..where((p) => p.synced.equals(false)))
-        .get();
+    final left = await (db.select(
+      db.pendingScans,
+    )..where((p) => p.synced.equals(false))).get();
     expect(left, isEmpty);
   });
 
@@ -585,7 +619,11 @@ void main() {
     // The organiser turned walk-ins off after it was queued. Retrying every
     // twelve seconds for the rest of the evening helps nobody.
     await repo.addWalkIn(legId, displayName: 'Aunty Nkechi', count: 3);
-    api.walkInError = ApiException(403, 'forbidden', 'You cannot add walk-ins.');
+    api.walkInError = ApiException(
+      403,
+      'forbidden',
+      'You cannot add walk-ins.',
+    );
 
     await repo.sync();
     final row = await db.select(db.pendingScans).getSingle();
@@ -646,7 +684,10 @@ void main() {
 
     final queued = await db.select(db.pendingScans).get();
     expect(queued, hasLength(2));
-    expect(queued.where((q) => q.result == 'reversal').single.admittedCount, -2);
+    expect(
+      queued.where((q) => q.result == 'reversal').single.admittedCount,
+      -2,
+    );
   });
 
   test('a refusal offers no undo', () async {
@@ -657,22 +698,28 @@ void main() {
     expect(row.canUndo, isFalse);
   });
 
-  test('reversals are shown through the row they undo, not as their own', () async {
-    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
-    await repo.undo((await repo.recent(legId)).single.clientUuid);
+  test(
+    'reversals are shown through the row they undo, not as their own',
+    () async {
+      await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+      await repo.undo((await repo.recent(legId)).single.clientUuid);
 
-    final rows = await repo.recent(legId);
-    expect(rows, hasLength(1), reason: 'a reversal is not a second event');
-    expect(rows.single.reversed, isTrue);
-  });
+      final rows = await repo.recent(legId);
+      expect(rows, hasLength(1), reason: 'a reversal is not a second event');
+      expect(rows.single.reversed, isTrue);
+    },
+  );
 
-  test('recent carries the sync state, so an usher knows what is queued', () async {
-    await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
-    expect((await repo.recent(legId)).single.synced, isFalse);
+  test(
+    'recent carries the sync state, so an usher knows what is queued',
+    () async {
+      await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
+      expect((await repo.recent(legId)).single.synced, isFalse);
 
-    await repo.sync();
-    expect((await repo.recent(legId)).single.synced, isTrue);
-  });
+      await repo.sync();
+      expect((await repo.recent(legId)).single.synced, isTrue);
+    },
+  );
 
   test('recent is scoped to this leg', () async {
     await repo.handle(legId, raw: tokenFor(passId), requestedCount: 2);
@@ -694,8 +741,11 @@ void main() {
     expect(repo.keys, isEmpty);
     expect(await repo.pendingCount(), 0);
     expect(await repo.recent(legId), isEmpty);
-    expect(await repo.find(passId, legId), isNull,
-        reason: 'the household list must not outlive the session');
+    expect(
+      await repo.find(passId, legId),
+      isNull,
+      reason: 'the household list must not outlive the session',
+    );
     expect(await repo.meta(legId), isNull);
 
     // And the cached assignment list, which is what would otherwise show

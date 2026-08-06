@@ -14,16 +14,15 @@ Future<void> showRecentSheet(
   BuildContext context,
   Repository repo,
   String legId,
-) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Palette.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (_) => _RecentSheet(repo: repo, legId: legId),
-    );
+) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  backgroundColor: Palette.surface,
+  shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+  ),
+  builder: (_) => _RecentSheet(repo: repo, legId: legId),
+);
 
 class _RecentSheet extends StatefulWidget {
   final Repository repo;
@@ -63,36 +62,47 @@ class _RecentSheetState extends State<_RecentSheet> {
       height: MediaQuery.of(context).size.height * 0.75,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('RECENT',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'RECENT',
               style: TextStyle(
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w600,
-                  color: Palette.muted)),
-          const SizedBox(height: 4),
-          const Text('From this phone, at this gate.',
-              style: TextStyle(fontSize: 12.5, color: Palette.muted)),
-          const SizedBox(height: 12),
-          Expanded(
-            child: rows == null
-                ? const Center(child: CircularProgressIndicator())
-                : rows.isEmpty
-                    ? const Center(
-                        child: Text('Nothing yet.',
-                            style: TextStyle(color: Palette.muted)))
-                    : ListView.separated(
-                        itemCount: rows.length,
-                        separatorBuilder: (_, _) =>
-                            const Divider(color: Palette.line, height: 1),
-                        itemBuilder: (_, i) => _Row(
-                          entry: rows[i],
-                          busy: _busy == rows[i].clientUuid,
-                          onUndo: () => _undo(rows[i]),
-                        ),
+                fontSize: 12,
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w600,
+                color: Palette.muted,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'From this phone, at this gate.',
+              style: TextStyle(fontSize: 12.5, color: Palette.muted),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: rows == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : rows.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Nothing yet.',
+                        style: TextStyle(color: Palette.muted),
                       ),
-          ),
-        ]),
+                    )
+                  : ListView.separated(
+                      itemCount: rows.length,
+                      separatorBuilder: (_, _) =>
+                          const Divider(color: Palette.line, height: 1),
+                      itemBuilder: (_, i) => _Row(
+                        entry: rows[i],
+                        busy: _busy == rows[i].clientUuid,
+                        onUndo: () => _undo(rows[i]),
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -129,51 +139,59 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry.displayName,
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w500,
-                    decoration:
-                        entry.reversed ? TextDecoration.lineThrough : null,
-                    color: entry.reversed ? Palette.muted : Palette.text,
-                  ),
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entry.displayName,
+                style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w500,
+                  decoration: entry.reversed
+                      ? TextDecoration.lineThrough
+                      : null,
+                  color: entry.reversed ? Palette.muted : Palette.text,
                 ),
-                const SizedBox(height: 3),
-                Row(children: [
-                  Text('$_when · ',
-                      style: const TextStyle(
-                          fontSize: 12.5, color: Palette.muted)),
-                  Text(_what,
-                      style: TextStyle(fontSize: 12.5, color: _tone)),
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Text(
+                    '$_when · ',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: Palette.muted,
+                    ),
+                  ),
+                  Text(_what, style: TextStyle(fontSize: 12.5, color: _tone)),
                   if (!entry.synced)
-                    const Text(' · waiting to sync',
-                        style:
-                            TextStyle(fontSize: 12.5, color: Palette.hold)),
+                    const Text(
+                      ' · waiting to sync',
+                      style: TextStyle(fontSize: 12.5, color: Palette.hold),
+                    ),
                   if (entry.contested)
-                    const Text(' · flagged',
-                        style:
-                            TextStyle(fontSize: 12.5, color: Palette.hold)),
-                ]),
-              ],
-            ),
+                    const Text(
+                      ' · flagged',
+                      style: TextStyle(fontSize: 12.5, color: Palette.hold),
+                    ),
+                ],
+              ),
+            ],
           ),
-          if (busy)
-            const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2))
-          else if (entry.canUndo)
-            TextButton(
-              onPressed: onUndo,
-              child: const Text('Undo'),
-            ),
-        ]),
-      );
+        ),
+        if (busy)
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else if (entry.canUndo)
+          TextButton(onPressed: onUndo, child: const Text('Undo')),
+      ],
+    ),
+  );
 }

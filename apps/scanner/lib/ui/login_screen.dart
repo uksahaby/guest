@@ -85,28 +85,28 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _acceptInvite() => _run(() async {
-        final token = extractInviteToken(_invite.text);
-        if (token.length < 20) {
-          setState(() => _error = "That doesn't look like a sign-in link.");
-          return;
-        }
-        await widget.api.acceptInvite(token);
-        await _remember();
-      });
+    final token = extractInviteToken(_invite.text);
+    if (token.length < 20) {
+      setState(() => _error = "That doesn't look like a sign-in link.");
+      return;
+    }
+    await widget.api.acceptInvite(token);
+    await _remember();
+  });
 
   Future<void> _request() => _run(() async {
-        final res = await widget.api.requestOtp(_phone.text.trim());
-        setState(() {
-          _codeSent = true;
-          // Dev servers return the code so the flow is testable end to end.
-          _devCode = res['dev_code'] as String?;
-        });
-      });
+    final res = await widget.api.requestOtp(_phone.text.trim());
+    setState(() {
+      _codeSent = true;
+      // Dev servers return the code so the flow is testable end to end.
+      _devCode = res['dev_code'] as String?;
+    });
+  });
 
   Future<void> _verify() => _run(() async {
-        await widget.api.verifyOtp(_phone.text.trim(), _code.text.trim());
-        await _remember();
-      });
+    await widget.api.verifyOtp(_phone.text.trim(), _code.text.trim());
+    await _remember();
+  });
 
   @override
   void dispose() {
@@ -126,11 +126,14 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 48),
-              const Text('Sign in to check guests in',
-                  style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -.5)),
+              const Text(
+                'Sign in to check guests in',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -.5,
+                ),
+              ),
               const SizedBox(height: 8),
               Text(
                 _subtitle(),
@@ -140,8 +143,10 @@ class _LoginScreenState extends State<LoginScreen> {
               ..._fields(),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!,
-                    style: const TextStyle(color: Palette.deny, fontSize: 13.5)),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: Palette.deny, fontSize: 13.5),
+                ),
               ],
               const SizedBox(height: 20),
               SizedBox(
@@ -152,29 +157,36 @@ class _LoginScreenState extends State<LoginScreen> {
                     foregroundColor: Palette.ground,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13)),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
                   ),
                   onPressed: _busy ? null : _primaryAction,
-                  child: Text(_primaryLabel(),
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    _primaryLabel(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
               if (_bySms && _codeSent)
                 TextButton(
                   onPressed: _busy ? null : _request,
-                  child: const Text('Resend code',
-                      style: TextStyle(color: Palette.muted)),
+                  child: const Text(
+                    'Resend code',
+                    style: TextStyle(color: Palette.muted),
+                  ),
                 ),
               const SizedBox(height: 6),
               TextButton(
                 onPressed: _busy
                     ? null
                     : () => setState(() {
-                          _bySms = !_bySms;
-                          _codeSent = false;
-                          _error = null;
-                        }),
+                        _bySms = !_bySms;
+                        _codeSent = false;
+                        _error = null;
+                      }),
                 child: Text(
                   _bySms
                       ? 'I have a sign-in link instead'
@@ -197,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return _codeSent
         ? 'Enter the six-digit code we sent to ${_phone.text}.'
         : 'Your phone number is your login. Only works if the organiser '
-            'set up text messages.';
+              'set up text messages.';
   }
 
   String _primaryLabel() {

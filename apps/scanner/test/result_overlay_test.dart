@@ -48,24 +48,28 @@ class _HarnessState extends State<_Harness> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        home: Scaffold(
-          body: ResultOverlay(
-            decision: _current,
-            onClose: widget.onClose,
-            onAdmitCount: (_) => setState(() => _current = _admitted),
-          ),
-        ),
-      );
+    home: Scaffold(
+      body: ResultOverlay(
+        decision: _current,
+        onClose: widget.onClose,
+        onAdmitCount: (_) => setState(() => _current = _admitted),
+      ),
+    ),
+  );
 }
 
 void main() {
-  testWidgets('admitting from the count picker returns to the camera',
-      (tester) async {
+  testWidgets('admitting from the count picker returns to the camera', (
+    tester,
+  ) async {
     var closed = false;
     await tester.pumpWidget(_Harness(onClose: () => closed = true));
 
-    expect(find.text('Admit 3'), findsOneWidget,
-        reason: 'the picker defaults to the full remaining count');
+    expect(
+      find.text('Admit 3'),
+      findsOneWidget,
+      reason: 'the picker defaults to the full remaining count',
+    );
 
     await tester.tap(find.text('Admit 3'));
     await tester.pump();
@@ -74,47 +78,58 @@ void main() {
     expect(closed, isFalse, reason: 'not instantly — the usher reads the name');
 
     await tester.pump(const Duration(milliseconds: 1600));
-    expect(closed, isTrue,
-        reason: 'the admitted result must hand the gate back on its own');
+    expect(
+      closed,
+      isTrue,
+      reason: 'the admitted result must hand the gate back on its own',
+    );
   });
 
   testWidgets('a plain admitted result still auto-returns', (tester) async {
     var closed = false;
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: ResultOverlay(
-          decision: _admitted,
-          onClose: () => closed = true,
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ResultOverlay(
+            decision: _admitted,
+            onClose: () => closed = true,
+          ),
         ),
       ),
-    ));
+    );
 
     await tester.pump(const Duration(milliseconds: 1600));
     expect(closed, isTrue);
   });
 
-  testWidgets('a refusal waits for a human and never times out',
-      (tester) async {
+  testWidgets('a refusal waits for a human and never times out', (
+    tester,
+  ) async {
     var closed = false;
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: ResultOverlay(
-          decision: const Decision(
-            outcome: Outcome.revoked,
-            tone: Tone.deny,
-            admittedCount: 0,
-            headline: 'Pass revoked',
-            log: true,
-            autoReturnMs: null,
-            actions: ['Dismiss'],
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ResultOverlay(
+            decision: const Decision(
+              outcome: Outcome.revoked,
+              tone: Tone.deny,
+              admittedCount: 0,
+              headline: 'Pass revoked',
+              log: true,
+              autoReturnMs: null,
+              actions: ['Dismiss'],
+            ),
+            onClose: () => closed = true,
           ),
-          onClose: () => closed = true,
         ),
       ),
-    ));
+    );
 
     await tester.pump(const Duration(seconds: 10));
-    expect(closed, isFalse,
-        reason: 'a refusal means a conversation is happening at the gate');
+    expect(
+      closed,
+      isFalse,
+      reason: 'a refusal means a conversation is happening at the gate',
+    );
   });
 }

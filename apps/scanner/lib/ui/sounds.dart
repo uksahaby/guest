@@ -130,7 +130,9 @@ void gateHaptic(Tone tone) {
     case Tone.hold:
       HapticFeedback.mediumImpact();
       Future.delayed(
-          const Duration(milliseconds: 120), HapticFeedback.mediumImpact);
+        const Duration(milliseconds: 120),
+        HapticFeedback.mediumImpact,
+      );
     case Tone.deny:
       HapticFeedback.vibrate();
   }
