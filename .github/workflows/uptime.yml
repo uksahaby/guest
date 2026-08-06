@@ -12,8 +12,13 @@ name: Uptime
 #
 # Set the repository variable API_HEALTH_URL (Settings → Secrets and
 # variables → Actions → Variables) to
-# https://your-api.onrender.com/health. Without it this exits quietly
-# rather than failing every ten minutes and training everyone to ignore it.
+# https://guest-r41s.onrender.com/health — the real deployed API, verified
+# answering {"ok":true} on 6 August. Without it this exits quietly rather
+# than failing every ten minutes and training everyone to ignore it.
+#
+# The URL is a variable and not a default in this file because it belongs
+# to one deployment: a fork or a second environment should watch its own
+# box, and hardcoding this one would have it watching somebody else's.
 #
 # Optional: secret UPTIME_WEBHOOK_URL, the same Slack/Discord/ntfy webhook
 # the API uses for errors. Without it a failure still reaches you — GitHub

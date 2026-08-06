@@ -30,10 +30,21 @@ the first deploy that was not a container. Moving `tsx` back to
 `devDependencies` breaks startup with `tsx: not found`, and no test
 catches it, because every test runs somewhere dev dependencies exist.
 
-Nothing here has been run against a real host yet. What *has* been checked
-is that the API boots under `NODE_ENV=production` with the full env below,
-binds every interface, answers `/health`, logs JSON with phone numbers
-redacted, and hides the dev-only routes.
+**Where it actually lives.** This was written before there was a
+deployment and said so for weeks; the URL then existed only in a browser
+tab, which is no use to whoever reads this next.
+
+| | |
+|---|---|
+| API | `https://guest-r41s.onrender.com` |
+| Health | `https://guest-r41s.onrender.com/health` |
+| Repo | `github.com/uksahaby/guest` — **public**, so nothing secret goes in it |
+
+Checked from outside on 6 August: `/health` → `{"ok":true}`, a bad guest
+token → 404 `No such invitation.`, scanner without a JWT → 401. The API
+also boots under `NODE_ENV=production` with the full env below, binds
+every interface, logs JSON with phone numbers redacted, and hides the
+dev-only routes.
 
 **No messaging provider is required.** Organisers sign up with a phone
 number and a password; ushers arrive by an invite link sent over WhatsApp.
@@ -348,8 +359,12 @@ would take any watcher hosted on Render down with it.
 
 **To switch it on:** repository **Settings → Secrets and variables →
 Actions → Variables**, add `API_HEALTH_URL` =
-`https://your-api.onrender.com/health`. Unset, the workflow exits quietly
+`https://guest-r41s.onrender.com/health`. Unset, the workflow exits quietly
 rather than failing every ten minutes and teaching everyone to ignore it.
+Worth confirming it is actually set: the failure mode is silence, so a
+workflow that has never watched anything looks exactly like one where
+nothing has gone wrong. Check a recent run's summary — an unset variable
+says so in as many words.
 
 Optionally add the secret `UPTIME_WEBHOOK_URL` — the same webhook the API
 uses for errors. Without it a failure still reaches you: GitHub emails the
