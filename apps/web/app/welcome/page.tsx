@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { api, requireToken } from "@/lib/org-api";
 import { saveName } from "./actions";
 import "../(app)/org.css";
+import { Brand } from "@/app/brand";
 
 /**
  * The one question onboarding asks. Sign-in is phone-only, so without this
@@ -27,9 +28,7 @@ export default async function WelcomePage({
   return (
     <div className="org-root login-wrap">
       <div className="login-card">
-        <div className="brand">
-          Working name<span className="brand-dot">·</span>gtfd.ng
-        </div>
+        <div className="brand"><Brand tone="light" size="sm" /></div>
         <h1>What should we call you?</h1>
         <p className="sub">
           Your name appears on your events and to the ushers working your

@@ -1,5 +1,6 @@
 import { acceptInvite } from "./actions";
 import "../../(app)/org.css";
+import { Brand } from "@/app/brand";
 
 /**
  * The usher's whole sign-up: tap a link, tap a button, you're on the gate.
@@ -21,9 +22,7 @@ export default async function JoinPage({
   return (
     <div className="org-root login-wrap">
       <div className="login-card">
-        <div className="brand">
-          Working name<span className="brand-dot">·</span>gtfd.ng
-        </div>
+        <div className="brand"><Brand tone="light" size="sm" /></div>
         <h1>You&rsquo;ve been added to a gate</h1>
         <p className="sub">
           Tap below to start checking guests in. Nothing to install and no

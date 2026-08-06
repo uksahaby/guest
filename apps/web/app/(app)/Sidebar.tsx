@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { Brand } from "@/app/brand";
 
 /**
  * The organiser's navigation.
@@ -88,11 +89,7 @@ export function Sidebar({
   return (
     <aside className="side">
       <Link href="/dashboard" className="brand">
-        <span className="brand-mark" aria-hidden="true">GT</span>
-        <span>
-          <strong>gtfd.ng</strong>
-          <small>Events, handled</small>
-        </span>
+        <Brand tone="dark" size="sm" />
       </Link>
 
       <nav className="nav">

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { recoverAccount } from "./actions";
 import "../(app)/org.css";
+import { Brand } from "@/app/brand";
 
 /**
  * Forgotten password. No text message, no email — the recovery code given
@@ -18,9 +19,7 @@ export default async function RecoverPage({
   return (
     <div className="org-root login-wrap">
       <div className="login-card">
-        <div className="brand">
-          Working name<span className="brand-dot">·</span>gtfd.ng
-        </div>
+        <div className="brand"><Brand tone="light" size="sm" /></div>
         <h1>Forgotten your password</h1>
         <p className="sub">
           Enter the recovery code you were given when you created your

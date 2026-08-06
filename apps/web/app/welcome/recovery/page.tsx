@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireToken } from "@/lib/org-api";
 import "../../(app)/org.css";
+import { Brand } from "@/app/brand";
 
 /**
  * The recovery code, shown exactly once.
@@ -23,9 +24,7 @@ export default async function RecoveryPage() {
   return (
     <div className="org-root login-wrap">
       <div className="login-card">
-        <div className="brand">
-          Working name<span className="brand-dot">·</span>gtfd.ng
-        </div>
+        <div className="brand"><Brand tone="light" size="sm" /></div>
         <h1>Write this down</h1>
         <p className="sub">
           If you forget your password, this code is the only way back into

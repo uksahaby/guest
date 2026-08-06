@@ -3675,3 +3675,13 @@ select.field {
   .planrow { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .plangrid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* The one link into the platform surface, for the two or three people who
+   have it. Set apart from the account links below it because it goes
+   somewhere categorically different. */
+.profile-menu .admin-jump {
+  color: var(--p600);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+
