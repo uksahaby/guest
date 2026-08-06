@@ -86,6 +86,7 @@
   font-weight: 600;
   letter-spacing: -0.01em;
 }
+
 .mkt .nav .sp {
   flex: 1;
 }
@@ -798,4 +799,471 @@
 }
 .mkt .newstrip b {
   color: var(--forest);
+}
+
+/* ================= the landing hero, to the mockup =================
+   A light hero on the page colour, product shot to the right, feature
+   strip riding the seam below it. The old dark-green hero is gone; the
+   green now belongs to the sidebar in the shot, which is where a visitor
+   will next see it. */
+
+.mkt .nav .wrap { max-width: 1220px; }
+.mkt .btn.ghost-g {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.mkt .btn.ghost-g:hover { border-color: var(--forest); color: var(--forest); }
+
+.mkt .hero2 {
+  position: relative;
+  overflow: hidden;
+  padding: 56px 0 0;
+  background:
+    radial-gradient(120% 90% at 88% 0%, #eef4ea 0%, transparent 55%),
+    var(--page);
+}
+
+.mkt .hero2-grid {
+  max-width: 1220px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+  gap: 42px;
+  align-items: center;
+  padding-bottom: 84px;
+}
+
+.mkt .hero2-copy { min-width: 0; }
+
+.mkt .pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px 6px 10px;
+  border-radius: 999px;
+  background: var(--p100);
+  color: var(--forest);
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 22px;
+}
+
+.mkt .pill-badge svg { width: 14px; height: 14px; color: var(--gold); }
+
+.mkt .hero2-h1 {
+  /* Sized to keep "Plan. Manage. Perfect" on one line in this column, as
+     the mockup has it — at 62px it broke after "Manage." */
+  font-size: clamp(34px, 4.1vw, 53px);
+  line-height: 1.04;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  margin-bottom: 20px;
+}
+
+/* "Every Event." on its own line, in green, with the mockup's swoosh. */
+.mkt .hero2-accent {
+  display: block;
+  position: relative;
+  color: var(--p600);
+  width: max-content;
+  max-width: 100%;
+}
+
+.mkt .swoosh {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.16em;
+  width: 100%;
+  height: 0.24em;
+  overflow: visible;
+}
+
+.mkt .swoosh path {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.85;
+}
+
+.mkt .hero2 .lead {
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  max-width: 46ch;
+  margin-bottom: 26px;
+}
+
+.mkt .hero2 .cta { display: flex; gap: 11px; flex-wrap: wrap; }
+
+.mkt .hero2 .btn.lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 22px;
+  font-size: 14.5px;
+}
+
+.mkt .hero2 .btn.lg svg { width: 17px; height: 17px; }
+
+.mkt .btn.outline {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.mkt .btn.outline:hover { border-color: var(--forest); color: var(--forest); }
+
+/* Where the mockup puts invented customer counts and star ratings. */
+.mkt .hero2-proof {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 28px;
+}
+
+.mkt .hero2-proof li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.mkt .hero2-proof svg { width: 15px; height: 15px; color: var(--p600); flex: 0 0 auto; }
+
+/* ---------- the product shot ---------- */
+
+.mkt .shot { position: relative; min-width: 0; }
+
+.mkt .shot-app {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: 0 30px 60px -28px rgba(20, 48, 15, 0.35), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.mkt .shot-side {
+  background: var(--forest);
+  padding: 12px 10px;
+  color: #dbe7d4;
+}
+
+.mkt .shot-brandrow { display: flex; align-items: center; gap: 7px; padding: 2px 4px 12px; }
+
+.mkt .shot-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid rgba(216, 180, 95, 0.6);
+  color: #d8b45f;
+  font-size: 7.5px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.mkt .shot-wordmark { font-size: 14px; color: #f6f1e4; font-weight: 500; }
+
+.mkt .shot-nav {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 9px;
+  color: rgba(219, 231, 212, 0.72);
+  white-space: nowrap;
+}
+
+.mkt .shot-nav.on { background: rgba(255, 255, 255, 0.13); color: #fff; font-weight: 600; }
+
+.mkt .shot-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  border: 1.2px solid currentColor;
+  opacity: 0.5;
+  flex: 0 0 auto;
+}
+
+.mkt .shot-main { padding: 13px 14px; min-width: 0; }
+
+.mkt .shot-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mkt .shot-top strong { display: block; font-size: 13px; }
+.mkt .shot-top small { display: block; font-size: 8.5px; color: var(--ink-3); margin-top: 2px; }
+
+.mkt .shot-me { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.mkt .shot-me b { display: block; font-size: 8.5px; }
+.mkt .shot-me i { display: block; font-size: 7.5px; color: var(--ink-3); font-style: normal; }
+
+.mkt .shot-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--p100);
+  color: var(--forest);
+  font-size: 8px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.mkt .shot-avatar.sm { width: 18px; height: 18px; font-size: 7px; }
+
+.mkt .shot-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 9px;
+}
+
+.mkt .shot-stat {
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  padding: 8px 9px;
+  min-width: 0;
+}
+
+.mkt .shot-stat small { display: block; font-size: 7.5px; color: var(--ink-3); }
+.mkt .shot-stat b { display: block; font-size: 17px; letter-spacing: -0.4px; margin: 1px 0; }
+.mkt .shot-stat i { display: block; font-size: 7px; color: var(--p600); font-style: normal; }
+
+.mkt .shot-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.mkt .shot-chart,
+.mkt .shot-feed {
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  padding: 9px 10px;
+  min-width: 0;
+}
+
+.mkt .shot-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mkt .shot-chart-head strong,
+.mkt .shot-feed > strong { font-size: 9.5px; }
+
+.mkt .shot-chip {
+  font-size: 7px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.mkt .shot-svg { display: block; width: 100%; height: 62px; }
+.mkt .shot-area { fill: rgba(47, 107, 28, 0.13); }
+
+.mkt .shot-line {
+  fill: none;
+  stroke: var(--p600);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.mkt .shot-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 6.5px;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+
+.mkt .shot-feed > strong { display: block; margin-bottom: 6px; }
+
+.mkt .shot-arrival {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3.5px 0;
+}
+
+.mkt .shot-arrival > span:nth-child(2) { flex: 1; min-width: 0; }
+.mkt .shot-arrival b { display: block; font-size: 8px; }
+
+.mkt .shot-arrival i {
+  display: block;
+  font-size: 7px;
+  color: var(--ink-3);
+  font-style: normal;
+}
+
+.mkt .shot-tick { width: 11px; height: 11px; color: var(--p600); flex: 0 0 auto; }
+
+/* ---------- the phone, overlapping ---------- */
+
+.mkt .shot-phone {
+  position: absolute;
+  left: -30px;
+  bottom: -34px;
+  width: 132px;
+  border-radius: 18px;
+  padding: 5px;
+  background: #101510;
+  box-shadow: 0 22px 42px -16px rgba(16, 21, 16, 0.5);
+}
+
+.mkt .shot-phone-in { background: #fff; border-radius: 14px; overflow: hidden; }
+
+.mkt .shot-phone-bar {
+  background: var(--forest);
+  color: #eaf3e4;
+  font-size: 7.5px;
+  padding: 7px 9px 6px;
+  text-align: center;
+}
+
+.mkt .shot-pass { padding: 9px 9px 11px; text-align: center; }
+.mkt .shot-pass small { display: block; font-size: 7px; color: var(--ink-3); }
+
+.mkt .shot-pass b.serif {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.mkt .shot-qr {
+  display: block;
+  width: 74px;
+  margin: 0 auto 7px;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.mkt .shot-qr svg { display: block; width: 100%; height: auto; fill: #101510; }
+.mkt .shot-pass > b:not(.serif) { display: block; font-size: 8.5px; }
+
+.mkt .shot-badge {
+  display: inline-block;
+  margin-top: 7px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--p100);
+  color: var(--forest);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---------- the feature strip ---------- */
+
+/* Rides up into the hero, so it needs to sit ABOVE it: the hero paints a
+   gradient background, which was covering the top of these cards and
+   slicing the icons in half. */
+.mkt .featstrip {
+  padding: 0 0 12px;
+  margin-top: -46px;
+  position: relative;
+  z-index: 2;
+}
+.mkt .featstrip .wrap { max-width: 1220px; }
+
+.mkt .featgrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px -22px rgba(20, 48, 15, 0.28);
+}
+
+.mkt .featcard {
+  padding: 22px 18px 24px;
+  border-right: 1px solid var(--line-soft);
+  min-width: 0;
+}
+
+.mkt .featcard:last-child { border-right: 0; }
+
+.mkt .featicon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--p50);
+  color: var(--p600);
+  margin-bottom: 12px;
+}
+
+.mkt .featicon svg { width: 17px; height: 17px; }
+
+.mkt .featcard strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.mkt .featcard p { font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+
+@media (max-width: 1120px) {
+  .mkt .hero2-grid { grid-template-columns: minmax(0, 1fr); gap: 34px; }
+  .mkt .hero2 .lead { max-width: none; }
+  .mkt .shot-phone { left: auto; right: -18px; bottom: -28px; }
+  .mkt .featgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mkt .featcard:nth-child(3n) { border-right: 0; }
+  .mkt .featcard:nth-child(-n + 3) { border-bottom: 1px solid var(--line-soft); }
+  .mkt .featstrip { margin-top: 0; padding-top: 8px; }
+}
+
+@media (max-width: 760px) {
+  .mkt .hero2 { padding-top: 34px; }
+  .mkt .hero2-grid { padding-bottom: 56px; }
+  .mkt .shot-app { grid-template-columns: 104px minmax(0, 1fr); }
+  .mkt .shot-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mkt .shot-lower { grid-template-columns: minmax(0, 1fr); }
+  .mkt .shot-phone { display: none; }
+  .mkt .featgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mkt .featcard:nth-child(2n) { border-right: 0; }
+  .mkt .featcard { border-bottom: 1px solid var(--line-soft); }
+  .mkt .featcard:nth-last-child(-n + 2) { border-bottom: 0; }
+}
+
+/* At 375px the nav is brand + Log in + Get started free, and "Log in" was
+   breaking across two lines. Nothing in a nav should ever wrap. */
+.mkt .nav .lnk,
+.mkt .nav .btn { white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .mkt .nav .wrap { gap: 10px; }
+  .mkt .nav .btn.pri { padding: 9px 13px; font-size: 13px; }
+  /* The tagline is the first thing to go when the row is tight. */
+  .mkt .nav .brandmark-words small { display: none; }
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import "./marketing.css";
+import { Brand } from "@/app/brand";
 
 /**
  * The marketing homepage — ported from design/mockups/public-website.html.
@@ -28,56 +29,387 @@ export const metadata: Metadata = {
     "Send your invitations on WhatsApp, let each family reply, and check every guest in at the gate with a scan. For Nigerian weddings and everything larger.",
 };
 
+
+/**
+ * The six cards under the hero. Every one is a thing this product already
+ * does — the mockup's six happen to describe it accurately, which is why
+ * they are here unchanged rather than trimmed.
+ */
+const FEATURES = [
+  {
+    title: "Guest management",
+    body: "One row per household, not per person. Import a spreadsheet and keep the numbers straight.",
+    icon: "M16 20v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6M21 20v-1a4 4 0 0 0-3-3.9",
+  },
+  {
+    title: "Invitations on WhatsApp",
+    body: "Each family gets their own link, replies on it, and keeps their pass in the same chat.",
+    icon: "M3 6h18v12H3zM3 7l9 6 9-6",
+  },
+  {
+    title: "QR passes & check-in",
+    body: "One pass per household, scanned at the gate — and it verifies with no signal at all.",
+    icon: "M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4M9 9h2v2H9zM13 13h2v2h-2z",
+  },
+  {
+    title: "Tables & seating",
+    body: "Lay out the room, seat households, and see who is still unseated before the day.",
+    icon: "M3 10h18M6 10v10M18 10v10M8 6h8v4H8z",
+  },
+  {
+    title: "Reports afterwards",
+    body: "Who came, who did not, when they arrived and what happened at every gate.",
+    icon: "M5 20V10m7 10V4m7 16v-7",
+  },
+  {
+    title: "Built to be private",
+    body: "Row-level security in the database, so one couple's guest list can never reach another.",
+    icon: "M12 3l8 3v6c0 5-3.4 8.3-8 9-4.6-.7-8-4-8-9V6z",
+  },
+];
+
+/**
+ * The product shot from the mockup, built rather than screenshotted: a
+ * still of the dashboard beside the pass a guest holds.
+ *
+ * Markup and CSS, not an image, for three reasons. It stays sharp on any
+ * screen, it costs a few kilobytes instead of a few hundred, and a
+ * screenshot goes stale the first time the dashboard changes while this
+ * cannot. The figures are illustrative — a product shot with sample data,
+ * which is what the mockup shows.
+ *
+ * aria-hidden throughout: it is a picture of software, and reading its
+ * numbers aloud tells a screen reader user nothing the hero has not
+ * already said in words.
+ */
+function ProductShot() {
+  // The half-hour arrival curve the check-in screen actually draws, shaped
+  // the way a real reception goes: a trickle, a rush after the ceremony,
+  // then a long tail.
+  const curve = [
+    3, 4, 6, 5, 9, 14, 12, 18, 26, 34, 30, 44, 58, 52, 71, 88, 79, 96, 84,
+    68, 55, 47, 38, 31, 26, 21, 17, 14, 11, 8, 6, 4,
+  ];
+  const W = 320;
+  const H = 96;
+  const max = Math.max(...curve);
+  const pts = curve.map((v, i) => [
+    (i / (curve.length - 1)) * W,
+    H - (v / max) * (H - 8) - 2,
+  ]);
+  const line = pts.map(([x, y]) => `${x!.toFixed(1)},${y!.toFixed(1)}`).join(" ");
+  const area =
+    `M0,${H} ` +
+    pts.map(([x, y]) => `L${x!.toFixed(1)},${y!.toFixed(1)}`).join(" ") +
+    ` L${W},${H} Z`;
+
+  const arrivals = [
+    { name: "Mustafa Bello", seat: "Table 7", at: "4:15 PM" },
+    { name: "Zainab Bello", seat: "Table 7", at: "4:20 PM" },
+    { name: "Aisha Ibrahim", seat: "Table 12", at: "4:31 PM" },
+    { name: "Ibrahim Khan", seat: "Table 3", at: "4:35 PM" },
+  ];
+
+  const NAV = [
+    "Dashboard", "Events", "Guests", "Invitations", "RSVPs",
+    "Tables & Seating", "QR Passes", "Check-in", "Reports", "Settings",
+  ];
+
+  const STATS = [
+    { k: "Total guests", v: "682", n: "240 households" },
+    { k: "RSVP confirmed", v: "412", n: "60.4% of total" },
+    { k: "Checked in", v: "245", n: "35.9% of total" },
+    { k: "Tables occupied", v: "90%", n: "12 of 12 tables" },
+  ];
+
+  return (
+    <div className="shot" aria-hidden="true">
+      <div className="shot-app">
+        <div className="shot-side">
+          <div className="shot-brandrow">
+            <span className="shot-mark">EF</span>
+            <span className="shot-wordmark serif">EventFlow</span>
+          </div>
+          {NAV.map((l, i) => (
+            <div className={`shot-nav${i === 0 ? " on" : ""}`} key={l}>
+              <span className="shot-dot" />
+              {l}
+            </div>
+          ))}
+        </div>
+
+        <div className="shot-main">
+          <div className="shot-top">
+            <div>
+              <strong>Dashboard</strong>
+              <small>Welcome back, Ukashah — here is what is happening.</small>
+            </div>
+            <div className="shot-me">
+              <span className="shot-avatar">US</span>
+              <span>
+                <b>Ukashah Sahabi</b>
+                <i>Organiser</i>
+              </span>
+            </div>
+          </div>
+
+          <div className="shot-stats">
+            {STATS.map((c) => (
+              <div className="shot-stat" key={c.k}>
+                <small>{c.k}</small>
+                <b>{c.v}</b>
+                <i>{c.n}</i>
+              </div>
+            ))}
+          </div>
+
+          <div className="shot-lower">
+            <div className="shot-chart">
+              <div className="shot-chart-head">
+                <strong>Check-in activity</strong>
+                <span className="shot-chip">By half hour</span>
+              </div>
+              <svg
+                viewBox={`0 0 ${W} ${H}`}
+                preserveAspectRatio="none"
+                className="shot-svg"
+              >
+                <path className="shot-area" d={area} />
+                <polyline className="shot-line" points={line} />
+              </svg>
+              <div className="shot-axis">
+                <span>2 PM</span>
+                <span>4 PM</span>
+                <span>6 PM</span>
+                <span>8 PM</span>
+              </div>
+            </div>
+
+            <div className="shot-feed">
+              <strong>Recent check-ins</strong>
+              {arrivals.map((a) => (
+                <div className="shot-arrival" key={a.name}>
+                  <span className="shot-avatar sm">
+                    {a.name.split(" ").map((w) => w[0]).join("")}
+                  </span>
+                  <span>
+                    <b>{a.name}</b>
+                    <i>
+                      {a.seat} · {a.at}
+                    </i>
+                  </span>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shot-tick"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="m8.5 12 2.5 2.5 4.5-5" />
+                  </svg>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* The guest's own pass, overlapping the dashboard as the mockup has it. */}
+      <div className="shot-phone">
+        <div className="shot-phone-in">
+          <div className="shot-phone-bar">Your QR pass</div>
+          <div className="shot-pass">
+            <small>Ahmed &amp; Aisha&rsquo;s</small>
+            <b className="serif">24 Aug 2026</b>
+            <span className="shot-qr">
+              <QrPattern />
+            </span>
+            <b>Mustafa Bello</b>
+            <small>Table 7 · Admits 4</small>
+            <span className="shot-badge">Confirmed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A QR-shaped pattern: three finder squares and a deterministic body.
+ *
+ * Deliberately not a real code. A scannable QR on a public marketing page
+ * is an invitation to point a phone at it, and whatever it resolved to
+ * would be either a dead link or somebody's actual pass.
+ */
+function QrPattern() {
+  const N = 21;
+  const cells: React.ReactElement[] = [];
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const inFinder =
+        (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
+      let on = false;
+      if (inFinder) {
+        // Local coordinates inside whichever 7x7 finder this is.
+        const fx = x > 13 ? x - 14 : x;
+        const fy = y > 13 ? y - 14 : y;
+        const edge = fx === 0 || fx === 6 || fy === 0 || fy === 6;
+        const core = fx >= 2 && fx <= 4 && fy >= 2 && fy <= 4;
+        on = edge || core;
+      } else {
+        on = (x * 7 + y * 13 + ((x * y) % 5)) % 3 === 0;
+      }
+      if (on) {
+        cells.push(<rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" />);
+      }
+    }
+  }
+  return (
+    <svg viewBox="0 0 21 21" shapeRendering="crispEdges">
+      {cells}
+    </svg>
+  );
+}
+
 export default function Home() {
   return (
     <div className={`mkt ${cormorant.variable} ${inter.variable}`}>
       <nav className="nav">
         <div className="wrap">
           <Link className="brand" href="/">
-            <div className="m">◈</div>
-            <span>Working name</span>
+            <Brand tone="light" size="sm" />
           </Link>
           <div className="sp" />
-          <a className="lnk hideS" href="#how">
-            How it works
+          {/* The mockup's Features / Solutions / Resources dropdowns want
+              pages that do not exist. These go to the sections that do —
+              a menu that opens onto nothing is worse than a short menu. */}
+          <a className="lnk hideS" href="#features">Features</a>
+          <a className="lnk hideS" href="#how">How it works</a>
+          <a className="lnk hideS" href="#price">Pricing</a>
+          <a className="lnk hideS" href="#inst">For organisations</a>
+          <Link className="lnk" href="/login">Log in</Link>
+          {/* Where the mockup has "Book a Demo". There is no booking
+              system and no recorded demo, so this opens a real
+              conversation instead of pretending to schedule one. */}
+          <a className="btn ghost-g hideS" href="mailto:hello@gtfd.ng?subject=EventFlow%20%E2%80%94%20can%20we%20talk%3F">
+            Talk to us
           </a>
-          <a className="lnk hideS" href="#price">
-            Pricing
-          </a>
-          <a className="lnk hideS" href="#inst">
-            For organisations
-          </a>
-          <Link className="lnk" href="/login">
-            Log in
-          </Link>
-          <Link className="btn pri" href="/login">
-            Create your event
-          </Link>
+          <Link className="btn pri" href="/signup">Get started free</Link>
         </div>
       </nav>
 
       {/* ================= HERO ================= */}
-      <header className="hero">
-        <div className="wrap">
-          <div className="eyebrow">For Nigerian weddings</div>
-          <h1 className="serif">
-            Everyone you invited.<em>Nobody you didn&rsquo;t.</em>
-          </h1>
-          <p className="lead">
-            Send your invitations on WhatsApp, let each family reply, and check
-            every guest in at the gate with a scan.
-          </p>
-          <div className="cta">
-            <Link className="btn ivory lg" href="/login">
-              Create your event free
-            </Link>
-            <a className="btn outline-i lg" href="#how">
-              See how it works
-            </a>
+      <header className="hero2">
+        <div className="wrap hero2-grid">
+          <div className="hero2-copy">
+            <span className="pill-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3l1.9 4.6L19 9.2l-3.6 3.4.8 5-4.2-2.4L7.8 17.6l.8-5L5 9.2l5.1-1.6z" />
+              </svg>
+              All-in-one event management platform
+            </span>
+
+            <h1 className="serif hero2-h1">
+              Plan. Manage. Perfect
+              <span className="hero2-accent">
+                Every Event.
+                {/* The hand-drawn underline from the mockup. */}
+                <svg className="swoosh" viewBox="0 0 300 14" preserveAspectRatio="none" aria-hidden="true">
+                  <path d="M2 9c48-6 108-8 158-6 42 2 82 5 138 2" />
+                </svg>
+              </span>
+            </h1>
+
+            <p className="lead">
+              From invitations to check-ins and seating, EventFlow helps you
+              manage every detail so you can focus on the day itself.
+            </p>
+
+            <div className="cta">
+              <Link className="btn pri lg" href="/signup">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 8h18M7 3v4m10-4v4M4 5h16v16H4z" />
+                </svg>
+                Create your first event
+              </Link>
+              <a className="btn outline lg" href="#how">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" /><path d="M10 8.5l6 3.5-6 3.5z" />
+                </svg>
+                See how it works
+              </a>
+            </div>
+
+            {/*
+              The mockup puts "Trusted by 5,000+ event organizers worldwide"
+              here, over four faces and five gold stars, and a wall of six
+              named client logos below the fold.
+
+              None of it is true. There are no customers yet, no reviews to
+              average into stars, and those six companies are not ours —
+              they are a designer's placeholder text. A page that invents
+              them is lying to the one person it most needs to trust it, and
+              the first real customer who finds out is the one who tells
+              everybody.
+
+              So the same slot carries the things that ARE true, which are
+              not nothing: the price, and the fact that the gate works with
+              no signal at all.
+            */}
+            <ul className="hero2-proof">
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.5 2.5 4.5-5" />
+                </svg>
+                First 150 guests free
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.5 2.5 4.5-5" />
+                </svg>
+                No card needed
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.5 2.5 4.5-5" />
+                </svg>
+                The gate works with no signal
+              </li>
+            </ul>
           </div>
-          <p className="fine">Your first 150 guests are free · No card needed</p>
+
+          <ProductShot />
         </div>
       </header>
+
+      {/* ================= FEATURE STRIP ================= */}
+      <section id="features" className="featstrip">
+        <div className="wrap">
+          <div className="featgrid">
+            {FEATURES.map((f) => (
+              <div className="featcard" key={f.title}>
+                <span className="featicon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
+                    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d={f.icon} />
+                  </svg>
+                </span>
+                <strong>{f.title}</strong>
+                <p>{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ================= PROBLEM ================= */}
       <section>
@@ -544,8 +876,7 @@ gtfd.ng/a9k2mv`}
           <div className="fgrid">
             <div style={{ maxWidth: 250 }}>
               <Link className="brand" href="/">
-                <div className="m">◈</div>
-                <span>Working name</span>
+                <Brand tone="light" size="sm" />
               </Link>
               <p className="fabout">
                 Guest lists, invitations and entry, for Nigerian weddings and

@@ -75,7 +75,7 @@ re-triggers the "Allow USB debugging?" prompt on the handset.
 ### Tests
 
 ```bash
-npm test --workspace api            # 348
+npm test --workspace api            # 357
 npm test --workspace checkin-core   # 40
 npm test --workspace web            # 3  (the QR decoder, pinned)
 cd apps/scanner && flutter test     # 89
@@ -119,6 +119,7 @@ Both the web app and the Flutter scanner talk to the **one** backend,
 | Web scanner | `POST /scanner/legs/:id/scan` (server decides) · `GET /scanner/legs/:id/guests` · `POST /scanner/legs/:id/walk-ins` |
 | Live | `GET /legs/:id/attendance` · `GET /legs/:id/live` · `GET /legs/:id/stream` (SSE) |
 | Reports | `GET /events/:id/report` (+ `?format=csv`) |
+| Platform admin | `GET /admin/overview` — aggregates only; app_admin holds **no permission on guest data** (019) |
 | Money | `GET /events/:id/billing` (plan, usage, **payment history**) · `POST /events/:id/checkout` · `POST /webhooks/paystack` |
 | Guest | `GET /public/invitations/:token` · `POST /public/invitations/:token/rsvp` |
 
@@ -138,6 +139,21 @@ the web scanner
 ---
 
 ## 3. Decisions already made — don't re-litigate
+
+- **The platform admin sees the business, never a guest list.** A super
+  admin is the first thing that deliberately steps outside RLS, so the step
+  is bounded at the database rather than in the queries: `app_admin`
+  (migration 019) is granted SELECT on workspaces, events, event_legs,
+  payments and named columns of users — and **nothing at all** on
+  invitations, invitation_legs, passes, check_in_events or seating_tables.
+  A query that reaches for a wedding fails; it does not return one. Guest
+  numbers come from `admin_event_size()`, a SECURITY DEFINER function that
+  counts without reading. The role is read-only, so an administrator cannot
+  alter a customer's row either. `admin.test.ts` asserts each of those
+  refusals — they are the point of the feature, not a side effect.
+  Support screens that must show a real guest list would be a separate,
+  explicit grant, and should arrive with the audit log that the sidebar
+  already has a place for.
 
 - **A phone number is read the way it is written, everywhere.** `0803…`,
   `803…`, `234803…` and `+234…` all reach the same E.164 row, through one
