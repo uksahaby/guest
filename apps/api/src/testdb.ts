@@ -24,7 +24,7 @@ process.env.JWT_SECRET ??= "test-secret";
 // the app connections in a test run pointing at a real database while the
 // admin connection stayed local. That is a very quiet way to write test
 // rows into production.
-for (const role of ["app_rw", "app_usher", "app_public", "app_verify", "app_billing"]) {
+for (const role of ["app_rw", "app_usher", "app_public", "app_verify", "app_billing", "app_admin"]) {
   process.env[`DATABASE_URL_${role.toUpperCase()}`] =
     `postgres://${role}:${role}_dev_only@localhost:5432/${TEST_DB}`;
 }

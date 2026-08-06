@@ -11,7 +11,9 @@ const inter = Inter({
   variable: "--font-sans",
 });
 
-export const metadata = { title: "gtfd.ng" };
+// Inherits the root title. Setting it here would template into
+// "EventFlow — EventFlow".
+export const metadata = { title: { absolute: "EventFlow" } };
 
 export default async function AppLayout({
   children,
@@ -28,7 +30,11 @@ export default async function AppLayout({
   // Who is signed in, and whether anything is due. Both belong to the top
   // bar, which every page inherits, so they are fetched once here.
   const { data: me } = await api<{
-    user: { full_name: string | null; has_avatar: boolean };
+    user: {
+      full_name: string | null;
+      has_avatar: boolean;
+      is_platform_admin?: boolean;
+    };
   }>("/me");
 
   const soonest =
@@ -57,6 +63,7 @@ export default async function AppLayout({
             hasAvatar={Boolean(me.user?.has_avatar)}
             dueNow={0}
             eventId={soonest?.id ?? null}
+            isPlatformAdmin={Boolean(me.user?.is_platform_admin)}
           />
           <main className="main">{children}</main>
         </div>

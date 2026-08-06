@@ -450,7 +450,7 @@ export async function authRoutes(
 
       const user = await asAnon(async (db) => {
         const [row] = await db`
-          select id, full_name, phone, email, password_hash
+          select id, full_name, phone, email, password_hash, is_platform_admin
           from users where phone = ${phone}`;
         // Hash even when there is no such user, so the response time does
         // not say which numbers have accounts.
@@ -482,6 +482,10 @@ export async function authRoutes(
           full_name: user.full_name,
           phone: user.phone,
           email: user.email,
+          // So the sign-in screen's Admin tab can send them to the right
+          // place, and say so when it is the wrong door. Not a permission:
+          // /admin checks the flag itself on every request.
+          is_platform_admin: user.is_platform_admin === true,
         },
       };
     },
@@ -601,8 +605,12 @@ export async function authRoutes(
       // avatar is not sent here — it is bytes, and a JSON body is the
       // wrong place for them. Callers ask GET /me/avatar for the image and
       // use this flag to decide whether to bother.
+      // is_platform_admin is here so the app can SHOW the way in. It is not
+      // what grants anything — /admin/* checks the flag itself on every
+      // request (admin.ts), because a client that decides its own
+      // permissions has none.
       const [user] = await db`
-        select id, full_name, phone, email,
+        select id, full_name, phone, email, is_platform_admin,
                (avatar is not null) as has_avatar
         from users where id = ${userId}`;
       // RLS narrows this to workspaces the caller owns or belongs to; the

@@ -64,6 +64,25 @@ export const sqlVerify = postgres(roleUrl("app_verify", "app_verify_dev_only"), 
  */
 export const sqlBilling = postgres(roleUrl("app_billing", "app_billing_dev_only"), opts);
 
+/**
+ * The platform administrator's view of the business (db/migrations/019).
+ *
+ * Read-only, and deliberately blind to guest data: no grant exists on
+ * invitations, passes, check_in_events or seating_tables, so a query that
+ * reaches for a guest list fails rather than returning one. Sizes come
+ * back through admin_event_size(), which counts without reading.
+ */
+export const sqlPlatform = postgres(roleUrl("app_admin", "app_admin_dev_only"), opts);
+
+/**
+ * No context to set — this role sees every row by policy. It is a
+ * transaction for consistency of the numbers on one dashboard, not for
+ * scoping.
+ */
+export async function asPlatform<T>(fn: (db: Db) => Promise<T>): Promise<T> {
+  return sqlPlatform.begin(async (tx) => fn(tx as Db)) as Promise<T>;
+}
+
 /** The handle a route works with: a transaction carrying request context. */
 export type Db = postgres.TransactionSql<Record<string, never>>;
 
@@ -137,5 +156,6 @@ export async function closeDb(): Promise<void> {
     sqlPublic.end(),
     sqlVerify.end(),
     sqlBilling.end(),
+    sqlPlatform.end(),
   ]);
 }

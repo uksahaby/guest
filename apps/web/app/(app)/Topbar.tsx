@@ -19,11 +19,14 @@ export function Topbar({
   hasAvatar,
   dueNow,
   eventId,
+  isPlatformAdmin,
 }: {
   name: string | null;
   hasAvatar: boolean;
   dueNow: number;
   eventId: string | null;
+  /** Shows the door. The API is what actually unlocks it. */
+  isPlatformAdmin?: boolean;
 }) {
   const first = (name ?? "").trim().split(/\s+/)[0] || "there";
   const initials = (name ?? "?")
@@ -76,6 +79,13 @@ export function Topbar({
             <strong>Hello, {first}</strong>
             <small>{name ?? ""}</small>
           </div>
+          {/* An administrator is an ordinary organiser with one extra
+              place to go, so this sits with the account links rather than
+              in the event sidebar. Absent entirely for everyone else —
+              there is no greyed-out version of it to notice. */}
+          {isPlatformAdmin && (
+            <Link href="/admin" className="admin-jump">Super admin</Link>
+          )}
           <Link href="/profile">Your profile</Link>
           <Link href="/events">Your events</Link>
           {eventId && <Link href={`/events/${eventId}/billing`}>Billing &amp; plan</Link>}

@@ -16,6 +16,7 @@ import { liveRoutes } from "./live.ts";
 import { settingsRoutes } from "./settings.ts";
 import { teamRoutes } from "./team.ts";
 import { webScanRoutes } from "./webscan.ts";
+import { adminRoutes } from "./admin.ts";
 import { dashboardRoutes } from "./dashboard.ts";
 import { rsvpRoutes } from "./rsvps.ts";
 import { imageRoutes } from "./images.ts";
@@ -153,6 +154,7 @@ export function buildServer(
   app.register(settingsRoutes);
   app.register(teamRoutes);
   app.register(webScanRoutes);
+  app.register(adminRoutes);
   app.register(dashboardRoutes);
   app.register(rsvpRoutes);
   app.register(imageRoutes);
